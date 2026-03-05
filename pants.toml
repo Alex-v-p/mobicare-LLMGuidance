@@ -1,0 +1,12 @@
+[GLOBAL]
+pants_version = "2.31.0"
+backend_packages = [
+  "pants.backend.python",
+  "pants.backend.python.lint.black",
+]
+
+[python]
+interpreter_constraints = ["==3.12.*"]
+
+[source]
+root_patterns = ["src", "services/*/src"]
