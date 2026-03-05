@@ -7,7 +7,7 @@ from shared.contracts.health import HealthReport
 
 router = APIRouter(tags=["health"])
 
-@router.get("/healths", response_model=HealthReport)
+@router.get("/health", response_model=HealthReport)
 async def health() -> HealthReport:
     """Single health endpoint.
 
