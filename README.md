@@ -13,4 +13,14 @@ wsl pants
 
 
 
-Protection test change.
+Health URLs
+
+API: http://localhost:8000/health
+
+Inference: http://localhost:8001/health
+
+Qdrant: http://localhost:6333
+
+MinIO console: http://localhost:9001
+
+Ollama: http://localhost:11434
