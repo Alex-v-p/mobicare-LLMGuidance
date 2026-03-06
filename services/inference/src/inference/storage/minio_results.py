@@ -43,13 +43,13 @@ class MinioResultStore:
         except Exception:
             pass
 
-    def build_object_key(self, request_id: str, completed_at_iso: str | None = None) -> str:
+    def build_object_key(self, job_id: str, completed_at_iso: str | None = None) -> str:
         completed_at = datetime.fromisoformat(completed_at_iso) if completed_at_iso else datetime.now(timezone.utc)
-        return f"jobs/{completed_at:%Y/%m/%d}/{request_id}.json"
+        return f"jobs/{completed_at:%Y/%m/%d}/{job_id}.json"
 
     def put_job_result(self, record: JobRecord) -> str:
         self.ensure_bucket()
-        object_key = self.build_object_key(record.request_id, record.completed_at)
+        object_key = self.build_object_key(record.job_id, record.completed_at)
         payload = json.dumps(record.model_dump(mode="json"), indent=2).encode("utf-8")
         self._client.put_object(
             self._bucket,

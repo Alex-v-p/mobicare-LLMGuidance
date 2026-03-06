@@ -29,8 +29,8 @@ class InferenceClient:
             response.raise_for_status()
             return JobAcceptedResponse.model_validate(response.json())
 
-    async def get_job_status(self, request_id: str) -> JobRecord:
+    async def get_job_status(self, job_id: str) -> JobRecord:
         async with create_async_client(timeout_s=self._timeout_s) as client:
-            response = await client.get(f"{self._base_url}/jobs/{request_id}")
+            response = await client.get(f"{self._base_url}/jobs/{job_id}")
             response.raise_for_status()
             return JobRecord.model_validate(response.json())

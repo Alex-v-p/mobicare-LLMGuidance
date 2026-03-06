@@ -16,10 +16,10 @@ async def generate_guidance(request: GuidanceRequest) -> ApiGuidanceResponse:
 @router.post("/guidance/jobs", response_model=JobAcceptedResponse, status_code=202)
 async def create_guidance_job(request: GuidanceRequest, http_request: Request) -> JobAcceptedResponse:
     accepted = await GuidanceService().submit_job(request)
-    accepted.status_url = str(http_request.url_for("get_guidance_job_status", request_id=accepted.request_id))
+    accepted.status_url = str(http_request.url_for("get_guidance_job_status", job_id=accepted.job_id))
     return accepted
 
 
-@router.get("/guidance/jobs/{request_id}", response_model=ApiGuidanceJobStatus)
-async def get_guidance_job_status(request_id: str) -> ApiGuidanceJobStatus:
-    return await GuidanceService().get_job_status(request_id)
+@router.get("/guidance/jobs/{job_id}", name="get_guidance_job_status", response_model=ApiGuidanceJobStatus)
+async def get_guidance_job_status(job_id: str) -> ApiGuidanceJobStatus:
+    return await GuidanceService().get_job_status(job_id)

@@ -21,21 +21,22 @@ async def create_job(request: InferenceRequest, http_request: Request) -> JobAcc
         await store.close()
 
     return JobAcceptedResponse(
+        job_id=record.job_id,
         request_id=request.request_id,
-        status_url=str(http_request.url_for("get_job_status", request_id=request.request_id)),
+        status_url=str(http_request.url_for("get_job_status", job_id=record.job_id)),
     )
 
 
-@router.get("/jobs/{request_id}", name="get_job_status", response_model=JobRecord)
-async def get_job_status(request_id: str) -> JobRecord:
+@router.get("/jobs/{job_id}", name="get_job_status", response_model=JobRecord)
+async def get_job_status(job_id: str) -> JobRecord:
     store = RedisJobStore()
     try:
-        record = await store.get(request_id)
+        record = await store.get(job_id)
     finally:
         await store.close()
 
     if record is None:
-        raise HTTPException(status_code=404, detail=f"Job {request_id} was not found")
+        raise HTTPException(status_code=404, detail=f"Job {job_id} was not found")
 
     if record.result is None and record.result_object_key:
         try:

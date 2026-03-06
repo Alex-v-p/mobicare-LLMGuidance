@@ -17,6 +17,7 @@ class CallbackNotifier:
     def _payload(self, record: JobRecord) -> Dict[str, Any]:
         result = record.result
         return {
+            "job_id": record.job_id,
             "request_id": record.request_id,
             "status": record.status,
             "result_object_key": record.result_object_key,
@@ -41,6 +42,7 @@ class CallbackNotifier:
 
         headers = dict(record.request.options.callback_headers)
         headers.setdefault("Content-Type", "application/json")
+        headers.setdefault("X-Job-ID", record.job_id)
         headers.setdefault("X-Request-ID", record.request_id)
 
         last_error: str | None = None

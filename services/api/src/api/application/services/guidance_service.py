@@ -39,13 +39,14 @@ class GuidanceService:
     async def submit_job(self, request: GuidanceRequest) -> JobAcceptedResponse:
         return await self._inference_client.submit_job(self._to_inference_request(request))
 
-    async def get_job_status(self, request_id: str) -> ApiGuidanceJobStatus:
-        record = await self._inference_client.get_job_status(request_id)
+    async def get_job_status(self, job_id: str) -> ApiGuidanceJobStatus:
+        record = await self._inference_client.get_job_status(job_id)
         return self._to_api_job_status(record)
 
     def _to_api_job_status(self, record: JobRecord) -> ApiGuidanceJobStatus:
         if record.result is None:
             return ApiGuidanceJobStatus(
+                job_id=record.job_id,
                 request_id=record.request_id,
                 status=record.status,
                 error=record.error,
@@ -53,6 +54,8 @@ class GuidanceService:
                 callback_attempts=record.callback_attempts,
                 callback_last_status=record.callback_last_status,
                 callback_last_error=record.callback_last_error,
+                worker_id=record.worker_id,
+                lease_expires_at=record.lease_expires_at,
                 created_at=record.created_at,
                 started_at=record.started_at,
                 completed_at=record.completed_at,
@@ -60,6 +63,7 @@ class GuidanceService:
             )
 
         return ApiGuidanceJobStatus(
+            job_id=record.job_id,
             request_id=record.request_id,
             status=record.status,
             answer=record.result.answer,
@@ -73,6 +77,8 @@ class GuidanceService:
             callback_attempts=record.callback_attempts,
             callback_last_status=record.callback_last_status,
             callback_last_error=record.callback_last_error,
+            worker_id=record.worker_id,
+            lease_expires_at=record.lease_expires_at,
             created_at=record.created_at,
             started_at=record.started_at,
             completed_at=record.completed_at,

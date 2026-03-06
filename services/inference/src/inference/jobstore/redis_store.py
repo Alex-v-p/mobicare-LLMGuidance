@@ -2,23 +2,37 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from redis.asyncio import Redis
+import redis.asyncio as redis
 
 from shared.contracts.inference import JobRecord, utc_now_iso
 
 
+def _parse_iso(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    return datetime.fromisoformat(value)
+
+
 class RedisJobStore:
-    def __init__(self, redis_url: str | None = None, queue_name: str | None = None, ttl_seconds: int | None = None) -> None:
+    def __init__(
+        self,
+        redis_url: str | None = None,
+        queue_name: str | None = None,
+        ttl_seconds: int | None = None,
+        lease_seconds: int | None = None,
+    ) -> None:
         self._redis_url = redis_url or os.getenv("REDIS_URL", "redis://redis:6379/0")
         self._queue_name = queue_name or os.getenv("REDIS_JOB_QUEUE", "guidance_jobs")
         self._ttl_seconds = ttl_seconds if ttl_seconds is not None else int(os.getenv("JOB_TTL_SECONDS", str(7 * 24 * 60 * 60)))
-        self._redis: Optional[Redis] = None
+        self._lease_seconds = lease_seconds if lease_seconds is not None else int(os.getenv("JOB_LEASE_SECONDS", "60"))
+        self._redis: Optional[redis.Redis] = None
 
-    async def _client(self) -> Redis:
+    async def _client(self) -> redis.Redis:
         if self._redis is None:
-            self._redis = Redis.from_url(self._redis_url, decode_responses=True)
+            self._redis = redis.Redis.from_url(self._redis_url, decode_responses=True)
         return self._redis
 
     async def close(self) -> None:
@@ -26,45 +40,79 @@ class RedisJobStore:
             await self._redis.aclose()
             self._redis = None
 
-    def _job_key(self, request_id: str) -> str:
-        return f"job:{request_id}"
+    def _job_key(self, job_id: str) -> str:
+        return f"job:{job_id}"
+
+    def _lease_expiry_iso(self) -> str:
+        return (datetime.now(timezone.utc) + timedelta(seconds=self._lease_seconds)).isoformat()
 
     async def create(self, record: JobRecord) -> None:
-        redis = await self._client()
-        key = self._job_key(record.request_id)
-        created = await redis.set(key, record.model_dump_json(), ex=self._ttl_seconds, nx=True)
+        client = await self._client()
+        key = self._job_key(record.job_id)
+        created = await client.set(key, record.model_dump_json(), ex=self._ttl_seconds, nx=True)
         if not created:
-            raise FileExistsError(f"Job {record.request_id} already exists")
-        await redis.rpush(self._queue_name, record.request_id)
+            raise FileExistsError(f"Job {record.job_id} already exists")
+        await client.rpush(self._queue_name, record.job_id)
 
-    async def get(self, request_id: str) -> Optional[JobRecord]:
-        redis = await self._client()
-        payload = await redis.get(self._job_key(request_id))
+    async def get(self, job_id: str) -> Optional[JobRecord]:
+        client = await self._client()
+        payload = await client.get(self._job_key(job_id))
         if payload is None:
             return None
         return JobRecord.model_validate_json(payload)
 
     async def update(self, record: JobRecord) -> None:
-        redis = await self._client()
+        client = await self._client()
         record.updated_at = utc_now_iso()
-        await redis.set(self._job_key(record.request_id), record.model_dump_json(), ex=self._ttl_seconds)
+        await client.set(self._job_key(record.job_id), record.model_dump_json(), ex=self._ttl_seconds)
 
-    async def claim_next(self, timeout_s: int = 5) -> Optional[JobRecord]:
-        redis = await self._client()
-        popped = await redis.blpop(self._queue_name, timeout=timeout_s)
+    async def heartbeat(self, job_id: str, worker_id: str) -> bool:
+        record = await self.get(job_id)
+        if record is None or record.status != "running" or record.worker_id != worker_id:
+            return False
+        record.lease_expires_at = self._lease_expiry_iso()
+        await self.update(record)
+        return True
+
+    async def requeue_stale_running_jobs(self) -> int:
+        client = await self._client()
+        count = 0
+        async for key in client.scan_iter(match="job:*"):
+            payload = await client.get(key)
+            if payload is None:
+                continue
+            record = JobRecord.model_validate_json(payload)
+            if record.status != "running":
+                continue
+            lease_expires_at = _parse_iso(record.lease_expires_at)
+            if lease_expires_at is None or lease_expires_at > datetime.now(timezone.utc):
+                continue
+            record.status = "queued"
+            record.worker_id = None
+            record.lease_expires_at = None
+            record.error = "Worker lease expired; job re-queued automatically."
+            await self.update(record)
+            await client.rpush(self._queue_name, record.job_id)
+            count += 1
+        return count
+
+    async def claim_next(self, worker_id: str, timeout_s: int = 5) -> Optional[JobRecord]:
+        client = await self._client()
+        await self.requeue_stale_running_jobs()
+        popped = await client.blpop(self._queue_name, timeout=timeout_s)
         if popped is None:
             return None
 
-        _queue, request_id = popped
-        record = await self.get(request_id)
+        _queue, job_id = popped
+        record = await self.get(job_id)
         if record is None:
             return None
-
         if record.status != "queued":
             return record
 
         record.status = "running"
+        record.worker_id = worker_id
         record.started_at = record.started_at or utc_now_iso()
-        record.updated_at = utc_now_iso()
+        record.lease_expires_at = self._lease_expiry_iso()
         await self.update(record)
         return record
