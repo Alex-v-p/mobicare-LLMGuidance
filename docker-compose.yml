@@ -55,6 +55,7 @@ services:
       - ollama
       - redis
       - minio
+    # restart: unless-stopped # Uncomment this line when running in final version
 
   redis:
     image: redis:7-alpine
