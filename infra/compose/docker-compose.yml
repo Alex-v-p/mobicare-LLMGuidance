@@ -21,6 +21,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
       interval: 10s
@@ -38,6 +40,11 @@ services:
       OLLAMA_URL: "http://ollama:11434"
       QDRANT_URL: "http://qdrant:6333"
       MINIO_ENDPOINT: "http://minio:9000"
+      REDIS_URL: "redis://redis:6379/0"
+      REDIS_JOB_QUEUE: "guidance_jobs"
+      JOB_TTL_SECONDS: "604800"
+      MINIO_RESULTS_BUCKET: "guidance-job-results"
+      MINIO_JOB_RETENTION_DAYS: "7"
     ports:
       - "8001:8001"
     depends_on:
@@ -47,11 +54,49 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8001/health"]
       interval: 10s
       timeout: 3s
       retries: 10
+
+  inference-worker:
+    build:
+      context: .
+      dockerfile: deploy/inference.worker.Dockerfile
+    env_file:
+      - .env
+    environment:
+      OLLAMA_URL: "http://ollama:11434"
+      MINIO_ENDPOINT: "http://minio:9000"
+      REDIS_URL: "redis://redis:6379/0"
+      REDIS_JOB_QUEUE: "guidance_jobs"
+      JOB_TTL_SECONDS: "604800"
+      MINIO_RESULTS_BUCKET: "guidance-job-results"
+      MINIO_JOB_RETENTION_DAYS: "7"
+      CALLBACK_TIMEOUT_S: "10"
+      CALLBACK_MAX_ATTEMPTS: "3"
+    depends_on:
+      inference:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
 
   ollama:
     image: ollama/ollama:latest
@@ -59,11 +104,6 @@ services:
       - ollama:/root/.ollama
     ports:
       - "11434:11434"
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - capabilities: [gpu]
     healthcheck:
       test: ["CMD", "sh", "-c", "wget -qO- http://localhost:11434/api/tags >/dev/null 2>&1 || exit 1"]
       interval: 15s

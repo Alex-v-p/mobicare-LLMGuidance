@@ -19,7 +19,9 @@ RUN pip install --no-cache-dir \
     uvicorn[standard]==0.30.6 \
     httpx==0.27.2 \
     pydantic==2.9.2 \
-    pydantic-settings==2.5.2
+    pydantic-settings==2.5.2 \
+    "redis>=5,<6" \
+    "minio>=7,<8"
 
 EXPOSE 8000
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
