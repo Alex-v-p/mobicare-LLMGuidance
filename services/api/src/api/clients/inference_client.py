@@ -13,13 +13,19 @@ class InferenceClient:
 
     async def generate(self, payload: InferenceRequest) -> InferenceResponse:
         async with create_async_client(timeout_s=self._timeout_s) as client:
-            response = await client.post(f"{self._base_url}/generate", json=payload.model_dump())
+            response = await client.post(
+                f"{self._base_url}/generate",
+                json=payload.model_dump(mode="json")
+            )
             response.raise_for_status()
             return InferenceResponse.model_validate(response.json())
 
     async def submit_job(self, payload: InferenceRequest) -> JobAcceptedResponse:
         async with create_async_client(timeout_s=self._timeout_s) as client:
-            response = await client.post(f"{self._base_url}/jobs", json=payload.model_dump())
+            response = await client.post(
+                f"{self._base_url}/jobs",
+                json=payload.model_dump(mode="json")
+            )
             response.raise_for_status()
             return JobAcceptedResponse.model_validate(response.json())
 

@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Literal, Optional
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, HttpUrl
 
 
 class PatientVariables(BaseModel):
@@ -15,6 +15,8 @@ class GenerationOptions(BaseModel):
     use_fake_rag: bool = True
     temperature: float = 0.2
     max_tokens: int = 256
+    callback_url: Optional[HttpUrl] = None
+    callback_headers: Dict[str, str] = Field(default_factory=dict)
 
 
 class GuidanceRequest(BaseModel):
@@ -90,6 +92,10 @@ class JobRecord(BaseModel):
     request: InferenceRequest
     result: Optional[InferenceResponse] = None
     error: Optional[str] = None
+    result_object_key: Optional[str] = None
+    callback_attempts: int = 0
+    callback_last_status: Optional[str] = None
+    callback_last_error: Optional[str] = None
     created_at: str = Field(default_factory=utc_now_iso)
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
@@ -106,6 +112,10 @@ class ApiGuidanceJobStatus(BaseModel):
     warnings: List[str] = Field(default_factory=list)
     metadata: Dict[str, Any] = Field(default_factory=dict)
     error: Optional[str] = None
+    result_object_key: Optional[str] = None
+    callback_attempts: int = 0
+    callback_last_status: Optional[str] = None
+    callback_last_error: Optional[str] = None
     created_at: Optional[str] = None
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
