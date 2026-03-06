@@ -11,6 +11,7 @@ services:
       QDRANT_URL: "${QDRANT_URL:-http://qdrant:${QDRANT_PORT:-6333}}"
       MINIO_ENDPOINT: "${MINIO_ENDPOINT:-http://minio:${MINIO_PORT:-9000}}"
       OLLAMA_URL: "${OLLAMA_URL:-http://ollama:${OLLAMA_PORT:-11434}}"
+      REDIS_URL: "${REDIS_URL:-redis://redis:6379/0}"
     ports:
       - "${API_PORT:-8000}:8000"
 
