@@ -12,7 +12,8 @@ ENV PYTHONUNBUFFERED=1 \
 RUN pip install --no-cache-dir \
     httpx==0.27.2 \
     pydantic==2.9.2 \
-    pydantic-settings==2.5.2
+    pydantic-settings==2.5.2 \
+    "redis>=5,<6" \
+    "minio>=7,<8"
 
-# Placeholder: worker implementation comes later.
-CMD ["python", "-c", "print('inference worker container placeholder')"]
+CMD ["python", "-m", "inference.worker.runtime.main"]
