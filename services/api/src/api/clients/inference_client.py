@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 
 from shared.clients.http import create_async_client
-from shared.contracts.inference import InferenceRequest, InferenceResponse
+from shared.contracts.inference import InferenceRequest, InferenceResponse, JobAcceptedResponse, JobRecord
 
 
 class InferenceClient:
@@ -16,3 +16,15 @@ class InferenceClient:
             response = await client.post(f"{self._base_url}/generate", json=payload.model_dump())
             response.raise_for_status()
             return InferenceResponse.model_validate(response.json())
+
+    async def submit_job(self, payload: InferenceRequest) -> JobAcceptedResponse:
+        async with create_async_client(timeout_s=self._timeout_s) as client:
+            response = await client.post(f"{self._base_url}/jobs", json=payload.model_dump())
+            response.raise_for_status()
+            return JobAcceptedResponse.model_validate(response.json())
+
+    async def get_job_status(self, request_id: str) -> JobRecord:
+        async with create_async_client(timeout_s=self._timeout_s) as client:
+            response = await client.get(f"{self._base_url}/jobs/{request_id}")
+            response.raise_for_status()
+            return JobRecord.model_validate(response.json())

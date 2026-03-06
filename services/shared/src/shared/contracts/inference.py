@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Literal, Optional
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
@@ -68,3 +69,44 @@ class OllamaGenerateResponse(BaseModel):
     load_duration: Optional[int] = None
     prompt_eval_count: Optional[int] = None
     eval_count: Optional[int] = None
+
+
+JobState = Literal["queued", "running", "completed", "failed", "not_found"]
+
+
+def utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+class JobAcceptedResponse(BaseModel):
+    request_id: str
+    status: Literal["queued"] = "queued"
+    status_url: str
+
+
+class JobRecord(BaseModel):
+    request_id: str
+    status: JobState
+    request: InferenceRequest
+    result: Optional[InferenceResponse] = None
+    error: Optional[str] = None
+    created_at: str = Field(default_factory=utc_now_iso)
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    updated_at: str = Field(default_factory=utc_now_iso)
+
+
+class ApiGuidanceJobStatus(BaseModel):
+    request_id: str
+    status: JobState
+    answer: Optional[str] = None
+    model: Optional[str] = None
+    rag: List[RetrievedContext] = Field(default_factory=list)
+    used_variables: Dict[str, Any] = Field(default_factory=dict)
+    warnings: List[str] = Field(default_factory=list)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    error: Optional[str] = None
+    created_at: Optional[str] = None
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    updated_at: Optional[str] = None

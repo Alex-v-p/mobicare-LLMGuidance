@@ -14,5 +14,4 @@ RUN pip install --no-cache-dir \
     pydantic==2.9.2 \
     pydantic-settings==2.5.2
 
-# Placeholder: worker implementation comes later.
-CMD ["python", "-c", "print('inference worker container placeholder')"]
+CMD ["python", "-m", "inference.worker.runtime.main"]

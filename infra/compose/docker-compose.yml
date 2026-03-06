@@ -38,6 +38,7 @@ services:
       OLLAMA_URL: "http://ollama:11434"
       QDRANT_URL: "http://qdrant:6333"
       MINIO_ENDPOINT: "http://minio:9000"
+      JOBS_DIR: "/data/jobs"
     ports:
       - "8001:8001"
     depends_on:
@@ -52,6 +53,22 @@ services:
       interval: 10s
       timeout: 3s
       retries: 10
+
+  inference-worker:
+    build:
+      context: .
+      dockerfile: deploy/inference.worker.Dockerfile
+    env_file:
+      - .env
+    environment:
+      OLLAMA_URL: "${OLLAMA_URL:-http://ollama:${OLLAMA_PORT:-11434}}"
+      JOBS_DIR: "${JOBS_DIR:-/data/jobs}"
+      WORKER_POLL_INTERVAL_S: "${WORKER_POLL_INTERVAL_S:-1.0}"
+    depends_on:
+      - inference
+      - ollama
+    volumes:
+      - inference_jobs:/data/jobs
 
   ollama:
     image: ollama/ollama:latest
@@ -104,3 +121,4 @@ volumes:
   qdrant:
   minio:
   ollama:
+  inference_jobs:
