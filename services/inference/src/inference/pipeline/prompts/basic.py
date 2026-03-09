@@ -17,7 +17,7 @@ def build_prompt(question: str, patient_variables: Dict[str, Any], retrieved_con
     return f"""
 You are a clinical guidance prototype for internal testing only.
 You are NOT making a final medical decision.
-Use the provided fake retrieved context and patient variables.
+Use the provided retrieved context and patient variables.
 Be cautious, concise, and explicit about uncertainty.
 Do not invent values that are missing.
 

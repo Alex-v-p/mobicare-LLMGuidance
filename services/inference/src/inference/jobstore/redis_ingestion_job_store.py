@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import json
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import redis.asyncio as redis
 
-from shared.contracts.inference import JobRecord, utc_now_iso
+from shared.contracts.ingestion import IngestionJobRecord, utc_now_iso
 
 
 def _parse_iso(value: str | None) -> datetime | None:
@@ -16,7 +15,7 @@ def _parse_iso(value: str | None) -> datetime | None:
     return datetime.fromisoformat(value)
 
 
-class RedisJobStore:
+class RedisIngestionJobStore:
     def __init__(
         self,
         redis_url: str | None = None,
@@ -25,7 +24,7 @@ class RedisJobStore:
         lease_seconds: int | None = None,
     ) -> None:
         self._redis_url = redis_url or os.getenv("REDIS_URL", "redis://redis:6379/0")
-        self._queue_name = queue_name or os.getenv("REDIS_JOB_QUEUE", "guidance_jobs")
+        self._queue_name = queue_name or os.getenv("REDIS_INGESTION_JOB_QUEUE", "ingestion_jobs")
         self._ttl_seconds = ttl_seconds if ttl_seconds is not None else int(os.getenv("JOB_TTL_SECONDS", str(7 * 24 * 60 * 60)))
         self._lease_seconds = lease_seconds if lease_seconds is not None else int(os.getenv("JOB_LEASE_SECONDS", "60"))
         self._redis: Optional[redis.Redis] = None
@@ -41,27 +40,27 @@ class RedisJobStore:
             self._redis = None
 
     def _job_key(self, job_id: str) -> str:
-        return f"job:{job_id}"
+        return f"ingestion_job:{job_id}"
 
     def _lease_expiry_iso(self) -> str:
         return (datetime.now(timezone.utc) + timedelta(seconds=self._lease_seconds)).isoformat()
 
-    async def create(self, record: JobRecord) -> None:
+    async def create(self, record: IngestionJobRecord) -> None:
         client = await self._client()
         key = self._job_key(record.job_id)
         created = await client.set(key, record.model_dump_json(), ex=self._ttl_seconds, nx=True)
         if not created:
-            raise FileExistsError(f"Job {record.job_id} already exists")
+            raise FileExistsError(f"Ingestion job {record.job_id} already exists")
         await client.rpush(self._queue_name, record.job_id)
 
-    async def get(self, job_id: str) -> Optional[JobRecord]:
+    async def get(self, job_id: str) -> Optional[IngestionJobRecord]:
         client = await self._client()
         payload = await client.get(self._job_key(job_id))
         if payload is None:
             return None
-        return JobRecord.model_validate_json(payload)
+        return IngestionJobRecord.model_validate_json(payload)
 
-    async def update(self, record: JobRecord) -> None:
+    async def update(self, record: IngestionJobRecord) -> None:
         client = await self._client()
         record.updated_at = utc_now_iso()
         await client.set(self._job_key(record.job_id), record.model_dump_json(), ex=self._ttl_seconds)
@@ -77,11 +76,11 @@ class RedisJobStore:
     async def requeue_stale_running_jobs(self) -> int:
         client = await self._client()
         count = 0
-        async for key in client.scan_iter(match="job:*"):
+        async for key in client.scan_iter(match="ingestion_job:*"):
             payload = await client.get(key)
             if payload is None:
                 continue
-            record = JobRecord.model_validate_json(payload)
+            record = IngestionJobRecord.model_validate_json(payload)
             if record.status != "running":
                 continue
             lease_expires_at = _parse_iso(record.lease_expires_at)
@@ -96,7 +95,7 @@ class RedisJobStore:
             count += 1
         return count
 
-    async def claim_next(self, worker_id: str, timeout_s: int = 5) -> Optional[JobRecord]:
+    async def claim_next(self, worker_id: str, timeout_s: int = 5) -> Optional[IngestionJobRecord]:
         client = await self._client()
         await self.requeue_stale_running_jobs()
         popped = await client.blpop(self._queue_name, timeout=timeout_s)

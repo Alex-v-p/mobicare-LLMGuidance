@@ -20,9 +20,11 @@ class PatientVariables(BaseModel):
 
 
 class GenerationOptions(BaseModel):
-    use_fake_rag: bool = True
+    use_retrieval: bool = True
+    top_k: int = 3
     temperature: float = 0.2
     max_tokens: int = 256
+    use_example_response: bool = False
     callback_url: Optional[HttpUrl] = None
     callback_headers: Dict[str, str] = Field(default_factory=dict)
 
