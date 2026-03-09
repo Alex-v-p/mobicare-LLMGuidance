@@ -31,7 +31,11 @@ class OllamaEmbeddingsClient:
                 legacy.raise_for_status()
                 payload = legacy.json()
                 return payload["embedding"]
-            response.raise_for_status()
+            if response.is_error:
+                print("OLLAMA EMBED ERROR STATUS:", response.status_code)
+                print("OLLAMA EMBED ERROR BODY:", response.text)
+                response.raise_for_status()
+
             payload = response.json()
             return payload["embeddings"][0]
 

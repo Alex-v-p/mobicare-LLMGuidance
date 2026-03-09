@@ -10,6 +10,7 @@ from shared.contracts.inference import (
     JobRecord,
 )
 from shared.contracts.ingestion import (
+    IngestDocumentsRequest,
     IngestionJobAcceptedResponse,
     IngestionJobRecord,
 )
@@ -70,9 +71,9 @@ class InferenceClient:
                 raise InferenceClientError(response.status_code, _extract_detail(response))
             return JobRecord.model_validate(response.json())
 
-    async def submit_ingestion_job(self) -> IngestionJobAcceptedResponse:
+    async def submit_ingestion_job(self, payload: IngestDocumentsRequest) -> IngestionJobAcceptedResponse:
         async with create_async_client(timeout_s=self._timeout_s) as client:
-            response = await client.post(f"{self._base_url}/ingestion/jobs", json={})
+            response = await client.post(f"{self._base_url}/ingestion/jobs", json=payload.model_dump(mode="json"))
             if response.is_error:
                 raise InferenceClientError(response.status_code, _extract_detail(response))
             return IngestionJobAcceptedResponse.model_validate(response.json())

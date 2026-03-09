@@ -6,6 +6,7 @@ from inference.indexing.ingestion_service import IngestionService
 from inference.jobstore.redis_ingestion_job_store import RedisIngestionJobStore
 from inference.storage.minio_ingestion_job_results import MinioIngestionJobResultStore
 from shared.contracts.ingestion import (
+    IngestDocumentsRequest,
     IngestionJobAcceptedResponse,
     IngestionJobRecord,
     IngestionResponse,
@@ -15,9 +16,9 @@ router = APIRouter(tags=["ingestion"])
 
 
 @router.post("/ingest", response_model=IngestionResponse)
-async def ingest_documents() -> IngestionResponse:
+async def ingest_documents(payload: IngestDocumentsRequest) -> IngestionResponse:
     service = IngestionService()
-    return await service.ingest()
+    return await service.ingest(payload)
 
 
 @router.post(
@@ -25,9 +26,12 @@ async def ingest_documents() -> IngestionResponse:
     response_model=IngestionJobAcceptedResponse,
     status_code=status.HTTP_202_ACCEPTED,
 )
-async def create_ingestion_job(http_request: Request) -> IngestionJobAcceptedResponse:
+async def create_ingestion_job(
+    http_request: Request,
+    payload: IngestDocumentsRequest,
+) -> IngestionJobAcceptedResponse:
     store = RedisIngestionJobStore()
-    record = IngestionJobRecord(status="queued")
+    record = IngestionJobRecord(status="queued", request=payload)
 
     try:
         await store.create(record)
