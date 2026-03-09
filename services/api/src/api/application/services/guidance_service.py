@@ -9,6 +9,7 @@ from shared.contracts.inference import (
     JobAcceptedResponse,
     JobRecord,
 )
+from shared.contracts.ingestion import IngestDocumentsRequest, IngestionResponse
 
 
 class GuidanceService:
@@ -35,6 +36,9 @@ class GuidanceService:
             warnings=inference_response.warnings,
             metadata=inference_response.metadata,
         )
+
+    async def ingest(self) -> IngestionResponse:
+        return await self._inference_client.ingest(IngestDocumentsRequest())
 
     async def submit_job(self, request: GuidanceRequest) -> JobAcceptedResponse:
         return await self._inference_client.submit_job(self._to_inference_request(request))

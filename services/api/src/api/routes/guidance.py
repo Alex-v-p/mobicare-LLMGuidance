@@ -4,6 +4,7 @@ from fastapi import APIRouter, Request
 
 from api.application.services.guidance_service import GuidanceService
 from shared.contracts.inference import ApiGuidanceJobStatus, ApiGuidanceResponse, GuidanceRequest, JobAcceptedResponse
+from shared.contracts.ingestion import IngestionResponse
 
 router = APIRouter(tags=["guidance"])
 
@@ -11,6 +12,11 @@ router = APIRouter(tags=["guidance"])
 @router.post("/guidance", response_model=ApiGuidanceResponse)
 async def generate_guidance(request: GuidanceRequest) -> ApiGuidanceResponse:
     return await GuidanceService().generate(request)
+
+
+@router.post("/guidance/ingest", response_model=IngestionResponse)
+async def ingest_guidance_documents() -> IngestionResponse:
+    return await GuidanceService().ingest()
 
 
 @router.post("/guidance/jobs", response_model=JobAcceptedResponse, status_code=202)

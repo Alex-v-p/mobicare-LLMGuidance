@@ -28,7 +28,7 @@ class DenseRetriever:
     async def retrieve(self, query: str, limit: int | None = None) -> list[RetrievedContext]:
         use_limit = limit or self._default_top_k
         if not self._vector_store.collection_has_points():
-            await self._ingestion_service.ingest(recreate_collection=False)
+            await self._ingestion_service.ingest()
             if not self._vector_store.collection_has_points():
                 return []
 

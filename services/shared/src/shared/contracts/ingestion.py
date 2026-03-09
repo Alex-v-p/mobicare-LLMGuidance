@@ -1,20 +1,22 @@
 from __future__ import annotations
 
-from typing import Optional
-
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
-class IngestionRequest(BaseModel):
-    recreate_collection: bool = False
-    bucket: Optional[str] = None
-    prefix: str = ""
+class IngestDocumentsRequest(BaseModel):
+    """Public/internal request to ingest configured guidance documents.
+
+    Infra details such as bucket name and collection name are configured via env,
+    not supplied by clients.
+    """
+
+    pass
 
 
 class IngestionResponse(BaseModel):
     status: str = "ok"
-    bucket: str
-    prefix: str = ""
+    documents_bucket: str
+    documents_prefix: str = ""
     documents_found: int = 0
     chunks_created: int = 0
     vectors_upserted: int = 0

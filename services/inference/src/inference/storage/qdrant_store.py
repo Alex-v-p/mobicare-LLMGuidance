@@ -4,32 +4,30 @@ import os
 from typing import Any
 
 from qdrant_client import QdrantClient
-from qdrant_client.http.exceptions import UnexpectedResponse
 from qdrant_client.models import Distance, PointStruct, VectorParams
 
 from inference.indexing.models import TextChunk
 
 
 class QdrantVectorStore:
-    def __init__(self) -> None:
-        self._url = os.getenv("QDRANT_URL", "http://qdrant:6333")
-        self._collection = os.getenv("QDRANT_COLLECTION", "guidance_chunks")
+    def __init__(self, url: str | None = None, collection_name: str | None = None) -> None:
+        self._url = url or os.getenv("QDRANT_URL", "http://qdrant:6333")
+        self._collection = collection_name or os.getenv("QDRANT_COLLECTION", "guidance_chunks")
         self._client = QdrantClient(url=self._url)
 
     @property
     def collection_name(self) -> str:
         return self._collection
 
-    def ensure_collection(self, vector_size: int, recreate: bool = False) -> None:
-        if recreate:
-            try:
-                self._client.delete_collection(self._collection)
-            except Exception:
-                pass
-        try:
-            self._client.get_collection(self._collection)
-            return
-        except Exception:
+    def recreate_collection(self, vector_size: int) -> None:
+        self._client.recreate_collection(
+            collection_name=self._collection,
+            vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
+        )
+
+    def ensure_collection(self, vector_size: int) -> None:
+        collections = {c.name for c in self._client.get_collections().collections}
+        if self._collection not in collections:
             self._client.create_collection(
                 collection_name=self._collection,
                 vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
@@ -37,10 +35,18 @@ class QdrantVectorStore:
 
     def collection_has_points(self) -> bool:
         try:
+            self.ensure_collection(vector_size=self._infer_vector_size())
             count_result = self._client.count(collection_name=self._collection, exact=False)
             return int(count_result.count) > 0
         except Exception:
             return False
+
+    def _infer_vector_size(self) -> int:
+        configured = os.getenv("OLLAMA_EMBEDDING_DIMENSIONS")
+        if configured:
+            return int(configured)
+        # nomic-embed-text default
+        return 768
 
     def upsert_chunks(self, chunks: list[TextChunk], embeddings: list[list[float]]) -> int:
         points: list[PointStruct] = []
@@ -56,10 +62,12 @@ class QdrantVectorStore:
             points.append(PointStruct(id=point_id, vector=embedding, payload=payload))
         if not points:
             return 0
+        self.ensure_collection(vector_size=len(embeddings[0]))
         self._client.upsert(collection_name=self._collection, points=points)
         return len(points)
 
     def search(self, query_vector: list[float], limit: int = 3):
+        self.ensure_collection(vector_size=len(query_vector))
         result = self._client.query_points(
             collection_name=self._collection,
             query=query_vector,
