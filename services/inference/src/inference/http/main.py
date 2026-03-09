@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from inference.http.routes.health import router as health_router
 from inference.http.routes.generate import router as generate_router
 from inference.http.routes.jobs import router as jobs_router
-from inference.http.routes.ingest import router as ingest_router
+from inference.http.routes.ingestion_jobs import router as ingestion_jobs_router
 
 
 def create_app() -> FastAPI:
@@ -11,7 +11,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(generate_router)
     app.include_router(jobs_router)
-    app.include_router(ingest_router)
+    app.include_router(ingestion_jobs_router)
     return app
 
 

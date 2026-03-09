@@ -9,6 +9,10 @@ from qdrant_client.models import Distance, PointStruct, VectorParams
 from inference.indexing.models import TextChunk
 
 
+class MissingCollectionError(RuntimeError):
+    pass
+
+
 class QdrantVectorStore:
     def __init__(self, url: str | None = None, collection_name: str | None = None) -> None:
         self._url = url or os.getenv("QDRANT_URL", "http://qdrant:6333")
@@ -19,34 +23,22 @@ class QdrantVectorStore:
     def collection_name(self) -> str:
         return self._collection
 
-    def recreate_collection(self, vector_size: int) -> None:
-        self._client.recreate_collection(
-            collection_name=self._collection,
-            vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
-        )
+    def collection_exists(self) -> bool:
+        collections = {c.name for c in self._client.get_collections().collections}
+        return self._collection in collections
 
     def ensure_collection(self, vector_size: int) -> None:
-        collections = {c.name for c in self._client.get_collections().collections}
-        if self._collection not in collections:
+        if not self.collection_exists():
             self._client.create_collection(
                 collection_name=self._collection,
                 vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
             )
 
     def collection_has_points(self) -> bool:
-        try:
-            self.ensure_collection(vector_size=self._infer_vector_size())
-            count_result = self._client.count(collection_name=self._collection, exact=False)
-            return int(count_result.count) > 0
-        except Exception:
+        if not self.collection_exists():
             return False
-
-    def _infer_vector_size(self) -> int:
-        configured = os.getenv("OLLAMA_EMBEDDING_DIMENSIONS")
-        if configured:
-            return int(configured)
-        # nomic-embed-text default
-        return 768
+        count_result = self._client.count(collection_name=self._collection, exact=False)
+        return int(count_result.count) > 0
 
     def upsert_chunks(self, chunks: list[TextChunk], embeddings: list[list[float]]) -> int:
         points: list[PointStruct] = []
@@ -67,7 +59,10 @@ class QdrantVectorStore:
         return len(points)
 
     def search(self, query_vector: list[float], limit: int = 3):
-        self.ensure_collection(vector_size=len(query_vector))
+        if not self.collection_exists():
+            raise MissingCollectionError(
+                f"Qdrant collection '{self._collection}' does not exist yet. Run document ingestion first."
+            )
         result = self._client.query_points(
             collection_name=self._collection,
             query=query_vector,

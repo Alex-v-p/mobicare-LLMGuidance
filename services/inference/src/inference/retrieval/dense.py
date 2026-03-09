@@ -3,10 +3,12 @@ from __future__ import annotations
 import os
 
 from inference.embeddings.ollama_embeddings import OllamaEmbeddingsClient
-from inference.indexing.ingestion_service import IngestionService
-from inference.storage.minio_documents import MinioDocumentStore
-from inference.storage.qdrant_store import QdrantVectorStore
+from inference.storage.qdrant_store import MissingCollectionError, QdrantVectorStore
 from shared.contracts.inference import RetrievedContext
+
+
+class RetrievalCollectionNotReadyError(RuntimeError):
+    pass
 
 
 class DenseRetriever:
@@ -14,26 +16,27 @@ class DenseRetriever:
         self,
         embedding_client: OllamaEmbeddingsClient | None = None,
         vector_store: QdrantVectorStore | None = None,
-        ingestion_service: IngestionService | None = None,
     ) -> None:
         self._embedding_client = embedding_client or OllamaEmbeddingsClient()
         self._vector_store = vector_store or QdrantVectorStore()
-        self._ingestion_service = ingestion_service or IngestionService(
-            document_store=MinioDocumentStore(),
-            embedding_client=self._embedding_client,
-            vector_store=self._vector_store,
-        )
         self._default_top_k = int(os.getenv("RETRIEVAL_TOP_K", "3"))
 
     async def retrieve(self, query: str, limit: int | None = None) -> list[RetrievedContext]:
         use_limit = limit or self._default_top_k
+        if not self._vector_store.collection_exists():
+            raise RetrievalCollectionNotReadyError(
+                f"Qdrant collection '{self._vector_store.collection_name}' does not exist yet. Run document ingestion first."
+            )
         if not self._vector_store.collection_has_points():
-            await self._ingestion_service.ingest()
-            if not self._vector_store.collection_has_points():
-                return []
+            raise RetrievalCollectionNotReadyError(
+                f"Qdrant collection '{self._vector_store.collection_name}' is empty. Run document ingestion first."
+            )
 
         query_vector = await self._embedding_client.embed(query)
-        hits = self._vector_store.search(query_vector=query_vector, limit=use_limit)
+        try:
+            hits = self._vector_store.search(query_vector=query_vector, limit=use_limit)
+        except MissingCollectionError as exc:
+            raise RetrievalCollectionNotReadyError(str(exc)) from exc
         results: list[RetrievedContext] = []
         for hit in hits:
             payload = hit.payload or {}
