@@ -16,7 +16,7 @@ def _parse_iso(value: str | None) -> datetime | None:
     return datetime.fromisoformat(value)
 
 
-class RedisJobStore:
+class RedisGuidanceJobStore:
     def __init__(
         self,
         redis_url: str | None = None,

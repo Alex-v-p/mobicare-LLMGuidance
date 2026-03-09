@@ -12,7 +12,7 @@ from minio.lifecycleconfig import Expiration, LifecycleConfig, Rule
 from shared.contracts.ingestion import IngestionJobRecord
 
 
-class MinioIngestionResultStore:
+class MinioIngestionJobResultStore:
     def __init__(self) -> None:
         endpoint = os.getenv("MINIO_ENDPOINT", "http://minio:9000").replace("http://", "").replace("https://", "")
         secure = os.getenv("MINIO_SECURE", "false").lower() == "true"

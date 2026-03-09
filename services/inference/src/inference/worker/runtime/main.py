@@ -7,11 +7,11 @@ from uuid import uuid4
 
 from inference.callbacks.notifier import CallbackNotifier
 from inference.indexing.ingestion_service import IngestionService
-from inference.jobstore.redis_ingestion_store import RedisIngestionJobStore
-from inference.jobstore.redis_store import RedisJobStore
+from inference.jobstore.redis_ingestion_job_store import RedisIngestionJobStore
+from inference.jobstore.redis_guidance_job_store import RedisGuidanceJobStore
 from inference.pipeline.generate_guidance import GuidancePipeline
-from inference.storage.minio_ingestion_results import MinioIngestionResultStore
-from inference.storage.minio_results import MinioResultStore
+from inference.storage.minio_ingestion_job_results import MinioIngestionJobResultStore
+from inference.storage.minio_guidance_job_results import MinioGuidanceJobResultStore
 from shared.contracts.ingestion import utc_now_iso as ingestion_utc_now_iso
 from shared.contracts.inference import utc_now_iso
 
@@ -25,9 +25,9 @@ async def _heartbeat_loop(store, job_id: str, worker_id: str, interval_s: int) -
 
 
 async def _handle_guidance_jobs(worker_id: str, heartbeat_interval_s: int) -> bool:
-    store = RedisJobStore()
+    store = RedisGuidanceJobStore()
     pipeline = GuidancePipeline()
-    results = MinioResultStore()
+    results = MinioGuidanceJobResultStore()
     notifier = CallbackNotifier()
     try:
         record = await store.claim_next(worker_id=worker_id, timeout_s=1)
@@ -70,7 +70,7 @@ async def _handle_guidance_jobs(worker_id: str, heartbeat_interval_s: int) -> bo
 async def _handle_ingestion_jobs(worker_id: str, heartbeat_interval_s: int) -> bool:
     store = RedisIngestionJobStore()
     service = IngestionService()
-    results = MinioIngestionResultStore()
+    results = MinioIngestionJobResultStore()
     try:
         record = await store.claim_next(worker_id=worker_id, timeout_s=1)
         if record is None or record.status != "running":

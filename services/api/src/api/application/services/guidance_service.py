@@ -24,7 +24,7 @@ class GuidanceService:
         )
 
     async def generate(self, request: GuidanceRequest) -> ApiGuidanceResponse:
-        inference_response = await self._inference_client.generate(self._to_inference_request(request))
+        inference_response = await self._inference_client.generate_guidance(self._to_inference_request(request))
         return ApiGuidanceResponse(
             request_id=inference_response.request_id,
             status=inference_response.status,
@@ -38,10 +38,10 @@ class GuidanceService:
 
 
     async def submit_job(self, request: GuidanceRequest) -> JobAcceptedResponse:
-        return await self._inference_client.submit_job(self._to_inference_request(request))
+        return await self._inference_client.submit_guidance_job(self._to_inference_request(request))
 
     async def get_job_status(self, job_id: str) -> ApiGuidanceJobStatus:
-        record = await self._inference_client.get_job_status(job_id)
+        record = await self._inference_client.get_guidance_job_status(job_id)
         return self._to_api_job_status(record)
 
     def _to_api_job_status(self, record: JobRecord) -> ApiGuidanceJobStatus:
