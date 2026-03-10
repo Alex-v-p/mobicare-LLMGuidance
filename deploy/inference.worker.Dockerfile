@@ -14,6 +14,8 @@ RUN pip install --no-cache-dir \
     pydantic==2.9.2 \
     pydantic-settings==2.5.2 \
     "redis>=5,<6" \
-    "minio>=7,<8"
+    "minio>=7,<8" \
+    "qdrant-client>=1.9,<2" \
+    "pypdf>=5,<6"
 
 CMD ["python", "-m", "inference.worker.runtime.main"]

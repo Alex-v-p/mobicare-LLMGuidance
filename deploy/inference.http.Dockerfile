@@ -20,7 +20,9 @@ RUN pip install --no-cache-dir \
     pydantic==2.9.2 \
     pydantic-settings==2.5.2 \
     "redis>=5,<6" \
-    "minio>=7,<8"
+    "minio>=7,<8" \
+    "qdrant-client>=1.9,<2" \
+    "pypdf>=5,<6"
 
 EXPOSE 8001
 CMD ["uvicorn", "inference.http.main:app", "--host", "0.0.0.0", "--port", "8001"]

@@ -20,9 +20,22 @@ class PatientVariables(BaseModel):
 
 
 class GenerationOptions(BaseModel):
-    use_fake_rag: bool = True
+    use_retrieval: bool = True
+    top_k: int = 3
     temperature: float = 0.2
     max_tokens: int = 256
+    use_example_response: bool = False
+    retrieval_mode: Literal["dense", "hybrid"] = "hybrid"
+    hybrid_dense_weight: float = 0.65
+    hybrid_sparse_weight: float = 0.35
+    use_graph_augmentation: bool = True
+    graph_max_extra_nodes: int = 2
+    enable_query_rewriting: bool = False
+    enable_response_verification: bool = False
+    enable_regeneration: bool = False
+    max_regeneration_attempts: int = 1
+    llm_model: Optional[str] = None
+    embedding_model: Optional[str] = None
     callback_url: Optional[HttpUrl] = None
     callback_headers: Dict[str, str] = Field(default_factory=dict)
 
@@ -38,6 +51,8 @@ class RetrievedContext(BaseModel):
     source_id: str
     title: str
     snippet: str
+    chunk_id: Optional[str] = None
+    page_number: Optional[int] = None
 
 
 class InferenceRequest(BaseModel):
@@ -46,6 +61,12 @@ class InferenceRequest(BaseModel):
     patient_variables: Dict[str, Any] = Field(default_factory=dict)
     retrieved_context: List[RetrievedContext] = Field(default_factory=list)
     options: GenerationOptions = Field(default_factory=GenerationOptions)
+
+
+class VerificationResult(BaseModel):
+    verdict: Literal["pass", "fail"]
+    issues: List[str] = Field(default_factory=list)
+    confidence: Literal["high", "medium", "low"] = "low"
 
 
 class InferenceResponse(BaseModel):
@@ -57,6 +78,7 @@ class InferenceResponse(BaseModel):
     used_variables: Dict[str, Any] = Field(default_factory=dict)
     warnings: List[str] = Field(default_factory=list)
     metadata: Dict[str, Any] = Field(default_factory=dict)
+    verification: Optional[VerificationResult] = None
 
 
 class ApiGuidanceResponse(BaseModel):
@@ -68,6 +90,7 @@ class ApiGuidanceResponse(BaseModel):
     used_variables: Dict[str, Any] = Field(default_factory=dict)
     warnings: List[str] = Field(default_factory=list)
     metadata: Dict[str, Any] = Field(default_factory=dict)
+    verification: Optional[VerificationResult] = None
 
 
 class OllamaGenerateResponse(BaseModel):
@@ -124,6 +147,7 @@ class ApiGuidanceJobStatus(BaseModel):
     used_variables: Dict[str, Any] = Field(default_factory=dict)
     warnings: List[str] = Field(default_factory=list)
     metadata: Dict[str, Any] = Field(default_factory=dict)
+    verification: Optional[VerificationResult] = None
     error: Optional[str] = None
     result_object_key: Optional[str] = None
     callback_attempts: int = 0
