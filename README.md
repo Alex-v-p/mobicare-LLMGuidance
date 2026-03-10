@@ -92,6 +92,36 @@ wsl pants
     }
 }
 
+Hybrid retrieval request example:
+
+{
+  "request_id": "case-2026-0002",
+  "question": "What should be monitored after starting sacubitril/valsartan in symptomatic HFrEF?",
+  "patient": {
+    "values": {
+      "age": 67,
+      "diagnosis": "HFrEF"
+    }
+  },
+  "options": {
+    "use_retrieval": true,
+    "retrieval_mode": "hybrid",
+    "top_k": 4,
+    "hybrid_dense_weight": 0.65,
+    "hybrid_sparse_weight": 0.35,
+    "use_graph_augmentation": true,
+    "graph_max_extra_nodes": 2,
+    "temperature": 0.2,
+    "max_tokens": 300,
+    "use_example_response": false
+  }
+}
+
+
+
+
+
+
 
 
 Health URLs

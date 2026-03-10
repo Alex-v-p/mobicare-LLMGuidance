@@ -58,6 +58,31 @@ class QdrantVectorStore:
         self._client.upsert(collection_name=self._collection, points=points)
         return len(points)
 
+
+    def get_all_payloads(self, batch_size: int = 256) -> list[dict[str, Any]]:
+        if not self.collection_exists():
+            raise MissingCollectionError(
+                f"Qdrant collection '{self._collection}' does not exist yet. Run document ingestion first."
+            )
+
+        payloads: list[dict[str, Any]] = []
+        offset = None
+        while True:
+            points, offset = self._client.scroll(
+                collection_name=self._collection,
+                limit=batch_size,
+                with_payload=True,
+                with_vectors=False,
+                offset=offset,
+            )
+            for point in points:
+                payload = dict(point.payload or {})
+                if payload:
+                    payloads.append(payload)
+            if offset is None:
+                break
+        return payloads
+
     def search(self, query_vector: list[float], limit: int = 3):
         if not self.collection_exists():
             raise MissingCollectionError(
