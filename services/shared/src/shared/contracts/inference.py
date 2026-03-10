@@ -34,6 +34,8 @@ class GenerationOptions(BaseModel):
     enable_response_verification: bool = False
     enable_regeneration: bool = False
     max_regeneration_attempts: int = 1
+    llm_model: Optional[str] = None
+    embedding_model: Optional[str] = None
     callback_url: Optional[HttpUrl] = None
     callback_headers: Dict[str, str] = Field(default_factory=dict)
 

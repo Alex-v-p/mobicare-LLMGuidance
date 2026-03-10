@@ -31,6 +31,9 @@ class GuidancePipeline:
         self._hybrid_retriever = hybrid_retriever or HybridRetriever()
         self._ollama_client = ollama_client or OllamaClient()
 
+    def _get_llm_client(self, request: InferenceRequest) -> OllamaClient:
+        return self._ollama_client.with_model(request.options.llm_model)
+
     def _build_mock_answer(self, request: InferenceRequest, retrieved_context: list[RetrievedContext]) -> str:
         question = request.question.strip() or "No question was supplied."
         variable_lines = [f"- {key}: {value}" for key, value in sorted(request.patient_variables.items())]
@@ -63,7 +66,7 @@ class GuidancePipeline:
             return QueryRewriteResult(query=request.question, rewritten=False)
 
         prompt = build_query_rewrite_prompt(request.question, request.patient_variables)
-        response = await self._ollama_client.generate(
+        response = await self._get_llm_client(request).generate(
             prompt=prompt,
             temperature=0.0,
             max_tokens=min(96, request.options.max_tokens),
@@ -88,6 +91,7 @@ class GuidancePipeline:
             retrieved_context = await self._retriever.retrieve(
                 query=retrieval_query,
                 limit=request.options.top_k,
+                embedding_model=request.options.embedding_model,
             )
         else:
             hybrid_result = await self._hybrid_retriever.retrieve(
@@ -97,6 +101,7 @@ class GuidancePipeline:
                 sparse_weight=request.options.hybrid_sparse_weight,
                 use_graph_augmentation=request.options.use_graph_augmentation,
                 graph_max_extra_nodes=request.options.graph_max_extra_nodes,
+                embedding_model=request.options.embedding_model,
             )
             retrieved_context = hybrid_result.items
             retrieval_metadata.update(hybrid_result.metadata)
@@ -119,7 +124,7 @@ class GuidancePipeline:
             verification_feedback=verification_feedback,
             attempt_number=attempt_number,
         )
-        llm_response = await self._ollama_client.generate(
+        llm_response = await self._get_llm_client(request).generate(
             prompt=prompt,
             temperature=request.options.temperature,
             max_tokens=request.options.max_tokens,
@@ -160,7 +165,7 @@ class GuidancePipeline:
             retrieved_context=retrieved_context,
             answer=answer,
         )
-        response = await self._ollama_client.generate(
+        response = await self._get_llm_client(request).generate(
             prompt=prompt,
             temperature=0.0,
             max_tokens=160,
@@ -201,7 +206,7 @@ class GuidancePipeline:
             return InferenceResponse(
                 request_id=request.request_id,
                 status="ok",
-                model="mock-guidance-v1",
+                model=request.options.llm_model or "mock-guidance-v1",
                 answer=self._build_mock_answer(request, retrieved_context).strip(),
                 retrieved_context=retrieved_context,
                 used_variables=request.patient_variables,
@@ -214,6 +219,8 @@ class GuidancePipeline:
                     "max_tokens": request.options.max_tokens,
                     "retrieval_mode": request.options.retrieval_mode,
                     "use_graph_augmentation": request.options.use_graph_augmentation,
+                    "llm_model": request.options.llm_model or self._ollama_client.model,
+                    "embedding_model": request.options.embedding_model or self._retriever._embedding_client.model,
                 },
                 verification=None,
             )
@@ -259,7 +266,7 @@ class GuidancePipeline:
         return InferenceResponse(
             request_id=request.request_id,
             status="ok",
-            model=self._ollama_client.model,
+            model=self._get_llm_client(request).model,
             answer=answer,
             retrieved_context=retrieved_context,
             used_variables=request.patient_variables,
@@ -277,6 +284,8 @@ class GuidancePipeline:
                 "generation_attempts": attempts_used,
                 "regeneration_enabled": request.options.enable_regeneration,
                 "response_verification_enabled": request.options.enable_response_verification,
+                "llm_model": self._get_llm_client(request).model,
+                "embedding_model": request.options.embedding_model or self._retriever._embedding_client.model,
                 **retrieval_metadata,
             },
             verification=verification,

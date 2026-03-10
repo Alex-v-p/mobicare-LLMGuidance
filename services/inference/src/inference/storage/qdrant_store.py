@@ -33,6 +33,17 @@ class QdrantVectorStore:
                 collection_name=self._collection,
                 vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
             )
+            return
+
+        info = self._client.get_collection(self._collection)
+        existing_size = info.config.params.vectors.size
+
+        if existing_size != vector_size:
+            raise ValueError(
+                f"Collection '{self._collection}' expects dimension {existing_size}, "
+                f"but current embedding model produced dimension {vector_size}. "
+                f"Delete/recreate the collection or use a different collection name."
+            )
 
     def collection_has_points(self) -> bool:
         if not self.collection_exists():

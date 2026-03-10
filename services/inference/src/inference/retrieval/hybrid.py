@@ -42,6 +42,7 @@ class HybridRetriever:
         sparse_weight: float = 0.35,
         use_graph_augmentation: bool = False,
         graph_max_extra_nodes: int = 2,
+        embedding_model: str | None = None,
     ) -> HybridRetrievalResult:
         if not self._vector_store.collection_exists():
             raise RetrievalCollectionNotReadyError(
@@ -58,7 +59,7 @@ class HybridRetriever:
                 f"Qdrant collection '{self._vector_store.collection_name}' is empty. Run document ingestion first."
             )
 
-        query_vector = await self._embedding_client.embed(query)
+        query_vector = await self._embedding_client.with_model(embedding_model).embed(query)
         try:
             dense_hits = self._vector_store.search(query_vector=query_vector, limit=max(limit * 4, 10))
         except MissingCollectionError as exc:

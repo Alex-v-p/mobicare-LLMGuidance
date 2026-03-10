@@ -27,6 +27,7 @@ class IngestionOptions(BaseModel):
     chunking_params: dict[str, Any] = Field(
         default_factory=lambda: {"chunk_size": 300, "chunk_overlap": 100}
     )
+    embedding_model: Optional[str] = None
 
 
 class IngestDocumentsRequest(BaseModel):
@@ -50,6 +51,7 @@ class IngestionResponse(BaseModel):
     chunking_strategy: ChunkingStrategy = "naive"
     cleaning_params: dict[str, Any] = Field(default_factory=dict)
     chunking_params: dict[str, Any] = Field(default_factory=dict)
+    embedding_model: Optional[str] = None
 
 
 class IngestionJobAcceptedResponse(BaseModel):
