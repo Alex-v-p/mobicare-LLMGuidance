@@ -3,12 +3,19 @@ from __future__ import annotations
 from inference.http.clients.ollama_client import OllamaClient
 from inference.pipeline.prompts.basic import build_prompt
 from inference.retrieval.dense import DenseRetriever
+from inference.retrieval.hybrid import HybridRetriever
 from shared.contracts.inference import InferenceRequest, InferenceResponse, RetrievedContext
 
 
 class GuidancePipeline:
-    def __init__(self, retriever: DenseRetriever | None = None, ollama_client: OllamaClient | None = None) -> None:
+    def __init__(
+        self,
+        retriever: DenseRetriever | None = None,
+        hybrid_retriever: HybridRetriever | None = None,
+        ollama_client: OllamaClient | None = None,
+    ) -> None:
         self._retriever = retriever or DenseRetriever()
+        self._hybrid_retriever = hybrid_retriever or HybridRetriever()
         self._ollama_client = ollama_client or OllamaClient()
 
     def _build_mock_answer(self, request: InferenceRequest, retrieved_context: list[RetrievedContext]) -> str:
@@ -61,15 +68,34 @@ class GuidancePipeline:
                     "retrieval_top_k": request.options.top_k,
                     "temperature": request.options.temperature,
                     "max_tokens": request.options.max_tokens,
+                    "retrieval_mode": request.options.retrieval_mode,
+                    "use_graph_augmentation": request.options.use_graph_augmentation,
                 },
             )
 
-        retrieved_context = []
+        retrieved_context: list[RetrievedContext] = []
+        retrieval_metadata: dict[str, object] = {
+            "retrieval_mode": request.options.retrieval_mode,
+            "use_graph_augmentation": request.options.use_graph_augmentation,
+        }
         if request.options.use_retrieval:
-            retrieved_context = await self._retriever.retrieve(
-                query=request.question,
-                limit=request.options.top_k,
-            )
+            if request.options.retrieval_mode == "dense":
+                retrieved_context = await self._retriever.retrieve(
+                    query=request.question,
+                    limit=request.options.top_k,
+                )
+            else:
+                hybrid_result = await self._hybrid_retriever.retrieve(
+                    query=request.question,
+                    limit=request.options.top_k,
+                    dense_weight=request.options.hybrid_dense_weight,
+                    sparse_weight=request.options.hybrid_sparse_weight,
+                    use_graph_augmentation=request.options.use_graph_augmentation,
+                    graph_max_extra_nodes=request.options.graph_max_extra_nodes,
+                )
+                retrieved_context = hybrid_result.items
+                retrieval_metadata.update(hybrid_result.metadata)
+
         prompt = build_prompt(
             question=request.question,
             patient_variables=request.patient_variables,
@@ -103,5 +129,9 @@ class GuidancePipeline:
                 "done_reason": llm_response.done_reason,
                 "eval_count": llm_response.eval_count,
                 "mock_response": False,
+                "hybrid_dense_weight": request.options.hybrid_dense_weight,
+                "hybrid_sparse_weight": request.options.hybrid_sparse_weight,
+                "graph_max_extra_nodes": request.options.graph_max_extra_nodes,
+                **retrieval_metadata,
             },
         )

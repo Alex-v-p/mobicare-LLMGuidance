@@ -25,6 +25,11 @@ class GenerationOptions(BaseModel):
     temperature: float = 0.2
     max_tokens: int = 256
     use_example_response: bool = False
+    retrieval_mode: Literal["dense", "hybrid"] = "hybrid"
+    hybrid_dense_weight: float = 0.65
+    hybrid_sparse_weight: float = 0.35
+    use_graph_augmentation: bool = True
+    graph_max_extra_nodes: int = 2
     callback_url: Optional[HttpUrl] = None
     callback_headers: Dict[str, str] = Field(default_factory=dict)
 
@@ -40,6 +45,8 @@ class RetrievedContext(BaseModel):
     source_id: str
     title: str
     snippet: str
+    chunk_id: Optional[str] = None
+    page_number: Optional[int] = None
 
 
 class InferenceRequest(BaseModel):
