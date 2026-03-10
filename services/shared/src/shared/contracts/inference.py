@@ -30,6 +30,10 @@ class GenerationOptions(BaseModel):
     hybrid_sparse_weight: float = 0.35
     use_graph_augmentation: bool = True
     graph_max_extra_nodes: int = 2
+    enable_query_rewriting: bool = False
+    enable_response_verification: bool = False
+    enable_regeneration: bool = False
+    max_regeneration_attempts: int = 1
     callback_url: Optional[HttpUrl] = None
     callback_headers: Dict[str, str] = Field(default_factory=dict)
 
@@ -57,6 +61,12 @@ class InferenceRequest(BaseModel):
     options: GenerationOptions = Field(default_factory=GenerationOptions)
 
 
+class VerificationResult(BaseModel):
+    verdict: Literal["pass", "fail"]
+    issues: List[str] = Field(default_factory=list)
+    confidence: Literal["high", "medium", "low"] = "low"
+
+
 class InferenceResponse(BaseModel):
     request_id: str
     status: str
@@ -66,6 +76,7 @@ class InferenceResponse(BaseModel):
     used_variables: Dict[str, Any] = Field(default_factory=dict)
     warnings: List[str] = Field(default_factory=list)
     metadata: Dict[str, Any] = Field(default_factory=dict)
+    verification: Optional[VerificationResult] = None
 
 
 class ApiGuidanceResponse(BaseModel):
@@ -77,6 +88,7 @@ class ApiGuidanceResponse(BaseModel):
     used_variables: Dict[str, Any] = Field(default_factory=dict)
     warnings: List[str] = Field(default_factory=list)
     metadata: Dict[str, Any] = Field(default_factory=dict)
+    verification: Optional[VerificationResult] = None
 
 
 class OllamaGenerateResponse(BaseModel):
@@ -133,6 +145,7 @@ class ApiGuidanceJobStatus(BaseModel):
     used_variables: Dict[str, Any] = Field(default_factory=dict)
     warnings: List[str] = Field(default_factory=list)
     metadata: Dict[str, Any] = Field(default_factory=dict)
+    verification: Optional[VerificationResult] = None
     error: Optional[str] = None
     result_object_key: Optional[str] = None
     callback_attempts: int = 0

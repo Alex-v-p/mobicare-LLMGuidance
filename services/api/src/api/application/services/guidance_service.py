@@ -34,6 +34,7 @@ class GuidanceService:
             used_variables=inference_response.used_variables,
             warnings=inference_response.warnings,
             metadata=inference_response.metadata,
+            verification=inference_response.verification,
         )
 
 
@@ -73,6 +74,7 @@ class GuidanceService:
             used_variables=record.result.used_variables,
             warnings=record.result.warnings,
             metadata=record.result.metadata,
+            verification=record.result.verification,
             error=record.error,
             result_object_key=record.result_object_key,
             callback_attempts=record.callback_attempts,
