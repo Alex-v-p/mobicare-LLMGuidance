@@ -3,6 +3,8 @@ from __future__ import annotations
 import io
 import os
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Iterable
 
 from minio import Minio
 from pypdf import PdfReader
@@ -13,7 +15,7 @@ class MinioDocument:
     object_name: str
     title: str
     text: str
-    metadata: dict[str, str]
+    metadata: dict[str, str | int]
 
 
 class MinioDocumentStore:
@@ -41,7 +43,7 @@ class MinioDocumentStore:
         if not self._client.bucket_exists(self._documents_bucket):
             self._client.make_bucket(self._documents_bucket)
 
-    def list_documents(self) -> list[MinioDocument]:
+    def list_documents(self, *, split_pdf_pages: bool = False) -> list[MinioDocument]:
         self.ensure_bucket_exists()
         documents: list[MinioDocument] = []
         for obj in self._client.list_objects(self._documents_bucket, prefix=self._documents_prefix, recursive=True):
@@ -59,24 +61,50 @@ class MinioDocumentStore:
                 response.close()
                 response.release_conn()
 
-            text = self._decode_document(object_name=object_name, payload=data)
-            if not text.strip():
-                continue
-            documents.append(
-                MinioDocument(
-                    object_name=object_name,
-                    title=object_name.rsplit("/", 1)[-1],
-                    text=text,
-                    metadata={"bucket": self._documents_bucket, "object_name": object_name},
-                )
-            )
+            documents.extend(self._decode_document(object_name=object_name, payload=data, split_pdf_pages=split_pdf_pages))
         return documents
 
-    def _decode_document(self, object_name: str, payload: bytes) -> str:
+    def _decode_document(self, object_name: str, payload: bytes, *, split_pdf_pages: bool) -> Iterable[MinioDocument]:
         lowered = object_name.lower()
+        base_metadata: dict[str, str | int] = {
+            "bucket": self._documents_bucket,
+            "object_name": object_name,
+        }
+
         if lowered.endswith((".txt", ".md")):
-            return payload.decode("utf-8", errors="ignore")
+            yield MinioDocument(
+                object_name=object_name,
+                title=Path(object_name).name,
+                text=payload.decode("utf-8", errors="ignore"),
+                metadata=base_metadata,
+            )
+            return
+
         if lowered.endswith(".pdf"):
             reader = PdfReader(io.BytesIO(payload))
-            return "\n".join((page.extract_text() or "") for page in reader.pages)
-        return ""
+            page_count = len(reader.pages)
+            if split_pdf_pages:
+                for index, page in enumerate(reader.pages):
+                    text = page.extract_text() or ""
+                    if not text.strip():
+                        continue
+                    yield MinioDocument(
+                        object_name=f"{object_name}#page-{index + 1}",
+                        title=Path(object_name).name,
+                        text=text,
+                        metadata={
+                            **base_metadata,
+                            "source_object_name": object_name,
+                            "page_number": index + 1,
+                            "page_count": page_count,
+                        },
+                    )
+                return
+
+            combined_text = "\n\n".join((page.extract_text() or "") for page in reader.pages)
+            yield MinioDocument(
+                object_name=object_name,
+                title=Path(object_name).name,
+                text=combined_text,
+                metadata={**base_metadata, "page_count": page_count},
+            )

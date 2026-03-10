@@ -78,7 +78,7 @@ async def _handle_ingestion_jobs(worker_id: str, heartbeat_interval_s: int) -> b
 
         heartbeat_task = asyncio.create_task(_heartbeat_loop(store, record.job_id, worker_id, heartbeat_interval_s))
         try:
-            result = await service.ingest()
+            result = await service.ingest(record.request)
             record.status = "completed"
             record.result = result
             record.error = None

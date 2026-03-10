@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
 
 IngestionJobState = Literal["queued", "running", "completed", "failed", "not_found"]
+CleaningStrategy = Literal["none", "basic", "deep", "medical_guideline_deep"]
+ChunkingStrategy = Literal["naive", "page_indexed", "late"]
 
 
 def new_ingestion_job_id() -> str:
@@ -18,13 +20,22 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+class IngestionOptions(BaseModel):
+    cleaning_strategy: CleaningStrategy = "deep"
+    cleaning_params: dict[str, Any] = Field(default_factory=dict)
+    chunking_strategy: ChunkingStrategy = "naive"
+    chunking_params: dict[str, Any] = Field(
+        default_factory=lambda: {"chunk_size": 300, "chunk_overlap": 100}
+    )
+
+
 class IngestDocumentsRequest(BaseModel):
     """Request to ingest configured guidance documents.
 
     Infra details such as bucket and collection names are configured internally.
     """
 
-    pass
+    options: IngestionOptions = Field(default_factory=IngestionOptions)
 
 
 class IngestionResponse(BaseModel):
@@ -35,6 +46,10 @@ class IngestionResponse(BaseModel):
     chunks_created: int = 0
     vectors_upserted: int = 0
     collection: str
+    cleaning_strategy: CleaningStrategy = "deep"
+    chunking_strategy: ChunkingStrategy = "naive"
+    cleaning_params: dict[str, Any] = Field(default_factory=dict)
+    chunking_params: dict[str, Any] = Field(default_factory=dict)
 
 
 class IngestionJobAcceptedResponse(BaseModel):
