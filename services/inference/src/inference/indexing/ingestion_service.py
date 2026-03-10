@@ -62,6 +62,7 @@ class IngestionService:
                 chunking_strategy=options.chunking_strategy,
                 cleaning_params=options.cleaning_params,
                 chunking_params=options.chunking_params,
+                embedding_model=options.embedding_model or self._embedding_client.model
             )
 
         safe_chunks = [chunk for chunk in chunks if chunk.text and chunk.text.strip()]
@@ -78,9 +79,11 @@ class IngestionService:
                 chunking_strategy=options.chunking_strategy,
                 cleaning_params=options.cleaning_params,
                 chunking_params=options.chunking_params,
+                embedding_model=options.embedding_model or self._embedding_client.model
             )
 
-        embeddings = await self._embedding_client.embed_many([chunk.text for chunk in safe_chunks])
+        embedding_client = self._embedding_client.with_model(options.embedding_model)
+        embeddings = await embedding_client.embed_many([chunk.text for chunk in safe_chunks])
         self._vector_store.ensure_collection(vector_size=len(embeddings[0]))
         vectors_upserted = self._vector_store.upsert_chunks(safe_chunks, embeddings)
 

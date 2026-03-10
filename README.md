@@ -52,7 +52,8 @@ wsl pants
     "chunking_params": {
       "chunk_size": 300,
       "chunk_overlap": 100
-    }
+    },
+    "embedding_model": "qwen3-embedding:4b"
   }
 }
 
@@ -121,9 +122,6 @@ Hybrid retrieval request example:
 
 
 
-
-
-
 Health URLs
 
 API: http://localhost:8000/health
@@ -135,3 +133,52 @@ Qdrant: http://localhost:6333
 MinIO console: http://localhost:9001
 
 Ollama: http://localhost:11434
+
+
+
+
+
+### Example guidance request
+
+```json
+{
+  "request_id": "case-2026-0020",
+  "question": "What escalation of therapy should be considered for symptomatic HFrEF despite ACE inhibitor and beta blocker therapy?",
+  "patient": {
+    "values": {
+      "age": 72,
+      "diagnosis": "HFrEF",
+      "ejection_fraction": 32
+    }
+  },
+  "options": {
+    "use_retrieval": true,
+    "top_k": 4,
+    "temperature": 0.2,
+    "max_tokens": 256,
+    "retrieval_mode": "hybrid",
+    "llm_model": "qwen2.5:3b-instruct",
+    "embedding_model": "qwen3-embedding:4b",
+    "enable_query_rewriting": true,
+    "enable_response_verification": true,
+    "enable_regeneration": true,
+    "max_regeneration_attempts": 2
+  }
+}
+```
+
+### Example ingestion request
+
+```json
+{
+  "options": {
+    "cleaning_strategy": "deep",
+    "chunking_strategy": "naive",
+    "chunking_params": {
+      "chunk_size": 300,
+      "chunk_overlap": 100
+    },
+    "embedding_model": "qwen3-embedding:4b"
+  }
+}
+```

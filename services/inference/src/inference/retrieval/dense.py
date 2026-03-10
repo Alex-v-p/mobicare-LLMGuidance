@@ -21,7 +21,12 @@ class DenseRetriever:
         self._vector_store = vector_store or QdrantVectorStore()
         self._default_top_k = int(os.getenv("RETRIEVAL_TOP_K", "3"))
 
-    async def retrieve(self, query: str, limit: int | None = None) -> list[RetrievedContext]:
+    async def retrieve(
+        self,
+        query: str,
+        limit: int | None = None,
+        embedding_model: str | None = None,
+    ) -> list[RetrievedContext]:
         use_limit = limit or self._default_top_k
         if not self._vector_store.collection_exists():
             raise RetrievalCollectionNotReadyError(
@@ -32,7 +37,7 @@ class DenseRetriever:
                 f"Qdrant collection '{self._vector_store.collection_name}' is empty. Run document ingestion first."
             )
 
-        query_vector = await self._embedding_client.embed(query)
+        query_vector = await self._embedding_client.with_model(embedding_model).embed(query)
         try:
             hits = self._vector_store.search(query_vector=query_vector, limit=use_limit)
         except MissingCollectionError as exc:
