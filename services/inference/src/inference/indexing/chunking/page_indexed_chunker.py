@@ -29,6 +29,7 @@ class PageIndexedChunker(DocumentChunker):
                     **document.metadata,
                     "chunk_index": index,
                     "chunking_strategy": "page_indexed",
+                    "page_number": page_number,
                 },
             )
             for index, part in enumerate(parts)

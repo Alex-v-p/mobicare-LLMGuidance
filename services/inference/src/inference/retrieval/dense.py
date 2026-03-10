@@ -45,6 +45,8 @@ class DenseRetriever:
                     source_id=str(payload.get("source_id") or payload.get("chunk_id") or hit.id),
                     title=str(payload.get("title") or payload.get("object_name") or "Untitled"),
                     snippet=str(payload.get("text") or ""),
+                    chunk_id=str(payload.get("chunk_id")) if payload.get("chunk_id") is not None else None,
+                    page_number=int(payload.get("page_number")) if payload.get("page_number") is not None else None,
                 )
             )
         return results

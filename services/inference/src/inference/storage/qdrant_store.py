@@ -44,12 +44,18 @@ class QdrantVectorStore:
         points: list[PointStruct] = []
         for index, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
             point_id = abs(hash(chunk.chunk_id)) % (10**18) + index
+            chunk_metadata = {
+                key: value
+                for key, value in chunk.metadata.items()
+                if key not in {"normalized_source_text", "page_ranges", "raw_page_texts"}
+            }
             payload: dict[str, Any] = {
                 "chunk_id": chunk.chunk_id,
                 "source_id": chunk.source_id,
                 "title": chunk.title,
                 "text": chunk.text,
-                **chunk.metadata,
+                "page_number": chunk.metadata.get("page_number"),
+                **chunk_metadata,
             }
             points.append(PointStruct(id=point_id, vector=embedding, payload=payload))
         if not points:

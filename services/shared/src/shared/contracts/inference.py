@@ -45,6 +45,8 @@ class RetrievedContext(BaseModel):
     source_id: str
     title: str
     snippet: str
+    chunk_id: Optional[str] = None
+    page_number: Optional[int] = None
 
 
 class InferenceRequest(BaseModel):
