@@ -2,21 +2,32 @@ from __future__ import annotations
 
 import os
 
-import httpx
-
 from shared.clients.http import create_async_client
 
 
 class OllamaEmbeddingsClient:
-    def __init__(self, base_url: str | None = None, model: str | None = None, timeout_s: float | None = None) -> None:
-        self._base_url = (base_url or os.getenv("OLLAMA_URL", "http://ollama:11434")).rstrip("/")
+    def __init__(
+        self,
+        base_url: str | None = None,
+        model: str | None = None,
+        timeout_s: float | None = None,
+    ) -> None:
+        self._base_url = (
+            base_url or os.getenv("OLLAMA_URL", "http://ollama:11434")
+        ).rstrip("/")
         self._model = model or os.getenv("OLLAMA_EMBEDDING_MODEL", "nomic-embed-text")
-        self._timeout_s = timeout_s if timeout_s is not None else float(os.getenv("OLLAMA_TIMEOUT_S", "120"))
+        self._timeout_s = timeout_s if timeout_s is not None else float(
+            os.getenv("OLLAMA_TIMEOUT_S", "120")
+        )
 
     def with_model(self, model: str | None) -> "OllamaEmbeddingsClient":
         if not model or model == self._model:
             return self
-        return OllamaEmbeddingsClient(base_url=self._base_url, model=model, timeout_s=self._timeout_s)
+        return OllamaEmbeddingsClient(
+            base_url=self._base_url,
+            model=model,
+            timeout_s=self._timeout_s,
+        )
 
     @property
     def model(self) -> str:

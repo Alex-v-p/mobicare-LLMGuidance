@@ -1,1 +1,3 @@
-from inference.pipeline.prompts.multistep import build_generation_prompt as build_prompt
+from inference.pipeline.prompts.multistep import build_generation_prompt
+
+build_prompt = build_generation_prompt
