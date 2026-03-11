@@ -14,13 +14,19 @@ jobs:
 
     steps:
       - name: Check out code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
+
+      - name: Create CI .env from example
+        run: |
+          cp .env.example .env
 
       - name: Validate Docker Compose configuration
-        run: docker compose config
+        run: |
+          docker compose config
 
       - name: Build deployable images
-        run: docker compose build api inference inference-worker
+        run: |
+          docker compose build api inference inference-worker
 
       - name: Export Docker images
         run: |

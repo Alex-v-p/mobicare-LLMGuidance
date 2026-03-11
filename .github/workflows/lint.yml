@@ -24,6 +24,7 @@ jobs:
           cache-dependency-path: |
             .pylintrc
             pants.toml
+            .env.example
             deploy/*.Dockerfile
             docker-compose.yml
             infra/compose/docker-compose.yml
@@ -77,6 +78,10 @@ jobs:
           fi
 
           python -c "score = float('$score'); threshold = 9.75; print(f'Pylint score: {score:.2f}/10 (threshold: {threshold:.2f})'); import sys; sys.exit(0 if score >= threshold else 1)"
+
+      - name: Create CI .env from example
+        run: |
+          cp .env.example .env
 
       - name: Validate Docker Compose file
         run: |
