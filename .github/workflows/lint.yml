@@ -22,14 +22,18 @@ jobs:
           python-version: "3.12"
           cache: "pip"
           cache-dependency-path: |
-            pants.toml
             .pylintrc
+            pants.toml
 
-      - name: Install CI tooling and lint dependencies
+      - name: Set up Pants
+        uses: pantsbuild/actions/init-pants@v9
+        with:
+          gha-cache-key: v0
+
+      - name: Install Pylint and runtime deps for import resolution
         run: |
           python -m pip install --upgrade pip
           python -m pip install \
-            "pantsbuild.pants==2.31.0" \
             "pylint==4.0.5" \
             "fastapi==0.115.0" \
             "uvicorn[standard]==0.30.6" \
