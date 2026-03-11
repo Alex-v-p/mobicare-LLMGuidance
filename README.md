@@ -1,15 +1,7 @@
 # mobicare-LLMGuidance
 
-
-wsl --install
-
-apt install -y python3-dev python3-distutils    
-
-mkdir -p ~/repos
-cp -r /mnt/c/Users/alexa/Pictures/Internship/repos/mobicare-LLMGuidance ~/repos/
-cd ~/repos/mobicare-LLMGuidance
-
-wsl pants
+docker compose exec ollama ollama pull nomic-embed-text
+docker compose exec ollama ollama pull qwen2.5:0.5b
 
 {
   "options": {
