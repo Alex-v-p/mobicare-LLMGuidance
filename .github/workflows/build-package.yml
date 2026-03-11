@@ -7,10 +7,15 @@ on:
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
   build-and-package:
     runs-on: ubuntu-latest
+
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/mobicare-llmguidance
 
     steps:
       - name: Check out code
@@ -32,16 +37,43 @@ jobs:
         run: |
           docker images
 
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag images for GHCR
+        run: |
+          docker tag mobicare-llmguidance-api $IMAGE_PREFIX-api:${GITHUB_SHA}
+          docker tag mobicare-llmguidance-api $IMAGE_PREFIX-api:latest
+
+          docker tag mobicare-llmguidance-inference $IMAGE_PREFIX-inference:${GITHUB_SHA}
+          docker tag mobicare-llmguidance-inference $IMAGE_PREFIX-inference:latest
+
+          docker tag mobicare-llmguidance-inference-worker $IMAGE_PREFIX-inference-worker:${GITHUB_SHA}
+          docker tag mobicare-llmguidance-inference-worker $IMAGE_PREFIX-inference-worker:latest
+
+      - name: Push images to GHCR
+        run: |
+          docker push $IMAGE_PREFIX-api:${GITHUB_SHA}
+          docker push $IMAGE_PREFIX-api:latest
+
+          docker push $IMAGE_PREFIX-inference:${GITHUB_SHA}
+          docker push $IMAGE_PREFIX-inference:latest
+
+          docker push $IMAGE_PREFIX-inference-worker:${GITHUB_SHA}
+          docker push $IMAGE_PREFIX-inference-worker:latest
+
       - name: Export Docker images
         run: |
           mkdir -p dist/images
-
           docker image save \
             mobicare-llmguidance-api \
             mobicare-llmguidance-inference \
             mobicare-llmguidance-inference-worker \
             -o dist/images/llmguidance-images-${GITHUB_SHA}.tar
-
           gzip -f dist/images/llmguidance-images-${GITHUB_SHA}.tar
 
       - name: Create source deployment bundle
