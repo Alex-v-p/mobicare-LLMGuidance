@@ -1,0 +1,58 @@
+name: Build and package
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Create CI .env from example
+        run: |
+          cp .env.example .env
+
+      - name: Validate Docker Compose configuration
+        run: |
+          docker compose config
+
+      - name: Build deployable images
+        run: |
+          docker compose build api inference inference-worker
+
+      - name: Export Docker images
+        run: |
+          mkdir -p dist/images
+          docker image save \
+            -o dist/images/llmguidance-images-${GITHUB_SHA}.tar \
+            $(docker compose images -q api inference inference-worker)
+          gzip -f dist/images/llmguidance-images-${GITHUB_SHA}.tar
+
+      - name: Create source deployment bundle
+        run: |
+          mkdir -p dist/bundles
+          tar \
+            --exclude='.git' \
+            --exclude='.pants.d' \
+            --exclude='dist' \
+            --exclude='__pycache__' \
+            --exclude='.pytest_cache' \
+            -czf dist/bundles/llmguidance-deployment-${GITHUB_SHA}.tar.gz \
+            .
+
+      - name: Upload packaged artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: llmguidance-package-${{ github.sha }}
+          path: |
+            dist/images/llmguidance-images-${{ github.sha }}.tar.gz
+            dist/bundles/llmguidance-deployment-${{ github.sha }}.tar.gz
+          if-no-files-found: error

@@ -10,7 +10,9 @@ from shared.contracts.health import DependencyStatus, HealthReport
 
 class HealthService:
     def __init__(self, timeout_s: float | None = None) -> None:
-        self._timeout_s = timeout_s if timeout_s is not None else float(os.getenv("HEALTHCHECK_TIMEOUT_S", "2.0"))
+        self._timeout_s = timeout_s if timeout_s is not None else float(
+            os.getenv("HEALTHCHECK_TIMEOUT_S", "2.0")
+        )
 
     def _env(self, name: str, default: str) -> str:
         return os.getenv(name, default)
@@ -40,12 +42,12 @@ class HealthService:
                 status_code=200,
                 error=None,
             )
-        except Exception as e:
+        except redis.RedisError as exc:
             return DependencyStatus(
                 ok=False,
                 url=redis_url,
                 status_code=None,
-                error=type(e).__name__,
+                error=type(exc).__name__,
             )
         finally:
             await client.aclose()

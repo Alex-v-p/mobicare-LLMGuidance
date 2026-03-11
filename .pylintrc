@@ -1,0 +1,20 @@
+[MASTER]
+ignore-paths=^\.git/.*,^\.pants\.d/.*
+init-hook=import sys; sys.path[:0] = ["services/api/src", "services/inference/src", "services/shared/src"]
+
+[MESSAGES CONTROL]
+disable=
+    missing-module-docstring,
+    missing-class-docstring,
+    missing-function-docstring,
+    redefined-outer-name,
+    too-few-public-methods,
+    line-too-long,
+    broad-exception-caught,
+    duplicate-code,
+    too-many-arguments,
+    too-many-locals,
+    too-many-branches,
+    too-many-return-statements,
+    protected-access,
+    invalid-name

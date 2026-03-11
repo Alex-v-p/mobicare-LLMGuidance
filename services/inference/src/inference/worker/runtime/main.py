@@ -34,7 +34,9 @@ async def _handle_guidance_jobs(worker_id: str, heartbeat_interval_s: int) -> bo
         if record is None or record.status != "running":
             return False
 
-        heartbeat_task = asyncio.create_task(_heartbeat_loop(store, record.job_id, worker_id, heartbeat_interval_s))
+        heartbeat_task = asyncio.create_task(
+            _heartbeat_loop(store, record.job_id, worker_id, heartbeat_interval_s)
+        )
         try:
             result = await pipeline.run(record.request)
             record.status = "completed"
@@ -55,12 +57,19 @@ async def _handle_guidance_jobs(worker_id: str, heartbeat_interval_s: int) -> bo
                 await heartbeat_task
             except asyncio.CancelledError:
                 pass
+
             record.worker_id = worker_id
             record.lease_expires_at = None
-            callback_status, callback_error, callback_attempts = await notifier.notify(record)
+
+            callback_status, callback_error, callback_attempts = await notifier.notify(
+                record.request.options.callback_url,
+                record.request.options.callback_headers,
+                record,
+            )
             record.callback_last_status = callback_status
             record.callback_last_error = callback_error
             record.callback_attempts = callback_attempts
+
             await store.update(record)
         return True
     finally:
@@ -76,7 +85,9 @@ async def _handle_ingestion_jobs(worker_id: str, heartbeat_interval_s: int) -> b
         if record is None or record.status != "running":
             return False
 
-        heartbeat_task = asyncio.create_task(_heartbeat_loop(store, record.job_id, worker_id, heartbeat_interval_s))
+        heartbeat_task = asyncio.create_task(
+            _heartbeat_loop(store, record.job_id, worker_id, heartbeat_interval_s)
+        )
         try:
             result = await service.ingest(record.request)
             record.status = "completed"
@@ -110,10 +121,16 @@ async def run_worker_loop() -> None:
     heartbeat_interval_s = int(os.getenv("JOB_HEARTBEAT_INTERVAL_SECONDS", "20"))
 
     while True:
-        handled = await _handle_guidance_jobs(worker_id=worker_id, heartbeat_interval_s=heartbeat_interval_s)
+        handled = await _handle_guidance_jobs(
+            worker_id=worker_id,
+            heartbeat_interval_s=heartbeat_interval_s,
+        )
         if handled:
             continue
-        handled = await _handle_ingestion_jobs(worker_id=worker_id, heartbeat_interval_s=heartbeat_interval_s)
+        handled = await _handle_ingestion_jobs(
+            worker_id=worker_id,
+            heartbeat_interval_s=heartbeat_interval_s,
+        )
         if handled:
             continue
         await asyncio.sleep(1)
