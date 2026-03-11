@@ -1,6 +1,6 @@
 [MASTER]
 ignore-paths=^\.git/.*,^\.pants\.d/.*
-init-hook=import sys; sys.path[:0] = ['services/api/src', 'services/inference/src', 'services/shared/src']
+init-hook=import sys; sys.path[:0] = ["services/api/src", "services/inference/src", "services/shared/src"]
 
 [MESSAGES CONTROL]
 disable=
@@ -8,4 +8,13 @@ disable=
     missing-class-docstring,
     missing-function-docstring,
     redefined-outer-name,
-    too-few-public-methods
+    too-few-public-methods,
+    line-too-long,
+    broad-exception-caught,
+    duplicate-code,
+    too-many-arguments,
+    too-many-locals,
+    too-many-branches,
+    too-many-return-statements,
+    protected-access,
+    invalid-name

@@ -1,1 +1,1 @@
-from inference.jobstore import FileJobStore
+from __future__ import annotations

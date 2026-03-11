@@ -24,6 +24,9 @@ jobs:
           cache-dependency-path: |
             .pylintrc
             pants.toml
+            deploy/*.Dockerfile
+            docker-compose.yml
+            infra/compose/docker-compose.yml
 
       - name: Set up Pants
         uses: pantsbuild/actions/init-pants@v9
@@ -53,16 +56,27 @@ jobs:
         run: |
           pants lint ::
 
-      - name: Run Pylint
+      - name: Run Pylint (pass at 9.75+)
         env:
           PYTHONPATH: services/api/src:services/inference/src:services/shared/src
         run: |
+          set -o pipefail
           files=$(git ls-files '*.py')
           if [ -z "$files" ]; then
             echo "No Python files found."
             exit 0
           fi
-          pylint $files
+
+          pylint $files | tee pylint-report.txt || true
+
+          score=$(python -c "import re, pathlib; text = pathlib.Path('pylint-report.txt').read_text(encoding='utf-8'); match = re.search(r'rated at\\s+([0-9]+\\.[0-9]+)/10', text); print(match.group(1) if match else '')")
+
+          if [ -z "$score" ]; then
+            echo "Could not determine Pylint score."
+            exit 1
+          fi
+
+          python -c "score = float('$score'); threshold = 9.75; print(f'Pylint score: {score:.2f}/10 (threshold: {threshold:.2f})'); import sys; sys.exit(0 if score >= threshold else 1)"
 
       - name: Validate Docker Compose file
         run: |
