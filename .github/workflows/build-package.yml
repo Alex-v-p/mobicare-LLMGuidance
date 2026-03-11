@@ -22,7 +22,7 @@ jobs:
 
       - name: Validate Docker Compose configuration
         run: |
-          docker compose config
+          docker compose config -q
 
       - name: Build deployable images
         run: |
@@ -31,9 +31,13 @@ jobs:
       - name: Export Docker images
         run: |
           mkdir -p dist/images
+
           docker image save \
-            -o dist/images/llmguidance-images-${GITHUB_SHA}.tar \
-            $(docker compose images -q api inference inference-worker)
+            llmguidance/api \
+            llmguidance/inference \
+            llmguidance/inference-worker \
+            -o dist/images/llmguidance-images-${GITHUB_SHA}.tar
+
           gzip -f dist/images/llmguidance-images-${GITHUB_SHA}.tar
 
       - name: Create source deployment bundle
