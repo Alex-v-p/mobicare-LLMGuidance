@@ -15,7 +15,6 @@ jobs:
 
     env:
       REGISTRY: ghcr.io
-      IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/mobicare-llmguidance
 
     steps:
       - name: Check out code
@@ -36,6 +35,10 @@ jobs:
       - name: Show built images
         run: |
           docker images
+
+      - name: Compute lowercase registry path
+        run: |
+          echo "IMAGE_PREFIX=${REGISTRY}/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/mobicare-llmguidance" >> $GITHUB_ENV
 
       - name: Log in to GHCR
         uses: docker/login-action@v4
