@@ -42,14 +42,7 @@ class OllamaEmbeddingsClient:
                 response.raise_for_status()
 
             payload = response.json()
-
-            if "embeddings" in payload and payload["embeddings"]:
-                return payload["embeddings"][0]
-
-            if "embedding" in payload and payload["embedding"]:
-                return payload["embedding"]
-
-            raise ValueError(f"Unexpected Ollama embed response: {payload}")
+            return payload["embeddings"][0]
 
     async def embed_many(self, texts: list[str]) -> list[list[float]]:
         return [await self.embed(text) for text in texts]
