@@ -28,14 +28,18 @@ jobs:
         run: |
           docker compose build api inference inference-worker
 
+      - name: Show built images
+        run: |
+          docker images
+
       - name: Export Docker images
         run: |
           mkdir -p dist/images
 
           docker image save \
-            llmguidance/api \
-            llmguidance/inference \
-            llmguidance/inference-worker \
+            mobicare-llmguidance-api \
+            mobicare-llmguidance-inference \
+            mobicare-llmguidance-inference-worker \
             -o dist/images/llmguidance-images-${GITHUB_SHA}.tar
 
           gzip -f dist/images/llmguidance-images-${GITHUB_SHA}.tar
