@@ -2,7 +2,7 @@
 
 docker compose exec ollama ollama pull nomic-embed-text
 docker compose exec ollama ollama pull qwen2.5:0.5b
-
+```json
 {
   "options": {
     "cleaning_strategy": "deep",
@@ -14,8 +14,9 @@ docker compose exec ollama ollama pull qwen2.5:0.5b
     }
   }
 }
+```
 
-
+```json
 {
   "options": {
     "cleaning_strategy": "deep",
@@ -23,8 +24,9 @@ docker compose exec ollama ollama pull qwen2.5:0.5b
     "chunking_params": {}
   }
 }
+```
 
-
+```json
 {
   "options": {
     "cleaning_strategy": "deep",
@@ -35,7 +37,9 @@ docker compose exec ollama ollama pull qwen2.5:0.5b
     }
   }
 }
+```
 
+```json
 {
   "options": {
     "cleaning_strategy": "medical_guideline_deep",
@@ -48,8 +52,9 @@ docker compose exec ollama ollama pull qwen2.5:0.5b
     "embedding_model": "qwen3-embedding:4b"
   }
 }
+```
 
-
+```json
 {
     "request_id": "case-2026-0001",
     "question": "According to the ESC heart failure guidelines, what is the recommended management for a patient with worsening chronic HFrEF who remains symptomatic despite treatment with ACE inhibitor, beta blocker, and MRA?",
@@ -84,9 +89,10 @@ docker compose exec ollama ollama pull qwen2.5:0.5b
         }
     }
 }
+```
 
 Hybrid retrieval request example:
-
+```json
 {
   "request_id": "case-2026-0002",
   "question": "What should be monitored after starting sacubitril/valsartan in symptomatic HFrEF?",
@@ -109,7 +115,7 @@ Hybrid retrieval request example:
     "use_example_response": false
   }
 }
-
+```
 
 
 
@@ -174,3 +180,11 @@ Ollama: http://localhost:11434
   }
 }
 ```
+
+
+### Document management endpoints
+
+- `GET /documents` returns metadata for all objects in the configured documents bucket/prefix.
+- `GET /documents/{object_name}` returns the stored document itself from MinIO.
+- `POST /documents` uploads a file to the configured documents bucket/prefix using multipart form data (`file`) and an optional `object_name` override.
+- `DELETE /documents/{object_name}` deletes a stored document from MinIO.

@@ -20,6 +20,7 @@ RUN pip install --no-cache-dir \
     httpx==0.27.2 \
     pydantic==2.9.2 \
     pydantic-settings==2.5.2 \
+    python-multipart==0.0.20 \
     "redis>=5,<6" \
     "minio>=7,<8"
 
