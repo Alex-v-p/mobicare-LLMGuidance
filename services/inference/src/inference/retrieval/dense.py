@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import os
-
 from inference.embeddings.ollama_embeddings import OllamaEmbeddingsClient
 from inference.storage.qdrant_store import MissingCollectionError, QdrantVectorStore
+from shared.config import Settings, get_settings
 from shared.contracts.inference import RetrievedContext
 
 
@@ -16,10 +15,12 @@ class DenseRetriever:
         self,
         embedding_client: OllamaEmbeddingsClient | None = None,
         vector_store: QdrantVectorStore | None = None,
+        settings: Settings | None = None,
     ) -> None:
-        self._embedding_client = embedding_client or OllamaEmbeddingsClient()
-        self._vector_store = vector_store or QdrantVectorStore()
-        self._default_top_k = int(os.getenv("RETRIEVAL_TOP_K", "3"))
+        self._settings = settings or get_settings()
+        self._embedding_client = embedding_client or OllamaEmbeddingsClient(settings=self._settings)
+        self._vector_store = vector_store or QdrantVectorStore(settings=self._settings)
+        self._default_top_k = self._settings.retrieval_top_k
 
     async def retrieve(
         self,

@@ -2,27 +2,26 @@ from __future__ import annotations
 
 import io
 import json
-import os
 from datetime import datetime, timezone
 
 from minio import Minio
 from minio.commonconfig import ENABLED, Filter
 from minio.lifecycleconfig import Expiration, LifecycleConfig, Rule
 
+from shared.config import Settings, get_settings
 from shared.contracts.ingestion import IngestionJobRecord
 
 
 class MinioIngestionJobResultStore:
-    def __init__(self) -> None:
-        endpoint = os.getenv("MINIO_ENDPOINT", "http://minio:9000").replace("http://", "").replace("https://", "")
-        secure = os.getenv("MINIO_SECURE", "false").lower() == "true"
-        self._bucket = os.getenv("MINIO_RESULTS_BUCKET", "guidance-job-results")
-        self._retention_days = int(os.getenv("MINIO_JOB_RETENTION_DAYS", "7"))
+    def __init__(self, settings: Settings | None = None) -> None:
+        self._settings = settings or get_settings()
+        self._bucket = self._settings.minio_results_bucket
+        self._retention_days = self._settings.minio_job_retention_days
         self._client = Minio(
-            endpoint,
-            access_key=os.getenv("MINIO_ROOT_USER", "minioadmin"),
-            secret_key=os.getenv("MINIO_ROOT_PASSWORD", "minioadmin"),
-            secure=secure,
+            self._settings.minio_client_endpoint,
+            access_key=self._settings.minio_root_user,
+            secret_key=self._settings.minio_root_password,
+            secure=self._settings.minio_secure,
         )
 
     def ensure_bucket(self) -> None:

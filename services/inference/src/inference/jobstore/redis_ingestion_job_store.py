@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import redis.asyncio as redis
 
+from shared.config import Settings, get_settings
 from shared.contracts.ingestion import IngestionJobRecord, utc_now_iso
 
 
@@ -22,11 +22,13 @@ class RedisIngestionJobStore:
         queue_name: str | None = None,
         ttl_seconds: int | None = None,
         lease_seconds: int | None = None,
+        settings: Settings | None = None,
     ) -> None:
-        self._redis_url = redis_url or os.getenv("REDIS_URL", "redis://redis:6379/0")
-        self._queue_name = queue_name or os.getenv("REDIS_INGESTION_JOB_QUEUE", "ingestion_jobs")
-        self._ttl_seconds = ttl_seconds if ttl_seconds is not None else int(os.getenv("JOB_TTL_SECONDS", str(7 * 24 * 60 * 60)))
-        self._lease_seconds = lease_seconds if lease_seconds is not None else int(os.getenv("JOB_LEASE_SECONDS", "60"))
+        self._settings = settings or get_settings()
+        self._redis_url = redis_url or self._settings.redis_url
+        self._queue_name = queue_name or self._settings.redis_ingestion_job_queue
+        self._ttl_seconds = ttl_seconds if ttl_seconds is not None else self._settings.job_ttl_seconds
+        self._lease_seconds = lease_seconds if lease_seconds is not None else self._settings.job_lease_seconds
         self._redis: Optional[redis.Redis] = None
 
     async def _client(self) -> redis.Redis:

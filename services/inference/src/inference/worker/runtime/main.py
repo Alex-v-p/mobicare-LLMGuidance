@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import os
 import traceback
 from uuid import uuid4
 
@@ -12,6 +11,7 @@ from inference.jobstore.redis_guidance_job_store import RedisGuidanceJobStore
 from inference.pipeline.generate_guidance import GuidancePipeline
 from inference.storage.minio_ingestion_job_results import MinioIngestionJobResultStore
 from inference.storage.minio_guidance_job_results import MinioGuidanceJobResultStore
+from shared.config import get_settings
 from shared.contracts.ingestion import utc_now_iso as ingestion_utc_now_iso
 from shared.contracts.inference import utc_now_iso
 
@@ -117,8 +117,9 @@ async def _handle_ingestion_jobs(worker_id: str, heartbeat_interval_s: int) -> b
 
 
 async def run_worker_loop() -> None:
-    worker_id = os.getenv("WORKER_ID", f"worker-{uuid4()}")
-    heartbeat_interval_s = int(os.getenv("JOB_HEARTBEAT_INTERVAL_SECONDS", "20"))
+    settings = get_settings()
+    worker_id = settings.worker_id or f"worker-{uuid4()}"
+    heartbeat_interval_s = settings.job_heartbeat_interval_seconds
 
     while True:
         handled = await _handle_guidance_jobs(

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import os
-
 import httpx
+
+from shared.config import Settings, get_settings
 
 from shared.clients.http import create_async_client
 from shared.contracts.inference import (
@@ -40,13 +40,15 @@ def _extract_detail(response: httpx.Response) -> str:
 
 
 class InferenceClient:
-    def __init__(self, base_url: str | None = None, timeout_s: float | None = None) -> None:
-        self._base_url = (
-            base_url or os.getenv("INFERENCE_URL", "http://inference:8001")
-        ).rstrip("/")
-        self._timeout_s = timeout_s if timeout_s is not None else float(
-            os.getenv("INFERENCE_TIMEOUT_S", "60")
-        )
+    def __init__(
+        self,
+        base_url: str | None = None,
+        timeout_s: float | None = None,
+        settings: Settings | None = None,
+    ) -> None:
+        self._settings = settings or get_settings()
+        self._base_url = (base_url or self._settings.inference_url).rstrip("/")
+        self._timeout_s = timeout_s if timeout_s is not None else self._settings.inference_timeout_s
 
     async def generate_guidance(self, payload: InferenceRequest) -> InferenceResponse:
         async with create_async_client(timeout_s=self._timeout_s) as client:

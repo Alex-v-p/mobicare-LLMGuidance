@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import os
 from typing import Any
+
+from shared.config import Settings, get_settings
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
@@ -14,9 +15,15 @@ class MissingCollectionError(RuntimeError):
 
 
 class QdrantVectorStore:
-    def __init__(self, url: str | None = None, collection_name: str | None = None) -> None:
-        self._url = url or os.getenv("QDRANT_URL", "http://qdrant:6333")
-        self._collection = collection_name or os.getenv("QDRANT_COLLECTION", "guidance_chunks")
+    def __init__(
+        self,
+        url: str | None = None,
+        collection_name: str | None = None,
+        settings: Settings | None = None,
+    ) -> None:
+        self._settings = settings or get_settings()
+        self._url = url or self._settings.qdrant_url
+        self._collection = collection_name or self._settings.qdrant_collection
         self._client = QdrantClient(url=self._url)
 
     @property

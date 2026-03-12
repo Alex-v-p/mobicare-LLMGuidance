@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import io
 import mimetypes
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO
@@ -10,6 +8,7 @@ from typing import BinaryIO
 from minio import Minio
 from minio.error import S3Error
 
+from shared.config import Settings, get_settings
 from shared.contracts.documents import DocumentDeleteResponse, DocumentMetadata
 
 
@@ -33,16 +32,15 @@ class DocumentBlob:
 
 
 class DocumentRepository:
-    def __init__(self) -> None:
-        endpoint = os.getenv("MINIO_ENDPOINT", "http://minio:9000").replace("http://", "").replace("https://", "")
-        secure = os.getenv("MINIO_SECURE", "false").lower() == "true"
-        self._documents_bucket = os.getenv("MINIO_DOCUMENTS_BUCKET", "guidance-documents")
-        self._documents_prefix = os.getenv("MINIO_DOCUMENTS_PREFIX", "")
+    def __init__(self, settings: Settings | None = None) -> None:
+        self._settings = settings or get_settings()
+        self._documents_bucket = self._settings.minio_documents_bucket
+        self._documents_prefix = self._settings.minio_documents_prefix
         self._client = Minio(
-            endpoint,
-            access_key=os.getenv("MINIO_ROOT_USER", "minioadmin"),
-            secret_key=os.getenv("MINIO_ROOT_PASSWORD", "minioadmin"),
-            secure=secure,
+            self._settings.minio_client_endpoint,
+            access_key=self._settings.minio_root_user,
+            secret_key=self._settings.minio_root_password,
+            secure=self._settings.minio_secure,
         )
 
     def list_documents(self) -> list[DocumentMetadata]:
