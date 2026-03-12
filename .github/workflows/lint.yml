@@ -22,6 +22,8 @@ jobs:
           python-version: "3.12"
           cache: "pip"
           cache-dependency-path: |
+            requirements.lock
+            requirements-dev.lock
             pyproject.toml
             .pylintrc
             pants.toml
@@ -35,10 +37,11 @@ jobs:
         with:
           gha-cache-key: v0
 
-      - name: Install project and dev dependencies
+      - name: Install locked dev dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e .[dev]
+          python -m pip install -r requirements-dev.lock
+          python -m pip install -e . --no-deps
 
       - name: Verify Pants bootstrap
         run: |

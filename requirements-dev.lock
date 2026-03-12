@@ -1,0 +1,12 @@
+# Locked development dependencies.
+#
+# Install with:
+#   python -m pip install -r requirements-dev.lock
+#
+# Update intentionally when dependency versions change:
+#   uv pip compile pyproject.toml --extra dev -o requirements-dev.lock
+-r requirements.lock
+black==24.8.0
+pylint==4.0.5
+pytest==8.3.3
+pytest-asyncio==0.24.0

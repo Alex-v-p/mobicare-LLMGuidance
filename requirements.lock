@@ -1,0 +1,15 @@
+# Locked runtime dependencies for local setup and CI.
+#
+# Update intentionally when dependency versions change:
+#   uv pip compile pyproject.toml -o requirements.lock
+#
+# This file is currently kept in sync with pyproject.toml.
+fastapi==0.115.0
+httpx==0.27.2
+minio==7.2.18
+pydantic==2.9.2
+pydantic-settings==2.5.2
+pypdf==5.0.1
+qdrant-client==1.12.1
+redis[hiredis]==5.2.0
+uvicorn[standard]==0.30.6
