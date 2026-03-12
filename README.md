@@ -186,3 +186,5 @@ Ollama: http://localhost:11434
 
 - `GET /documents` returns metadata for all objects in the configured documents bucket/prefix.
 - `GET /documents/{object_name}` returns the stored document itself from MinIO.
+- `POST /documents` uploads a file to the configured documents bucket/prefix using multipart form data (`file`) and an optional `object_name` override.
+- `DELETE /documents/{object_name}` deletes a stored document from MinIO.

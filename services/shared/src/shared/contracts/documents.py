@@ -20,3 +20,14 @@ class DocumentMetadata(BaseModel):
 class DocumentMetadataListResponse(BaseModel):
     documents: list[DocumentMetadata]
     count: int
+
+
+class DocumentUploadResponse(BaseModel):
+    document: DocumentMetadata
+    status: str = "uploaded"
+
+
+class DocumentDeleteResponse(BaseModel):
+    object_name: str
+    bucket: str
+    status: str = "deleted"
