@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from fastapi.responses import Response
 
 from api.application.services.document_service import DocumentService
+from api.dependencies import get_document_service
 from api.repositories.document_repository import DocumentNotFoundError, DocumentRepositoryError
 from shared.contracts.documents import (
     DocumentDeleteResponse,
@@ -15,10 +16,6 @@ from shared.contracts.documents import (
 )
 
 router = APIRouter(tags=["documents"])
-
-
-def get_document_service() -> DocumentService:
-    return DocumentService()
 
 
 @router.get("/documents", response_model=DocumentMetadataListResponse)

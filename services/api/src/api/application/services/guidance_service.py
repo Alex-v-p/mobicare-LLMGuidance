@@ -12,8 +12,8 @@ from shared.contracts.inference import (
 
 
 class GuidanceService:
-    def __init__(self, inference_client: InferenceClient | None = None) -> None:
-        self._inference_client = inference_client or InferenceClient()
+    def __init__(self, inference_client: InferenceClient) -> None:
+        self._inference_client = inference_client
 
     def _to_inference_request(self, request: GuidanceRequest) -> InferenceRequest:
         return InferenceRequest(

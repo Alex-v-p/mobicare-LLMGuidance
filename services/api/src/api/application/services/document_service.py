@@ -7,8 +7,8 @@ from shared.contracts.documents import DocumentDeleteResponse, DocumentMetadataL
 
 
 class DocumentService:
-    def __init__(self, repository: DocumentRepository | None = None) -> None:
-        self._repository = repository or DocumentRepository()
+    def __init__(self, repository: DocumentRepository) -> None:
+        self._repository = repository
 
     def list_metadata(self) -> DocumentMetadataListResponse:
         documents = self._repository.list_documents()

@@ -7,8 +7,6 @@ from typing import BinaryIO
 
 from minio import Minio
 from minio.error import S3Error
-
-from shared.config import Settings, get_settings
 from shared.contracts.documents import DocumentDeleteResponse, DocumentMetadata
 
 
@@ -32,16 +30,16 @@ class DocumentBlob:
 
 
 class DocumentRepository:
-    def __init__(self, settings: Settings | None = None) -> None:
-        self._settings = settings or get_settings()
-        self._documents_bucket = self._settings.minio_documents_bucket
-        self._documents_prefix = self._settings.minio_documents_prefix
-        self._client = Minio(
-            self._settings.minio_client_endpoint,
-            access_key=self._settings.minio_root_user,
-            secret_key=self._settings.minio_root_password,
-            secure=self._settings.minio_secure,
-        )
+    def __init__(
+        self,
+        *,
+        client: Minio,
+        documents_bucket: str,
+        documents_prefix: str = "",
+    ) -> None:
+        self._client = client
+        self._documents_bucket = documents_bucket
+        self._documents_prefix = documents_prefix
 
     def list_documents(self) -> list[DocumentMetadata]:
         self._ensure_bucket_exists()
