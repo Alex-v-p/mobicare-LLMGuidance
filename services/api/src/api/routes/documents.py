@@ -4,12 +4,14 @@ import os
 from email.utils import format_datetime
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, UploadFile, status
 from fastapi.responses import Response
 
 from api.application.services.document_service import DocumentService
 from api.dependencies import get_document_service
+from api.errors import BadRequestError, NotFoundError, ServiceUnavailableError
 from api.repositories.document_repository import DocumentNotFoundError, DocumentRepositoryError
+from api.repositories.documents import DocumentStorageUnavailableError, InvalidDocumentError
 from shared.contracts.documents import (
     DocumentDeleteResponse,
     DocumentMetadataListResponse,
@@ -25,8 +27,16 @@ async def list_documents(
 ) -> DocumentMetadataListResponse:
     try:
         return service.list_metadata()
+    except DocumentStorageUnavailableError as exc:
+        raise ServiceUnavailableError(
+            code=exc.code,
+            message="Document storage is currently unavailable.",
+        ) from exc
     except DocumentRepositoryError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise ServiceUnavailableError(
+            code=exc.code,
+            message=exc.message,
+        ) from exc
 
 
 @router.get("/documents/{object_name:path}")
@@ -37,9 +47,23 @@ async def get_document(
     try:
         document = service.get_document(object_name)
     except DocumentNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise NotFoundError(
+            code=exc.code,
+            message="The requested document was not found.",
+            details={"object_name": object_name},
+        ) from exc
+    except DocumentStorageUnavailableError as exc:
+        raise ServiceUnavailableError(
+            code=exc.code,
+            message="Document storage is currently unavailable.",
+            details={"object_name": object_name},
+        ) from exc
     except DocumentRepositoryError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise ServiceUnavailableError(
+            code=exc.code,
+            message=exc.message,
+            details={"object_name": object_name},
+        ) from exc
 
     headers = {
         "Content-Disposition": f"inline; filename*=UTF-8''{quote(document.object_name)}",
@@ -61,7 +85,10 @@ async def upload_document(
     service: DocumentService = Depends(get_document_service),
 ) -> DocumentUploadResponse:
     if not file.filename:
-        raise HTTPException(status_code=400, detail="Uploaded file must include a filename")
+        raise BadRequestError(
+            code="DOCUMENT_UPLOAD_INVALID",
+            message="Uploaded file must include a filename.",
+        )
 
     size_bytes = _get_upload_size(file)
 
@@ -73,8 +100,24 @@ async def upload_document(
             content_type=file.content_type,
             object_name=file.filename,
         )
+    except InvalidDocumentError as exc:
+        raise BadRequestError(
+            code=exc.code,
+            message=exc.message,
+            details={"filename": file.filename},
+        ) from exc
+    except DocumentStorageUnavailableError as exc:
+        raise ServiceUnavailableError(
+            code=exc.code,
+            message="Document storage is currently unavailable.",
+            details={"filename": file.filename},
+        ) from exc
     except DocumentRepositoryError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise ServiceUnavailableError(
+            code=exc.code,
+            message=exc.message,
+            details={"filename": file.filename},
+        ) from exc
     finally:
         await file.close()
 
@@ -87,9 +130,23 @@ async def delete_document(
     try:
         return service.delete_document(object_name)
     except DocumentNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise NotFoundError(
+            code=exc.code,
+            message="The requested document was not found.",
+            details={"object_name": object_name},
+        ) from exc
+    except DocumentStorageUnavailableError as exc:
+        raise ServiceUnavailableError(
+            code=exc.code,
+            message="Document storage is currently unavailable.",
+            details={"object_name": object_name},
+        ) from exc
     except DocumentRepositoryError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise ServiceUnavailableError(
+            code=exc.code,
+            message=exc.message,
+            details={"object_name": object_name},
+        ) from exc
 
 
 def _get_upload_size(file: UploadFile) -> int:

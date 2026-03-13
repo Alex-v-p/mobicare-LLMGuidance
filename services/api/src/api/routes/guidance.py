@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
 from api.application.services.guidance_service import GuidanceService
 from api.dependencies import get_guidance_service
-from api.clients.inference_client import InferenceClientError
 from shared.contracts.inference import (
     ApiGuidanceJobStatus,
     ApiGuidanceResponse,
@@ -20,10 +19,7 @@ async def generate_guidance(
     request: GuidanceRequest,
     service: GuidanceService = Depends(get_guidance_service),
 ) -> ApiGuidanceResponse:
-    try:
-        return await service.generate(request)
-    except InferenceClientError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return await service.generate(request)
 
 
 @router.post("/guidance/jobs", response_model=JobAcceptedResponse)
@@ -31,10 +27,7 @@ async def create_guidance_job(
     request: GuidanceRequest,
     service: GuidanceService = Depends(get_guidance_service),
 ) -> JobAcceptedResponse:
-    try:
-        return await service.submit_job(request)
-    except InferenceClientError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return await service.submit_job(request)
 
 
 @router.get("/guidance/jobs/{job_id}", response_model=ApiGuidanceJobStatus)
@@ -42,7 +35,4 @@ async def get_guidance_job_status(
     job_id: str,
     service: GuidanceService = Depends(get_guidance_service),
 ) -> ApiGuidanceJobStatus:
-    try:
-        return await service.get_job_status(job_id)
-    except InferenceClientError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return await service.get_job_status(job_id)

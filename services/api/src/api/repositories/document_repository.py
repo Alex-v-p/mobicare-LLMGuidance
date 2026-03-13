@@ -11,6 +11,7 @@ from api.repositories.documents import (
     DocumentNotFoundError,
     DocumentRepositoryError,
     DocumentStorage,
+    InvalidDocumentError,
 )
 from shared.contracts.documents import DocumentDeleteResponse, DocumentMetadata
 
@@ -71,7 +72,7 @@ class DocumentRepository:
         object_name: str | None = None,
     ) -> DocumentMetadata:
         if size_bytes < 0:
-            raise DocumentRepositoryError("Document size must be greater than or equal to zero")
+            raise InvalidDocumentError("Document size must be greater than or equal to zero")
 
         location = self._namer.resolve_location(object_name or filename)
         resolved_content_type = self._namer.resolve_content_type(location.object_name, content_type)

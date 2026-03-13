@@ -7,7 +7,11 @@ from minio.datatypes import Object
 from minio.helpers import ObjectWriteResult
 from urllib3.response import HTTPResponse
 
-from api.repositories.documents.errors import DocumentRepositoryError, map_storage_error
+from api.repositories.documents.errors import (
+    DocumentRepositoryError,
+    DocumentStorageUnavailableError,
+    map_storage_error,
+)
 from api.repositories.documents.models import DocumentLocation
 
 
@@ -21,21 +25,26 @@ class DocumentStorage:
         try:
             exists = self._client.bucket_exists(self._documents_bucket)
         except Exception as exc:
-            raise DocumentRepositoryError(str(exc)) from exc
+            raise DocumentStorageUnavailableError("Could not reach document storage") from exc
 
         if not exists:
-            raise DocumentRepositoryError(f"Documents bucket '{self._documents_bucket}' does not exist")
+            raise DocumentStorageUnavailableError(
+                f"Documents bucket '{self._documents_bucket}' does not exist"
+            )
 
     def list_objects(self) -> list[Object]:
         self.ensure_bucket_exists()
         objects: list[Object] = []
-        for obj in self._client.list_objects(
-            self._documents_bucket,
-            prefix=self._list_prefix,
-            recursive=True,
-        ):
-            if not obj.is_dir:
-                objects.append(obj)
+        try:
+            for obj in self._client.list_objects(
+                self._documents_bucket,
+                prefix=self._list_prefix,
+                recursive=True,
+            ):
+                if not obj.is_dir:
+                    objects.append(obj)
+        except Exception as exc:
+            raise DocumentStorageUnavailableError("Could not list documents from storage") from exc
         return objects
 
     def stat_object(self, location: DocumentLocation) -> object:
@@ -45,7 +54,7 @@ class DocumentStorage:
         except Exception as exc:
             if hasattr(exc, "code"):
                 raise map_storage_error(exc, location.object_name) from exc
-            raise DocumentRepositoryError(str(exc)) from exc
+            raise DocumentStorageUnavailableError("Could not fetch document metadata") from exc
 
     def get_object_bytes(self, location: DocumentLocation) -> bytes:
         self.ensure_bucket_exists()
@@ -56,7 +65,7 @@ class DocumentStorage:
         except Exception as exc:
             if hasattr(exc, "code"):
                 raise map_storage_error(exc, location.object_name) from exc
-            raise DocumentRepositoryError(str(exc)) from exc
+            raise DocumentStorageUnavailableError("Could not download document content") from exc
         finally:
             if response is not None:
                 response.close()
@@ -82,7 +91,7 @@ class DocumentStorage:
         except Exception as exc:
             if hasattr(exc, "code"):
                 raise map_storage_error(exc, location.object_name) from exc
-            raise DocumentRepositoryError(str(exc)) from exc
+            raise DocumentStorageUnavailableError("Could not upload document") from exc
 
     def remove_object(self, location: DocumentLocation) -> None:
         self.ensure_bucket_exists()
@@ -91,4 +100,4 @@ class DocumentStorage:
         except Exception as exc:
             if hasattr(exc, "code"):
                 raise map_storage_error(exc, location.object_name) from exc
-            raise DocumentRepositoryError(str(exc)) from exc
+            raise DocumentStorageUnavailableError("Could not delete document") from exc
