@@ -8,8 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from minio.error import S3Error
 
-from inference.retrieval.dense import RetrievalCollectionNotReadyError as DenseRetrievalCollectionNotReadyError
-from inference.retrieval.hybrid import RetrievalCollectionNotReadyError as HybridRetrievalCollectionNotReadyError
+from inference.retrieval.common import RetrievalCollectionNotReadyError
 from inference.storage.qdrant_store import MissingCollectionError
 
 
@@ -48,9 +47,7 @@ def map_known_exception(exc: Exception) -> InferenceHttpError | None:
     if isinstance(
         exc,
         (
-            DenseRetrievalCollectionNotReadyError,
-            HybridRetrievalCollectionNotReadyError,
-            MissingCollectionError,
+            RetrievalCollectionNotReadyError
         ),
     ):
         return ConflictError(str(exc))

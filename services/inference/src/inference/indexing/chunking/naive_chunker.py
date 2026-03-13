@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from inference.indexing.chunking.base import DocumentChunker
-from inference.indexing.chunking.utils import normalize_for_offset_matching, resolve_page_number
+from inference.indexing.chunking.utils import build_chunk, normalize_for_offset_matching, sliding_window_chunks
 from inference.indexing.models import SourceDocument, TextChunk
 
 
@@ -15,33 +15,9 @@ class NaiveChunker(DocumentChunker):
         if not text:
             return []
 
-        chunks: list[TextChunk] = []
-        start = 0
-        index = 0
-        while start < len(text):
-            end = min(len(text), start + self._chunk_size)
-            chunk_text = text[start:end].strip()
-            if chunk_text:
-                chunks.append(
-                    TextChunk(
-                        chunk_id=f"{document.source_id}-chunk-{index}",
-                        source_id=document.source_id,
-                        title=document.title,
-                        text=chunk_text,
-                        metadata={
-                            **document.metadata,
-                            "chunk_index": index,
-                            "chunking_strategy": "naive",
-                            "page_number": resolve_page_number(
-                                document.metadata,
-                                chunk_text=chunk_text,
-                                start_offset=start,
-                            ),
-                        },
-                    )
-                )
-            if end >= len(text):
-                break
-            start = max(0, end - self._chunk_overlap)
-            index += 1
-        return chunks
+        return [
+            build_chunk(document, index=index, text=chunk_text, strategy="naive", start_offset=start_offset)
+            for index, (start_offset, chunk_text) in enumerate(
+                sliding_window_chunks(text, chunk_size=self._chunk_size, chunk_overlap=self._chunk_overlap)
+            )
+        ]

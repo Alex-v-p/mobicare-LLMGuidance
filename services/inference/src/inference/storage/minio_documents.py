@@ -101,10 +101,11 @@ class MinioDocumentStore:
                     )
                 return
 
-            combined_text = "\n\n".join((page.extract_text() or "") for page in reader.pages)
+            page_texts = [(page.extract_text() or "") for page in reader.pages]
+            combined_text = "\n\n".join(page_texts)
             yield MinioDocument(
                 object_name=object_name,
                 title=Path(object_name).name,
                 text=combined_text,
-                metadata={**base_metadata, "page_count": page_count},
+                metadata={**base_metadata, "page_count": page_count, "raw_page_texts": page_texts},
             )

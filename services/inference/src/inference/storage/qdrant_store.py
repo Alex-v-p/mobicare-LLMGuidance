@@ -58,10 +58,13 @@ class QdrantVectorStore:
             )
 
     def collection_has_points(self) -> bool:
+        return self.count_points() > 0
+
+    def count_points(self) -> int:
         if not self.collection_exists():
-            return False
+            return 0
         count_result = self._client.count(collection_name=self._collection, exact=False)
-        return int(count_result.count) > 0
+        return int(count_result.count)
 
     def upsert_chunks(self, chunks: list[TextChunk], embeddings: list[list[float]]) -> int:
         points: list[PointStruct] = []
