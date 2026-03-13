@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from api.clients.inference_client import InferenceClient
+from api.clients.inference_client import InferenceClient, InferenceClientError
+from api.errors import AppError, ServiceUnavailableError
 from shared.contracts.inference import (
     ApiGuidanceJobStatus,
     ApiGuidanceResponse,
@@ -24,9 +25,12 @@ class GuidanceService:
         )
 
     async def generate(self, request: GuidanceRequest) -> ApiGuidanceResponse:
-        inference_response = await self._inference_client.generate_guidance(
-            self._to_inference_request(request)
-        )
+        try:
+            inference_response = await self._inference_client.generate_guidance(
+                self._to_inference_request(request)
+            )
+        except InferenceClientError as exc:
+            raise self._map_inference_error(exc) from exc
         return ApiGuidanceResponse(
             request_id=inference_response.request_id,
             status=inference_response.status,
@@ -40,12 +44,18 @@ class GuidanceService:
         )
 
     async def submit_job(self, request: GuidanceRequest) -> JobAcceptedResponse:
-        return await self._inference_client.submit_guidance_job(
-            self._to_inference_request(request)
-        )
+        try:
+            return await self._inference_client.submit_guidance_job(
+                self._to_inference_request(request)
+            )
+        except InferenceClientError as exc:
+            raise self._map_inference_error(exc) from exc
 
     async def get_job_status(self, job_id: str) -> ApiGuidanceJobStatus:
-        record = await self._inference_client.get_guidance_job_status(job_id)
+        try:
+            record = await self._inference_client.get_guidance_job_status(job_id)
+        except InferenceClientError as exc:
+            raise self._map_inference_error(exc) from exc
         return self._to_api_job_status(record)
 
     def _to_api_job_status(self, record: JobRecord) -> ApiGuidanceJobStatus:
@@ -89,4 +99,18 @@ class GuidanceService:
             started_at=record.started_at,
             completed_at=record.completed_at,
             updated_at=record.updated_at,
+        )
+
+    def _map_inference_error(self, exc: InferenceClientError) -> AppError:
+        if exc.status_code >= 500:
+            return ServiceUnavailableError(
+                code=exc.code,
+                message=exc.message,
+                details=exc.details,
+            )
+        return AppError(
+            code=exc.code,
+            message=exc.message,
+            status_code=exc.status_code,
+            details=exc.details,
         )

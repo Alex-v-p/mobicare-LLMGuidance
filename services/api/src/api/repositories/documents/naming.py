@@ -3,7 +3,7 @@ from __future__ import annotations
 import mimetypes
 from pathlib import Path
 
-from api.repositories.documents.errors import DocumentRepositoryError
+from api.repositories.documents.errors import InvalidDocumentError
 from api.repositories.documents.models import DocumentLocation
 
 
@@ -19,7 +19,7 @@ class DocumentNamer:
     def resolve_location(self, object_name: str) -> DocumentLocation:
         sanitized_object_name = object_name.strip().lstrip("/")
         if not sanitized_object_name:
-            raise DocumentRepositoryError("Document object name must not be empty")
+            raise InvalidDocumentError("Document object name must not be empty")
 
         if (
             self._documents_prefix
