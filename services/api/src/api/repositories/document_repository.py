@@ -6,7 +6,11 @@ from pathlib import Path
 from typing import BinaryIO
 
 from minio import Minio
+from minio.datatypes import Object
 from minio.error import S3Error
+from minio.helpers import ObjectWriteResult
+from urllib3.response import HTTPResponse
+
 from shared.contracts.documents import DocumentDeleteResponse, DocumentMetadata
 
 
@@ -16,6 +20,12 @@ class DocumentRepositoryError(RuntimeError):
 
 class DocumentNotFoundError(DocumentRepositoryError):
     pass
+
+
+@dataclass(frozen=True)
+class DocumentLocation:
+    bucket: str
+    object_name: str
 
 
 @dataclass
@@ -39,40 +49,37 @@ class DocumentRepository:
     ) -> None:
         self._client = client
         self._documents_bucket = documents_bucket
-        self._documents_prefix = documents_prefix
+        self._documents_prefix = documents_prefix.strip("/")
 
     def list_documents(self) -> list[DocumentMetadata]:
         self._ensure_bucket_exists()
-        documents: list[DocumentMetadata] = []
-        for obj in self._client.list_objects(self._documents_bucket, prefix=self._documents_prefix, recursive=True):
-            if obj.is_dir:
-                continue
-            documents.append(self._build_metadata_from_object(obj.object_name, obj))
-
+        documents = [
+            self._build_metadata(self._to_location(obj.object_name), obj)
+            for obj in self._iter_document_objects()
+        ]
         documents.sort(key=lambda doc: doc.object_name)
         return documents
 
     def get_document(self, object_name: str) -> DocumentBlob:
-        normalized_object_name = self._normalize_object_name(object_name)
+        location = self._resolve_location(object_name)
         self._ensure_bucket_exists()
-        try:
-            stat = self._client.stat_object(self._documents_bucket, normalized_object_name)
-            response = self._client.get_object(self._documents_bucket, normalized_object_name)
-        except S3Error as exc:
-            if getattr(exc, "code", "") in {"NoSuchKey", "NoSuchObject", "NoSuchVersion", "ResourceNotFound"}:
-                raise DocumentNotFoundError(f"Document '{normalized_object_name}' was not found") from exc
-            raise DocumentRepositoryError(str(exc)) from exc
 
+        response: HTTPResponse | None = None
         try:
+            stat = self._stat_object(location)
+            response = self._client.get_object(location.bucket, location.object_name)
             content = response.read()
+        except S3Error as exc:
+            raise self._map_storage_error(exc, location.object_name) from exc
         finally:
-            response.close()
-            response.release_conn()
+            if response is not None:
+                response.close()
+                response.release_conn()
 
-        content_type = getattr(stat, "content_type", None) or mimetypes.guess_type(normalized_object_name)[0] or "application/octet-stream"
+        content_type = self._resolve_content_type(location.object_name, getattr(stat, "content_type", None))
         return DocumentBlob(
-            object_name=normalized_object_name,
-            bucket=self._documents_bucket,
+            object_name=location.object_name,
+            bucket=location.bucket,
             content=content,
             content_type=content_type,
             etag=getattr(stat, "etag", None),
@@ -90,57 +97,78 @@ class DocumentRepository:
         object_name: str | None = None,
     ) -> DocumentMetadata:
         self._ensure_bucket_exists()
-        resolved_object_name = self._normalize_object_name(object_name or filename)
-        resolved_content_type = content_type or mimetypes.guess_type(resolved_object_name)[0] or "application/octet-stream"
-
-        if size_bytes < 0:
-            raise DocumentRepositoryError("Document size must be greater than or equal to zero")
+        location = self._resolve_location(object_name or filename)
+        resolved_content_type = self._resolve_content_type(location.object_name, content_type)
+        self._validate_upload_size(size_bytes)
 
         try:
-            self._client.put_object(
-                self._documents_bucket,
-                resolved_object_name,
-                data=content_stream,
-                length=size_bytes,
+            self._put_object(
+                location=location,
+                content_stream=content_stream,
+                size_bytes=size_bytes,
                 content_type=resolved_content_type,
             )
-            stat = self._client.stat_object(self._documents_bucket, resolved_object_name)
+            stat = self._stat_object(location)
         except S3Error as exc:
-            raise DocumentRepositoryError(str(exc)) from exc
+            raise self._map_storage_error(exc, location.object_name) from exc
 
-        return self._build_metadata_from_object(resolved_object_name, stat, content_type=resolved_content_type)
+        return self._build_metadata(location, stat, content_type=resolved_content_type)
 
     def delete_document(self, object_name: str) -> DocumentDeleteResponse:
-        normalized_object_name = self._normalize_object_name(object_name)
+        location = self._resolve_location(object_name)
         self._ensure_bucket_exists()
 
         try:
-            self._client.stat_object(self._documents_bucket, normalized_object_name)
+            self._stat_object(location)
+            self._client.remove_object(location.bucket, location.object_name)
         except S3Error as exc:
-            if getattr(exc, "code", "") in {"NoSuchKey", "NoSuchObject", "NoSuchVersion", "ResourceNotFound"}:
-                raise DocumentNotFoundError(f"Document '{normalized_object_name}' was not found") from exc
-            raise DocumentRepositoryError(str(exc)) from exc
+            raise self._map_storage_error(exc, location.object_name) from exc
 
-        try:
-            self._client.remove_object(self._documents_bucket, normalized_object_name)
-        except S3Error as exc:
-            raise DocumentRepositoryError(str(exc)) from exc
+        return DocumentDeleteResponse(object_name=location.object_name, bucket=location.bucket)
 
-        return DocumentDeleteResponse(object_name=normalized_object_name, bucket=self._documents_bucket)
+    def _iter_document_objects(self) -> list[Object]:
+        objects: list[Object] = []
+        for obj in self._client.list_objects(
+            self._documents_bucket,
+            prefix=self._list_prefix(),
+            recursive=True,
+        ):
+            if not obj.is_dir:
+                objects.append(obj)
+        return objects
 
-    def _build_metadata_from_object(
+    def _put_object(
         self,
-        object_name: str,
+        *,
+        location: DocumentLocation,
+        content_stream: BinaryIO,
+        size_bytes: int,
+        content_type: str,
+    ) -> ObjectWriteResult:
+        return self._client.put_object(
+            location.bucket,
+            location.object_name,
+            data=content_stream,
+            length=size_bytes,
+            content_type=content_type,
+        )
+
+    def _stat_object(self, location: DocumentLocation) -> object:
+        return self._client.stat_object(location.bucket, location.object_name)
+
+    def _build_metadata(
+        self,
+        location: DocumentLocation,
         obj: object,
         *,
         content_type: str | None = None,
     ) -> DocumentMetadata:
-        extension = Path(object_name).suffix.lower().lstrip(".") or None
-        resolved_content_type = content_type or getattr(obj, "content_type", None) or mimetypes.guess_type(object_name)[0] or "application/octet-stream"
+        extension = Path(location.object_name).suffix.lower().lstrip(".") or None
+        resolved_content_type = self._resolve_content_type(location.object_name, content_type or getattr(obj, "content_type", None))
         return DocumentMetadata(
-            object_name=object_name,
-            title=Path(object_name).name,
-            bucket=self._documents_bucket,
+            object_name=location.object_name,
+            title=Path(location.object_name).name,
+            bucket=location.bucket,
             prefix=self._documents_prefix,
             size_bytes=getattr(obj, "size", 0) or 0,
             extension=extension,
@@ -149,15 +177,28 @@ class DocumentRepository:
             last_modified=getattr(obj, "last_modified", None),
         )
 
-    def _normalize_object_name(self, object_name: str) -> str:
+    def _resolve_location(self, object_name: str) -> DocumentLocation:
         sanitized_object_name = object_name.strip().lstrip("/")
         if not sanitized_object_name:
             raise DocumentRepositoryError("Document object name must not be empty")
 
-        normalized_prefix = self._documents_prefix.strip("/")
-        if normalized_prefix and sanitized_object_name != normalized_prefix and not sanitized_object_name.startswith(f"{normalized_prefix}/"):
-            return f"{normalized_prefix}/{sanitized_object_name}"
-        return sanitized_object_name
+        if self._documents_prefix and sanitized_object_name != self._documents_prefix and not sanitized_object_name.startswith(f"{self._documents_prefix}/"):
+            sanitized_object_name = f"{self._documents_prefix}/{sanitized_object_name}"
+
+        return DocumentLocation(bucket=self._documents_bucket, object_name=sanitized_object_name)
+
+    def _to_location(self, object_name: str) -> DocumentLocation:
+        return DocumentLocation(bucket=self._documents_bucket, object_name=object_name)
+
+    def _list_prefix(self) -> str | None:
+        return self._documents_prefix or None
+
+    def _resolve_content_type(self, object_name: str, explicit_content_type: str | None) -> str:
+        return explicit_content_type or mimetypes.guess_type(object_name)[0] or "application/octet-stream"
+
+    def _validate_upload_size(self, size_bytes: int) -> None:
+        if size_bytes < 0:
+            raise DocumentRepositoryError("Document size must be greater than or equal to zero")
 
     def _ensure_bucket_exists(self) -> None:
         try:
@@ -167,3 +208,8 @@ class DocumentRepository:
 
         if not exists:
             raise DocumentRepositoryError(f"Documents bucket '{self._documents_bucket}' does not exist")
+
+    def _map_storage_error(self, exc: S3Error, object_name: str) -> DocumentRepositoryError:
+        if getattr(exc, "code", "") in {"NoSuchKey", "NoSuchObject", "NoSuchVersion", "ResourceNotFound"}:
+            return DocumentNotFoundError(f"Document '{object_name}' was not found")
+        return DocumentRepositoryError(str(exc))

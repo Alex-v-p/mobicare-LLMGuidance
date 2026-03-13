@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import os
 from email.utils import format_datetime
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import Response
 
 from api.application.services.document_service import DocumentService
@@ -59,19 +60,23 @@ async def upload_document(
     file: UploadFile = File(...),
     service: DocumentService = Depends(get_document_service),
 ) -> DocumentUploadResponse:
-    content = await file.read()
     if not file.filename:
         raise HTTPException(status_code=400, detail="Uploaded file must include a filename")
+
+    size_bytes = _get_upload_size(file)
 
     try:
         return service.upload_document(
             filename=file.filename,
-            content=content,
+            content_stream=file.file,
+            size_bytes=size_bytes,
             content_type=file.content_type,
             object_name=file.filename,
         )
     except DocumentRepositoryError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    finally:
+        await file.close()
 
 
 @router.delete("/documents/{object_name:path}", response_model=DocumentDeleteResponse)
@@ -85,3 +90,12 @@ async def delete_document(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except DocumentRepositoryError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+def _get_upload_size(file: UploadFile) -> int:
+    stream = file.file
+    current_position = stream.tell()
+    stream.seek(0, os.SEEK_END)
+    size_bytes = stream.tell()
+    stream.seek(current_position)
+    return size_bytes

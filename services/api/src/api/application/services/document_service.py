@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import io
+from typing import BinaryIO
 
 from api.repositories.document_repository import DocumentBlob, DocumentRepository
 from shared.contracts.documents import DocumentDeleteResponse, DocumentMetadataListResponse, DocumentUploadResponse
@@ -21,14 +21,15 @@ class DocumentService:
         self,
         *,
         filename: str,
-        content: bytes,
+        content_stream: BinaryIO,
+        size_bytes: int,
         content_type: str | None = None,
         object_name: str | None = None,
     ) -> DocumentUploadResponse:
         document = self._repository.upload_document(
             filename=filename,
-            content_stream=io.BytesIO(content),
-            size_bytes=len(content),
+            content_stream=content_stream,
+            size_bytes=size_bytes,
             content_type=content_type,
             object_name=object_name,
         )
