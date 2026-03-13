@@ -3,13 +3,10 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from api.application.services.health_service import HealthService
+from api.dependencies import get_health_service
 from shared.contracts.health import HealthReport
 
 router = APIRouter(tags=["health"])
-
-
-def get_health_service() -> HealthService:
-    return HealthService()
 
 
 @router.get("/health", response_model=HealthReport)

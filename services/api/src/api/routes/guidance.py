@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 
 from api.application.services.guidance_service import GuidanceService
+from api.dependencies import get_guidance_service
 from api.clients.inference_client import InferenceClientError
 from shared.contracts.inference import (
     ApiGuidanceJobStatus,
@@ -12,10 +13,6 @@ from shared.contracts.inference import (
 )
 
 router = APIRouter(tags=["guidance"])
-
-
-def get_guidance_service() -> GuidanceService:
-    return GuidanceService()
 
 
 @router.post("/guidance/generate", response_model=ApiGuidanceResponse)

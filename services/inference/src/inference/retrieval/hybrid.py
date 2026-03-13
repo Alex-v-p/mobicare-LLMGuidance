@@ -4,19 +4,20 @@ from dataclasses import dataclass
 from typing import Any
 
 from inference.embeddings.ollama_embeddings import OllamaEmbeddingsClient
+from inference.retrieval.common import (
+    ensure_collection_ready,
+    payload_identity,
+    payload_to_context,
+    search_qdrant,
+)
 from inference.retrieval.graph import ChunkGraphAugmenter
 from inference.retrieval.sparse import SparseKeywordRetriever
-from inference.storage.qdrant_store import MissingCollectionError, QdrantVectorStore
-from shared.contracts.inference import RetrievedContext
-
-
-class RetrievalCollectionNotReadyError(RuntimeError):
-    pass
+from inference.storage.qdrant_store import QdrantVectorStore
 
 
 @dataclass(slots=True)
 class HybridRetrievalResult:
-    items: list[RetrievedContext]
+    items: list
     metadata: dict[str, Any]
 
 
@@ -32,6 +33,8 @@ class HybridRetriever:
         self._vector_store = vector_store or QdrantVectorStore()
         self._sparse_retriever = sparse_retriever or SparseKeywordRetriever()
         self._graph_augmenter = graph_augmenter or ChunkGraphAugmenter()
+        self._cached_corpus_payloads: list[dict[str, Any]] | None = None
+        self._cached_corpus_count: int | None = None
 
     async def retrieve(
         self,
@@ -44,29 +47,65 @@ class HybridRetriever:
         graph_max_extra_nodes: int = 2,
         embedding_model: str | None = None,
     ) -> HybridRetrievalResult:
-        if not self._vector_store.collection_exists():
-            raise RetrievalCollectionNotReadyError(
-                f"Qdrant collection '{self._vector_store.collection_name}' does not exist yet. Run document ingestion first."
-            )
-        if not self._vector_store.collection_has_points():
-            raise RetrievalCollectionNotReadyError(
-                f"Qdrant collection '{self._vector_store.collection_name}' is empty. Run document ingestion first."
-            )
-
-        corpus_payloads = self._vector_store.get_all_payloads()
+        ensure_collection_ready(self._vector_store)
+        corpus_payloads = self._get_corpus_payloads()
         if not corpus_payloads:
-            raise RetrievalCollectionNotReadyError(
+            raise RuntimeError(
                 f"Qdrant collection '{self._vector_store.collection_name}' is empty. Run document ingestion first."
             )
 
         query_vector = await self._embedding_client.with_model(embedding_model).embed(query)
-        try:
-            dense_hits = self._vector_store.search(query_vector=query_vector, limit=max(limit * 4, 10))
-        except MissingCollectionError as exc:
-            raise RetrievalCollectionNotReadyError(str(exc)) from exc
+        dense_limit = max(limit * 4, 10)
+        dense_hits = search_qdrant(vector_store=self._vector_store, query_vector=query_vector, limit=dense_limit)
+        sparse_hits = self._sparse_retriever.search(query=query, documents=corpus_payloads, limit=dense_limit)
 
-        sparse_hits = self._sparse_retriever.search(query=query, documents=corpus_payloads, limit=max(limit * 4, 10))
+        fused = self._fuse_results(
+            dense_hits=dense_hits,
+            sparse_hits=sparse_hits,
+            dense_weight=dense_weight,
+            sparse_weight=sparse_weight,
+        )
+        ranked_payloads = [item["payload"] for item in sorted(fused.values(), key=lambda item: item["score"], reverse=True)[:limit]]
 
+        graph_metadata = {"graph_augmented": False, "graph_nodes_added": 0, "graph_edges_used": []}
+        if use_graph_augmentation:
+            items, graph_metadata = self._graph_augmenter.expand(
+                query=query,
+                ranked_payloads=ranked_payloads,
+                corpus_payloads=corpus_payloads,
+                max_extra_nodes=graph_max_extra_nodes,
+            )
+        else:
+            items = [payload_to_context(payload) for payload in ranked_payloads]
+
+        return HybridRetrievalResult(
+            items=items,
+            metadata={
+                "retrieval_mode": "hybrid",
+                "dense_candidates": len(dense_hits),
+                "sparse_candidates": len(sparse_hits),
+                "hybrid_dense_weight": dense_weight,
+                "hybrid_sparse_weight": sparse_weight,
+                **graph_metadata,
+            },
+        )
+
+    def _get_corpus_payloads(self) -> list[dict[str, Any]]:
+        count = self._vector_store.count_points()
+        if self._cached_corpus_payloads is not None and self._cached_corpus_count == count:
+            return self._cached_corpus_payloads
+        self._cached_corpus_payloads = self._vector_store.get_all_payloads()
+        self._cached_corpus_count = count
+        return self._cached_corpus_payloads
+
+    def _fuse_results(
+        self,
+        *,
+        dense_hits: list[Any],
+        sparse_hits: list[Any],
+        dense_weight: float,
+        sparse_weight: float,
+    ) -> dict[str, dict[str, Any]]:
         dense_norm = self._normalize_dense_hits(dense_hits)
         sparse_norm = self._normalize_sparse_hits(sparse_hits)
 
@@ -92,34 +131,7 @@ class HybridRetriever:
             else:
                 existing["score"] += sparse_component
                 existing["sparse_score"] = item["score"]
-
-        ranked_payloads = [
-            item["payload"]
-            for item in sorted(fused.values(), key=lambda item: item["score"], reverse=True)[:limit]
-        ]
-
-        graph_metadata = {"graph_augmented": False, "graph_nodes_added": 0, "graph_edges_used": []}
-        if use_graph_augmentation:
-            items, graph_metadata = self._graph_augmenter.expand(
-                query=query,
-                ranked_payloads=ranked_payloads,
-                corpus_payloads=corpus_payloads,
-                max_extra_nodes=graph_max_extra_nodes,
-            )
-        else:
-            items = [self._to_context(payload) for payload in ranked_payloads]
-
-        return HybridRetrievalResult(
-            items=items,
-            metadata={
-                "retrieval_mode": "hybrid",
-                "dense_candidates": len(dense_hits),
-                "sparse_candidates": len(sparse_hits),
-                "hybrid_dense_weight": dense_weight,
-                "hybrid_sparse_weight": sparse_weight,
-                **graph_metadata,
-            },
-        )
+        return fused
 
     def _normalize_dense_hits(self, hits: list[Any]) -> dict[str, dict[str, Any]]:
         raw: list[tuple[dict[str, Any], float]] = []
@@ -143,18 +155,9 @@ class HybridRetriever:
         denom = max(max_score - min_score, 1e-9)
         normalized: dict[str, dict[str, Any]] = {}
         for payload, score in items:
-            chunk_id = str(payload.get("chunk_id") or payload.get("source_id") or id(payload))
+            chunk_id = payload_identity(payload)
             normalized[chunk_id] = {
                 "payload": payload,
                 "score": (score - min_score) / denom if max_score != min_score else 1.0,
             }
         return normalized
-
-    def _to_context(self, payload: dict[str, Any]) -> RetrievedContext:
-        return RetrievedContext(
-            source_id=str(payload.get("source_id") or payload.get("chunk_id") or "unknown"),
-            title=str(payload.get("title") or payload.get("object_name") or "Untitled"),
-            snippet=str(payload.get("text") or ""),
-            chunk_id=str(payload.get("chunk_id")) if payload.get("chunk_id") is not None else None,
-            page_number=int(payload.get("page_number")) if payload.get("page_number") is not None else None,
-        )

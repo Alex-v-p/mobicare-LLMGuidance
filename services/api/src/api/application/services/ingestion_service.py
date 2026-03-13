@@ -9,8 +9,8 @@ from shared.contracts.ingestion import (
 
 
 class IngestionService:
-    def __init__(self, inference_client: InferenceClient | None = None) -> None:
-        self._inference_client = inference_client or InferenceClient()
+    def __init__(self, inference_client: InferenceClient) -> None:
+        self._inference_client = inference_client
 
     async def submit_job(
         self,

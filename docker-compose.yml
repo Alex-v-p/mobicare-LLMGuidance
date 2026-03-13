@@ -18,6 +18,23 @@ services:
       REDIS_URL: "${REDIS_URL:-redis://redis:6379/0}"
     ports:
       - "${API_PORT:-8000}:8000"
+    depends_on:
+      inference:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+      minio:
+        condition: service_started
+      redis:
+        condition: service_started
+      ollama:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
 
   inference:
     build:
@@ -41,6 +58,21 @@ services:
       MINIO_JOB_RETENTION_DAYS: "${MINIO_JOB_RETENTION_DAYS:-7}"
     ports:
       - "${INFERENCE_PORT:-8001}:8001"
+    depends_on:
+      qdrant:
+        condition: service_started
+      minio:
+        condition: service_started
+      redis:
+        condition: service_started
+      ollama:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
 
   inference-worker:
     build:
@@ -62,11 +94,24 @@ services:
       CALLBACK_TIMEOUT_S: "${CALLBACK_TIMEOUT_S:-10}"
       CALLBACK_MAX_ATTEMPTS: "${CALLBACK_MAX_ATTEMPTS:-3}"
     depends_on:
-      - inference
-      - ollama
-      - redis
-      - minio
-    # restart: unless-stopped # Uncomment this line when running in final version
+      qdrant:
+        condition: service_started
+      minio:
+        condition: service_started
+      redis:
+        condition: service_started
+      ollama:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"from pathlib import Path; import sys; cmd = Path('/proc/1/cmdline').read_bytes().replace(b'\\x00', b' ').decode(); sys.exit(0 if 'inference.worker.runtime.main' in cmd else 1)\"",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   redis:
     image: redis:7-alpine
