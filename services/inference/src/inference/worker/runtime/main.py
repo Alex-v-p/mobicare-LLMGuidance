@@ -5,12 +5,14 @@ import traceback
 from uuid import uuid4
 
 from inference.callbacks.notifier import CallbackNotifier
-from inference.indexing.ingestion_service import IngestionService
-from inference.jobstore.redis_ingestion_job_store import RedisIngestionJobStore
-from inference.jobstore.redis_guidance_job_store import RedisGuidanceJobStore
-from inference.pipeline.generate_guidance import GuidancePipeline
-from inference.storage.minio_ingestion_job_results import MinioIngestionJobResultStore
-from inference.storage.minio_guidance_job_results import MinioGuidanceJobResultStore
+from inference.http.dependencies import (
+    get_guidance_job_result_store,
+    get_guidance_job_store,
+    get_guidance_pipeline,
+    get_ingestion_job_result_store,
+    get_ingestion_job_store,
+    get_ingestion_service,
+)
 from shared.config import get_settings
 from shared.contracts.ingestion import utc_now_iso as ingestion_utc_now_iso
 from shared.contracts.inference import utc_now_iso
@@ -25,42 +27,49 @@ async def _heartbeat_loop(store, job_id: str, worker_id: str, interval_s: int) -
 
 
 async def _handle_guidance_jobs(worker_id: str, heartbeat_interval_s: int) -> bool:
-    store = RedisGuidanceJobStore()
-    pipeline = GuidancePipeline()
-    results = MinioGuidanceJobResultStore()
+    store = get_guidance_job_store()
+    pipeline = get_guidance_pipeline()
+    results = get_guidance_job_result_store()
     notifier = CallbackNotifier()
     try:
         record = await store.claim_next(worker_id=worker_id, timeout_s=1)
         if record is None or record.status != "running":
             return False
 
-        heartbeat_task = asyncio.create_task(
-            _heartbeat_loop(store, record.job_id, worker_id, heartbeat_interval_s)
-        )
+        heartbeat_task = asyncio.create_task(_heartbeat_loop(store, record.job_id, worker_id, heartbeat_interval_s))
         try:
             result = await pipeline.run(record.request)
-            record.result_object_key = results.put_job_result(record.model_copy(update={
-                "status": "completed",
-                "result": result,
-                "error": None,
-                "completed_at": utc_now_iso(),
-                "lease_expires_at": None,
-            }))
+            completed_at = utc_now_iso()
+            record.result_object_key = results.put_job_result(
+                record.model_copy(
+                    update={
+                        "status": "completed",
+                        "result": result,
+                        "error": None,
+                        "completed_at": completed_at,
+                        "lease_expires_at": None,
+                    }
+                )
+            )
             await store.mark_completed(
                 record,
                 result=result,
-                completed_at=utc_now_iso(),
+                completed_at=completed_at,
                 result_object_key=record.result_object_key,
             )
         except Exception as exc:  # pragma: no cover
             failed_at = utc_now_iso()
-            record.result_object_key = results.put_job_result(record.model_copy(update={
-                "status": "failed",
-                "result": None,
-                "error": f"{type(exc).__name__}: {exc}",
-                "completed_at": failed_at,
-                "lease_expires_at": None,
-            }))
+            record.result_object_key = results.put_job_result(
+                record.model_copy(
+                    update={
+                        "status": "failed",
+                        "result": None,
+                        "error": f"{type(exc).__name__}: {exc}",
+                        "completed_at": failed_at,
+                        "lease_expires_at": None,
+                    }
+                )
+            )
             await store.mark_failed(
                 record,
                 error=f"{type(exc).__name__}: {exc}",
@@ -94,27 +103,29 @@ async def _handle_guidance_jobs(worker_id: str, heartbeat_interval_s: int) -> bo
 
 
 async def _handle_ingestion_jobs(worker_id: str, heartbeat_interval_s: int) -> bool:
-    store = RedisIngestionJobStore()
-    service = IngestionService()
-    results = MinioIngestionJobResultStore()
+    store = get_ingestion_job_store()
+    service = get_ingestion_service()
+    results = get_ingestion_job_result_store()
     try:
         record = await store.claim_next(worker_id=worker_id, timeout_s=1)
         if record is None or record.status != "running":
             return False
 
-        heartbeat_task = asyncio.create_task(
-            _heartbeat_loop(store, record.job_id, worker_id, heartbeat_interval_s)
-        )
+        heartbeat_task = asyncio.create_task(_heartbeat_loop(store, record.job_id, worker_id, heartbeat_interval_s))
         try:
             result = await service.ingest(record.request)
             completed_at = ingestion_utc_now_iso()
-            record.result_object_key = results.put_job_result(record.model_copy(update={
-                "status": "completed",
-                "result": result,
-                "error": None,
-                "completed_at": completed_at,
-                "lease_expires_at": None,
-            }))
+            record.result_object_key = results.put_job_result(
+                record.model_copy(
+                    update={
+                        "status": "completed",
+                        "result": result,
+                        "error": None,
+                        "completed_at": completed_at,
+                        "lease_expires_at": None,
+                    }
+                )
+            )
             await store.mark_completed(
                 record,
                 result=result,
@@ -123,13 +134,17 @@ async def _handle_ingestion_jobs(worker_id: str, heartbeat_interval_s: int) -> b
             )
         except Exception as exc:  # pragma: no cover
             failed_at = ingestion_utc_now_iso()
-            record.result_object_key = results.put_job_result(record.model_copy(update={
-                "status": "failed",
-                "result": None,
-                "error": f"{type(exc).__name__}: {exc}",
-                "completed_at": failed_at,
-                "lease_expires_at": None,
-            }))
+            record.result_object_key = results.put_job_result(
+                record.model_copy(
+                    update={
+                        "status": "failed",
+                        "result": None,
+                        "error": f"{type(exc).__name__}: {exc}",
+                        "completed_at": failed_at,
+                        "lease_expires_at": None,
+                    }
+                )
+            )
             await store.mark_failed(
                 record,
                 error=f"{type(exc).__name__}: {exc}",
@@ -157,16 +172,10 @@ async def run_worker_loop() -> None:
     heartbeat_interval_s = settings.job_heartbeat_interval_seconds
 
     while True:
-        handled = await _handle_guidance_jobs(
-            worker_id=worker_id,
-            heartbeat_interval_s=heartbeat_interval_s,
-        )
+        handled = await _handle_guidance_jobs(worker_id=worker_id, heartbeat_interval_s=heartbeat_interval_s)
         if handled:
             continue
-        handled = await _handle_ingestion_jobs(
-            worker_id=worker_id,
-            heartbeat_interval_s=heartbeat_interval_s,
-        )
+        handled = await _handle_ingestion_jobs(worker_id=worker_id, heartbeat_interval_s=heartbeat_interval_s)
         if handled:
             continue
         await asyncio.sleep(1)

@@ -8,9 +8,12 @@ from inference.http.clients.ollama_client import OllamaClient
 from inference.http.services.guidance_service import GuidanceJobService, GuidanceRequestService
 from inference.http.services.ingestion_service import IngestionJobService, IngestionRequestService
 from inference.indexing.document_loader import DocumentLoader
+from inference.indexing.document_preparer import DocumentPreparationService
 from inference.indexing.ingestion_service import IngestionService
+from inference.indexing.vector_indexer import VectorIndexingService
 from inference.jobstore.redis_guidance_job_store import RedisGuidanceJobStore
 from inference.jobstore.redis_ingestion_job_store import RedisIngestionJobStore
+from inference.pipeline.components import AnswerGenerator, ExampleResponseBuilder, QueryRewriter, RetrievalOrchestrator, ResponseVerifier
 from inference.pipeline.generate_guidance import GuidancePipeline
 from inference.retrieval.dense import DenseRetriever
 from inference.retrieval.hybrid import HybridRetriever
@@ -67,6 +70,35 @@ def get_hybrid_retriever() -> HybridRetriever:
     )
 
 
+
+
+@lru_cache(maxsize=1)
+def get_retrieval_orchestrator() -> RetrievalOrchestrator:
+    return RetrievalOrchestrator(
+        retriever=get_dense_retriever(),
+        hybrid_retriever=get_hybrid_retriever(),
+    )
+
+
+@lru_cache(maxsize=1)
+def get_query_rewriter() -> QueryRewriter:
+    return QueryRewriter(get_ollama_client())
+
+
+@lru_cache(maxsize=1)
+def get_answer_generator() -> AnswerGenerator:
+    return AnswerGenerator(get_ollama_client())
+
+
+@lru_cache(maxsize=1)
+def get_response_verifier() -> ResponseVerifier:
+    return ResponseVerifier(get_ollama_client())
+
+
+@lru_cache(maxsize=1)
+def get_example_response_builder() -> ExampleResponseBuilder:
+    return ExampleResponseBuilder()
+
 @lru_cache(maxsize=1)
 def get_ollama_client() -> OllamaClient:
     return OllamaClient(settings=get_inference_settings())
@@ -78,6 +110,24 @@ def get_guidance_pipeline() -> GuidancePipeline:
         retriever=get_dense_retriever(),
         hybrid_retriever=get_hybrid_retriever(),
         ollama_client=get_ollama_client(),
+        query_rewriter=get_query_rewriter(),
+        retrieval_orchestrator=get_retrieval_orchestrator(),
+        answer_generator=get_answer_generator(),
+        response_verifier=get_response_verifier(),
+        example_response_builder=get_example_response_builder(),
+    )
+
+
+@lru_cache(maxsize=1)
+def get_document_preparer() -> DocumentPreparationService:
+    return DocumentPreparationService()
+
+
+@lru_cache(maxsize=1)
+def get_vector_indexer() -> VectorIndexingService:
+    return VectorIndexingService(
+        embedding_client=get_embedding_client(),
+        vector_store=get_vector_store(),
     )
 
 
@@ -88,6 +138,8 @@ def get_ingestion_service() -> IngestionService:
         document_loader=get_document_loader(),
         embedding_client=get_embedding_client(),
         vector_store=get_vector_store(),
+        document_preparer=get_document_preparer(),
+        vector_indexer=get_vector_indexer(),
     )
 
 
