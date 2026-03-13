@@ -39,17 +39,34 @@ async def _handle_guidance_jobs(worker_id: str, heartbeat_interval_s: int) -> bo
         )
         try:
             result = await pipeline.run(record.request)
-            record.status = "completed"
-            record.result = result
-            record.error = None
-            record.completed_at = utc_now_iso()
-            record.result_object_key = results.put_job_result(record)
+            record.result_object_key = results.put_job_result(record.model_copy(update={
+                "status": "completed",
+                "result": result,
+                "error": None,
+                "completed_at": utc_now_iso(),
+                "lease_expires_at": None,
+            }))
+            await store.mark_completed(
+                record,
+                result=result,
+                completed_at=utc_now_iso(),
+                result_object_key=record.result_object_key,
+            )
         except Exception as exc:  # pragma: no cover
-            record.status = "failed"
-            record.error = f"{type(exc).__name__}: {exc}"
-            record.completed_at = utc_now_iso()
-            record.result = None
-            record.result_object_key = results.put_job_result(record)
+            failed_at = utc_now_iso()
+            record.result_object_key = results.put_job_result(record.model_copy(update={
+                "status": "failed",
+                "result": None,
+                "error": f"{type(exc).__name__}: {exc}",
+                "completed_at": failed_at,
+                "lease_expires_at": None,
+            }))
+            await store.mark_failed(
+                record,
+                error=f"{type(exc).__name__}: {exc}",
+                completed_at=failed_at,
+                result_object_key=record.result_object_key,
+            )
             traceback.print_exc()
         finally:
             heartbeat_task.cancel()
@@ -90,17 +107,35 @@ async def _handle_ingestion_jobs(worker_id: str, heartbeat_interval_s: int) -> b
         )
         try:
             result = await service.ingest(record.request)
-            record.status = "completed"
-            record.result = result
-            record.error = None
-            record.completed_at = ingestion_utc_now_iso()
-            record.result_object_key = results.put_job_result(record)
+            completed_at = ingestion_utc_now_iso()
+            record.result_object_key = results.put_job_result(record.model_copy(update={
+                "status": "completed",
+                "result": result,
+                "error": None,
+                "completed_at": completed_at,
+                "lease_expires_at": None,
+            }))
+            await store.mark_completed(
+                record,
+                result=result,
+                completed_at=completed_at,
+                result_object_key=record.result_object_key,
+            )
         except Exception as exc:  # pragma: no cover
-            record.status = "failed"
-            record.error = f"{type(exc).__name__}: {exc}"
-            record.completed_at = ingestion_utc_now_iso()
-            record.result = None
-            record.result_object_key = results.put_job_result(record)
+            failed_at = ingestion_utc_now_iso()
+            record.result_object_key = results.put_job_result(record.model_copy(update={
+                "status": "failed",
+                "result": None,
+                "error": f"{type(exc).__name__}: {exc}",
+                "completed_at": failed_at,
+                "lease_expires_at": None,
+            }))
+            await store.mark_failed(
+                record,
+                error=f"{type(exc).__name__}: {exc}",
+                completed_at=failed_at,
+                result_object_key=record.result_object_key,
+            )
             traceback.print_exc()
         finally:
             heartbeat_task.cancel()
