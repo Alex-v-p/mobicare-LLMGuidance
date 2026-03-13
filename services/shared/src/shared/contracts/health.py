@@ -6,16 +6,13 @@ from pydantic import BaseModel
 
 
 class DependencyStatus(BaseModel):
-    """Result of checking a single dependency endpoint."""
-
     ok: bool
     url: str
     status_code: Optional[int] = None
     error: Optional[str] = None
+    latency_ms: Optional[float] = None
 
 
 class HealthReport(BaseModel):
-    """Aggregated health report returned by the API."""
-
-    status: str  # "ok" | "degraded"
+    status: str
     deps: Dict[str, DependencyStatus]

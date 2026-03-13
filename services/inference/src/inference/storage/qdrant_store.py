@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-import os
 from typing import Any
+from uuid import NAMESPACE_URL, uuid5
+
+from shared.config import Settings, get_settings
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
@@ -13,10 +15,20 @@ class MissingCollectionError(RuntimeError):
     pass
 
 
+def stable_point_id(chunk_id: str) -> str:
+    return str(uuid5(NAMESPACE_URL, chunk_id))
+
+
 class QdrantVectorStore:
-    def __init__(self, url: str | None = None, collection_name: str | None = None) -> None:
-        self._url = url or os.getenv("QDRANT_URL", "http://qdrant:6333")
-        self._collection = collection_name or os.getenv("QDRANT_COLLECTION", "guidance_chunks")
+    def __init__(
+        self,
+        url: str | None = None,
+        collection_name: str | None = None,
+        settings: Settings | None = None,
+    ) -> None:
+        self._settings = settings or get_settings()
+        self._url = url or self._settings.qdrant_url
+        self._collection = collection_name or self._settings.qdrant_collection
         self._client = QdrantClient(url=self._url)
 
     @property
@@ -46,15 +58,18 @@ class QdrantVectorStore:
             )
 
     def collection_has_points(self) -> bool:
+        return self.count_points() > 0
+
+    def count_points(self) -> int:
         if not self.collection_exists():
-            return False
+            return 0
         count_result = self._client.count(collection_name=self._collection, exact=False)
-        return int(count_result.count) > 0
+        return int(count_result.count)
 
     def upsert_chunks(self, chunks: list[TextChunk], embeddings: list[list[float]]) -> int:
         points: list[PointStruct] = []
-        for index, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-            point_id = abs(hash(chunk.chunk_id)) % (10**18) + index
+        for chunk, embedding in zip(chunks, embeddings):
+            point_id = stable_point_id(chunk.chunk_id)
             chunk_metadata = {
                 key: value
                 for key, value in chunk.metadata.items()

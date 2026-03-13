@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import os
-
 from shared.clients.http import create_async_client
+from shared.config import Settings, get_settings
 from shared.contracts.inference import OllamaGenerateResponse
 
 
@@ -12,14 +11,12 @@ class OllamaClient:
         base_url: str | None = None,
         model: str | None = None,
         timeout_s: float | None = None,
+        settings: Settings | None = None,
     ) -> None:
-        self._base_url = (
-            base_url or os.getenv("OLLAMA_URL", "http://ollama:11434")
-        ).rstrip("/")
-        self._model = model or os.getenv("OLLAMA_MODEL", "qwen2.5:0.5b")
-        self._timeout_s = timeout_s if timeout_s is not None else float(
-            os.getenv("OLLAMA_TIMEOUT_S", "120")
-        )
+        self._settings = settings or get_settings()
+        self._base_url = (base_url or self._settings.ollama_url).rstrip("/")
+        self._model = model or self._settings.ollama_model
+        self._timeout_s = timeout_s if timeout_s is not None else self._settings.ollama_timeout_s
 
     def with_model(self, model: str | None) -> "OllamaClient":
         if not model or model == self._model:
@@ -28,6 +25,7 @@ class OllamaClient:
             base_url=self._base_url,
             model=model,
             timeout_s=self._timeout_s,
+            settings=self._settings,
         )
 
     @property

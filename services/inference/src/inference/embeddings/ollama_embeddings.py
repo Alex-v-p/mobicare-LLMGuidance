@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import os
+import asyncio
 
 from shared.clients.http import create_async_client
+from shared.config import Settings, get_settings
 
 
 class OllamaEmbeddingsClient:
@@ -11,14 +12,16 @@ class OllamaEmbeddingsClient:
         base_url: str | None = None,
         model: str | None = None,
         timeout_s: float | None = None,
+        settings: Settings | None = None,
     ) -> None:
-        self._base_url = (
-            base_url or os.getenv("OLLAMA_URL", "http://ollama:11434")
-        ).rstrip("/")
-        self._model = model or os.getenv("OLLAMA_EMBEDDING_MODEL", "nomic-embed-text")
-        self._timeout_s = timeout_s if timeout_s is not None else float(
-            os.getenv("OLLAMA_TIMEOUT_S", "120")
-        )
+        self._settings = settings or get_settings()
+        self._base_url = (base_url or self._settings.ollama_url).rstrip("/")
+        self._model = model or self._settings.ollama_embedding_model
+        self._timeout_s = timeout_s if timeout_s is not None else self._settings.ollama_timeout_s
+
+    @property
+    def model(self) -> str:
+        return self._model
 
     def with_model(self, model: str | None) -> "OllamaEmbeddingsClient":
         if not model or model == self._model:
@@ -27,11 +30,8 @@ class OllamaEmbeddingsClient:
             base_url=self._base_url,
             model=model,
             timeout_s=self._timeout_s,
+            settings=self._settings,
         )
-
-    @property
-    def model(self) -> str:
-        return self._model
 
     async def embed(self, text: str) -> list[float]:
         async with create_async_client(timeout_s=self._timeout_s) as client:
@@ -56,4 +56,48 @@ class OllamaEmbeddingsClient:
             return payload["embeddings"][0]
 
     async def embed_many(self, texts: list[str]) -> list[list[float]]:
-        return [await self.embed(text) for text in texts]
+        if not texts:
+            return []
+
+        async with create_async_client(timeout_s=self._timeout_s) as client:
+            response = await client.post(
+                f"{self._base_url}/api/embed",
+                json={"model": self._model, "input": texts},
+            )
+            if response.status_code == 404:
+                return await self._embed_many_legacy(client, texts)
+            if response.is_error:
+                print("OLLAMA EMBED_MANY ERROR STATUS:", response.status_code)
+                print("OLLAMA EMBED_MANY ERROR BODY:", response.text)
+                response.raise_for_status()
+
+            payload = response.json()
+            embeddings = payload.get("embeddings")
+            if isinstance(embeddings, list) and len(embeddings) == len(texts):
+                return embeddings
+
+        return await self._embed_many_concurrently(texts)
+
+    async def _embed_many_legacy(self, client, texts: list[str]) -> list[list[float]]:
+        semaphore = asyncio.Semaphore(8)
+
+        async def _embed_one(text: str) -> list[float]:
+            async with semaphore:
+                response = await client.post(
+                    f"{self._base_url}/api/embeddings",
+                    json={"model": self._model, "prompt": text},
+                )
+                response.raise_for_status()
+                payload = response.json()
+                return payload["embedding"]
+
+        return list(await asyncio.gather(*(_embed_one(text) for text in texts)))
+
+    async def _embed_many_concurrently(self, texts: list[str]) -> list[list[float]]:
+        semaphore = asyncio.Semaphore(8)
+
+        async def _embed_one(text: str) -> list[float]:
+            async with semaphore:
+                return await self.embed(text)
+
+        return list(await asyncio.gather(*(_embed_one(text) for text in texts)))

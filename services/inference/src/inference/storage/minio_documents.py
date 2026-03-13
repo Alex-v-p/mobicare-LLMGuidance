@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import io
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
 from minio import Minio
 from pypdf import PdfReader
+
+from shared.config import Settings, get_settings
 
 
 @dataclass
@@ -19,16 +20,15 @@ class MinioDocument:
 
 
 class MinioDocumentStore:
-    def __init__(self) -> None:
-        endpoint = os.getenv("MINIO_ENDPOINT", "http://minio:9000").replace("http://", "").replace("https://", "")
-        secure = os.getenv("MINIO_SECURE", "false").lower() == "true"
-        self._documents_bucket = os.getenv("MINIO_DOCUMENTS_BUCKET", "guidance-documents")
-        self._documents_prefix = os.getenv("MINIO_DOCUMENTS_PREFIX", "")
+    def __init__(self, settings: Settings | None = None) -> None:
+        self._settings = settings or get_settings()
+        self._documents_bucket = self._settings.minio_documents_bucket
+        self._documents_prefix = self._settings.minio_documents_prefix
         self._client = Minio(
-            endpoint,
-            access_key=os.getenv("MINIO_ROOT_USER", "minioadmin"),
-            secret_key=os.getenv("MINIO_ROOT_PASSWORD", "minioadmin"),
-            secure=secure,
+            self._settings.minio_client_endpoint,
+            access_key=self._settings.minio_root_user,
+            secret_key=self._settings.minio_root_password,
+            secure=self._settings.minio_secure,
         )
 
     @property
@@ -101,10 +101,11 @@ class MinioDocumentStore:
                     )
                 return
 
-            combined_text = "\n\n".join((page.extract_text() or "") for page in reader.pages)
+            page_texts = [(page.extract_text() or "") for page in reader.pages]
+            combined_text = "\n\n".join(page_texts)
             yield MinioDocument(
                 object_name=object_name,
                 title=Path(object_name).name,
                 text=combined_text,
-                metadata={**base_metadata, "page_count": page_count},
+                metadata={**base_metadata, "page_count": page_count, "raw_page_texts": page_texts},
             )

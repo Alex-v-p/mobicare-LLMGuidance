@@ -10,6 +10,7 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app/services/inference/src:/app/services/shared/src
 
 RUN pip install --no-cache-dir \
+    fastapi==0.115.0 \
     httpx==0.27.2 \
     pydantic==2.9.2 \
     pydantic-settings==2.5.2 \

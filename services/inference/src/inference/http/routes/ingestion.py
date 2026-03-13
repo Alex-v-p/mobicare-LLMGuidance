@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Request, status
 
-from inference.indexing.ingestion_service import IngestionService
-from inference.jobstore.redis_ingestion_job_store import RedisIngestionJobStore
-from inference.storage.minio_ingestion_job_results import MinioIngestionJobResultStore
+from inference.http.dependencies import get_ingestion_job_service, get_ingestion_request_service
+from inference.http.services.ingestion_service import IngestionJobService, IngestionRequestService
 from shared.contracts.ingestion import (
     IngestDocumentsRequest,
     IngestionJobAcceptedResponse,
@@ -16,8 +15,10 @@ router = APIRouter(tags=["ingestion"])
 
 
 @router.post("/ingest", response_model=IngestionResponse)
-async def ingest_documents(payload: IngestDocumentsRequest) -> IngestionResponse:
-    service = IngestionService()
+async def ingest_documents(
+    payload: IngestDocumentsRequest,
+    service: IngestionRequestService = Depends(get_ingestion_request_service),
+) -> IngestionResponse:
     return await service.ingest(payload)
 
 
@@ -29,17 +30,9 @@ async def ingest_documents(payload: IngestDocumentsRequest) -> IngestionResponse
 async def create_ingestion_job(
     http_request: Request,
     payload: IngestDocumentsRequest,
+    service: IngestionJobService = Depends(get_ingestion_job_service),
 ) -> IngestionJobAcceptedResponse:
-    store = RedisIngestionJobStore()
-    record = IngestionJobRecord(status="queued", request=payload)
-
-    try:
-        await store.create(record)
-    except FileExistsError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    finally:
-        await store.close()
-
+    record = await service.create(payload)
     return IngestionJobAcceptedResponse(
         job_id=record.job_id,
         status_url=str(http_request.url_for("get_ingestion_job_status", job_id=record.job_id)),
@@ -51,22 +44,8 @@ async def create_ingestion_job(
     name="get_ingestion_job_status",
     response_model=IngestionJobRecord,
 )
-async def get_ingestion_job_status(job_id: str) -> IngestionJobRecord:
-    store = RedisIngestionJobStore()
-
-    try:
-        record = await store.get(job_id)
-    finally:
-        await store.close()
-
-    if record is None:
-        raise HTTPException(status_code=404, detail=f"Ingestion job {job_id} was not found")
-
-    if record.result is None and record.result_object_key:
-        result_store = MinioIngestionJobResultStore()
-        try:
-            record = await result_store.get_job_result(record.result_object_key)
-        except Exception:
-            pass
-
-    return record
+async def get_ingestion_job_status(
+    job_id: str,
+    service: IngestionJobService = Depends(get_ingestion_job_service),
+) -> IngestionJobRecord:
+    return await service.get(job_id)
