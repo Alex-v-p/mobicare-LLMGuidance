@@ -14,14 +14,6 @@ from shared.contracts.inference import (
 router = APIRouter(tags=["guidance"])
 
 
-@router.post("/guidance/generate", response_model=ApiGuidanceResponse)
-async def generate_guidance(
-    request: GuidanceRequest,
-    service: GuidanceService = Depends(get_guidance_service),
-) -> ApiGuidanceResponse:
-    return await service.generate(request)
-
-
 @router.post("/guidance/jobs", response_model=JobAcceptedResponse)
 async def create_guidance_job(
     request: GuidanceRequest,
