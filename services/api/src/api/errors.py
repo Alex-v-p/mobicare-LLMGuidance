@@ -36,6 +36,11 @@ class ConflictError(AppError):
         super().__init__(code=code, message=message, status_code=409, details=details)
 
 
+class UnauthorizedError(AppError):
+    def __init__(self, *, code: str, message: str, details: dict[str, Any] | None = None) -> None:
+        super().__init__(code=code, message=message, status_code=401, details=details)
+
+
 class ServiceUnavailableError(AppError):
     def __init__(self, *, code: str, message: str, details: dict[str, Any] | None = None) -> None:
         super().__init__(code=code, message=message, status_code=503, details=details)

@@ -47,6 +47,13 @@ class Settings(BaseSettings):
     callback_timeout_s: int = 10
     callback_max_attempts: int = 3
 
+    auth_validation_url: str = "http://auth-provider.local/validate"
+    auth_validation_timeout_s: float = 10.0
+    jwt_secret_key: str = "change-me"
+    jwt_access_token_exp_minutes: int = 60
+    jwt_issuer: str = "mobicare-llm-api"
+    jwt_audience: str = "mobicare-gateway"
+
     retrieval_top_k: int = 3
     jobs_dir: str = "/data/jobs"
     worker_id: str | None = None
