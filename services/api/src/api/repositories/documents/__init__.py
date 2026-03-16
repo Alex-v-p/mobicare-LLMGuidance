@@ -1,4 +1,5 @@
 from api.repositories.documents.errors import (
+    DocumentAlreadyExistsError,
     DocumentNotFoundError,
     DocumentRepositoryError,
     DocumentStorageUnavailableError,
@@ -10,6 +11,7 @@ from api.repositories.documents.naming import DocumentNamer
 from api.repositories.documents.storage import DocumentStorage
 
 __all__ = [
+    "DocumentAlreadyExistsError",
     "DocumentBlob",
     "DocumentLocation",
     "DocumentMetadataMapper",

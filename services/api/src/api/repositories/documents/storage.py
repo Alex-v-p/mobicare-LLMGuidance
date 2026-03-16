@@ -7,7 +7,7 @@ from minio.datatypes import Object
 from minio.helpers import ObjectWriteResult
 from urllib3.response import HTTPResponse
 
-from api.repositories.documents.errors import DocumentStorageUnavailableError, map_storage_error
+from api.repositories.documents.errors import DocumentNotFoundError, DocumentStorageUnavailableError, map_storage_error
 from api.repositories.documents.models import DocumentLocation
 
 
@@ -35,6 +35,13 @@ class DocumentStorage:
         except Exception as exc:
             raise map_storage_error(exc, self._documents_bucket) from exc
         return objects
+
+    def object_exists(self, location: DocumentLocation) -> bool:
+        try:
+            self.stat_object(location)
+            return True
+        except DocumentNotFoundError:
+            return False
 
     def stat_object(self, location: DocumentLocation) -> object:
         self.ensure_bucket_exists()

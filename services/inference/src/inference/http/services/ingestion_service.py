@@ -3,11 +3,15 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from inference.http.exceptions import NotFoundError
+from inference.jobstore.base import ReadWriteJobStore, managed_store
 from inference.indexing.ingestion_service import IngestionService
 from inference.storage.qdrant_store import QdrantVectorStore
-from inference.jobstore.redis_ingestion_job_store import RedisIngestionJobStore
-from inference.storage.minio_ingestion_job_results import MinioIngestionJobResultStore
+from inference.storage.base_minio_job_results import JobResultStore
 from shared.contracts.ingestion import IngestDocumentsRequest, IngestionCollectionDeleteResponse, IngestionJobRecord, IngestionResponse
+from shared.observability import get_logger
+
+
+logger = get_logger(__name__, service="inference")
 
 
 class IngestionRequestService:
@@ -27,27 +31,21 @@ class IngestionJobService:
     def __init__(
         self,
         *,
-        store_factory: Callable[[], RedisIngestionJobStore],
-        result_store: MinioIngestionJobResultStore,
+        store_factory: Callable[[], ReadWriteJobStore[IngestionJobRecord]],
+        result_store: JobResultStore[IngestionJobRecord],
     ) -> None:
         self._store_factory = store_factory
         self._result_store = result_store
 
     async def create(self, payload: IngestDocumentsRequest) -> IngestionJobRecord:
-        store = self._store_factory()
         record = IngestionJobRecord(status="queued", request=payload)
-        try:
+        async with managed_store(self._store_factory) as store:
             await store.create(record)
             return record
-        finally:
-            await store.close()
 
     async def get(self, job_id: str) -> IngestionJobRecord:
-        store = self._store_factory()
-        try:
+        async with managed_store(self._store_factory) as store:
             record = await store.get(job_id)
-        finally:
-            await store.close()
 
         if record is None:
             raise NotFoundError(f"Ingestion job {job_id} was not found")
@@ -55,6 +53,13 @@ class IngestionJobService:
         if record.result is None and record.result_object_key:
             try:
                 record = self._result_store.get_job_result(record.result_object_key)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning(
+                    "ingestion_job_archived_result_load_failed",
+                    extra={
+                        "event": "ingestion_job_archived_result_load_failed",
+                        "error_code": "JOB_RESULT_LOAD_FAILED",
+                    },
+                    exc_info=exc,
+                )
         return record

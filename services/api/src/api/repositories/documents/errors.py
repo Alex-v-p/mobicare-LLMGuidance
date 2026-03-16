@@ -28,6 +28,11 @@ class InvalidDocumentError(DocumentRepositoryError):
         super().__init__(message, code=ErrorCode.DOCUMENT_UPLOAD_INVALID)
 
 
+class DocumentAlreadyExistsError(DocumentRepositoryError):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, code=ErrorCode.CONFLICT)
+
+
 def map_storage_error(exc: Exception, object_name: str) -> DocumentRepositoryError:
     if isinstance(exc, S3Error):
         code = getattr(exc, "code", "")

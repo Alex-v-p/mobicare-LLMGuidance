@@ -3,10 +3,14 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from inference.http.exceptions import NotFoundError
-from inference.jobstore.redis_guidance_job_store import RedisGuidanceJobStore
+from inference.jobstore.base import ReadWriteJobStore, managed_store
 from inference.pipeline.generate_guidance import GuidancePipeline
-from inference.storage.minio_guidance_job_results import MinioGuidanceJobResultStore
+from inference.storage.base_minio_job_results import JobResultStore
 from shared.contracts.inference import InferenceRequest, InferenceResponse, JobRecord
+from shared.observability import get_logger
+
+
+logger = get_logger(__name__, service="inference")
 
 
 class GuidanceRequestService:
@@ -21,27 +25,21 @@ class GuidanceJobService:
     def __init__(
         self,
         *,
-        store_factory: Callable[[], RedisGuidanceJobStore],
-        result_store: MinioGuidanceJobResultStore,
+        store_factory: Callable[[], ReadWriteJobStore[JobRecord]],
+        result_store: JobResultStore[JobRecord],
     ) -> None:
         self._store_factory = store_factory
         self._result_store = result_store
 
     async def create(self, request: InferenceRequest) -> JobRecord:
-        store = self._store_factory()
         record = JobRecord(request_id=request.request_id, status="queued", request=request)
-        try:
+        async with managed_store(self._store_factory) as store:
             await store.create(record)
             return record
-        finally:
-            await store.close()
 
     async def get(self, job_id: str) -> JobRecord:
-        store = self._store_factory()
-        try:
+        async with managed_store(self._store_factory) as store:
             record = await store.get(job_id)
-        finally:
-            await store.close()
 
         if record is None:
             raise NotFoundError(f"Job {job_id} was not found")
@@ -49,6 +47,13 @@ class GuidanceJobService:
         if record.result is None and record.result_object_key:
             try:
                 record = self._result_store.get_job_result(record.result_object_key)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning(
+                    "guidance_job_archived_result_load_failed",
+                    extra={
+                        "event": "guidance_job_archived_result_load_failed",
+                        "error_code": "JOB_RESULT_LOAD_FAILED",
+                    },
+                    exc_info=exc,
+                )
         return record

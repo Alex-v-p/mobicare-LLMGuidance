@@ -4,6 +4,10 @@ import asyncio
 
 from shared.clients.http import create_async_client
 from shared.config import Settings, get_settings
+from shared.observability import get_logger
+
+
+logger = get_logger(__name__, service="inference")
 
 
 class OllamaEmbeddingsClient:
@@ -48,8 +52,18 @@ class OllamaEmbeddingsClient:
                 payload = legacy.json()
                 return payload["embedding"]
             if response.is_error:
-                print("OLLAMA EMBED ERROR STATUS:", response.status_code)
-                print("OLLAMA EMBED ERROR BODY:", response.text)
+                logger.error(
+                    "ollama_embed_failed",
+                    extra={
+                        "event": "ollama_embed_failed",
+                        "dependency": "ollama",
+                        "status_code": response.status_code,
+                        "error_code": "OLLAMA_EMBED_FAILED",
+                        "dependency_endpoint": f"{self._base_url}/api/embed",
+                        "model": self._model,
+                        "response_body": response.text[:500],
+                    },
+                )
                 response.raise_for_status()
 
             payload = response.json()
@@ -67,8 +81,18 @@ class OllamaEmbeddingsClient:
             if response.status_code == 404:
                 return await self._embed_many_legacy(client, texts)
             if response.is_error:
-                print("OLLAMA EMBED_MANY ERROR STATUS:", response.status_code)
-                print("OLLAMA EMBED_MANY ERROR BODY:", response.text)
+                logger.error(
+                    "ollama_embed_many_failed",
+                    extra={
+                        "event": "ollama_embed_many_failed",
+                        "dependency": "ollama",
+                        "status_code": response.status_code,
+                        "error_code": "OLLAMA_EMBED_MANY_FAILED",
+                        "dependency_endpoint": f"{self._base_url}/api/embed",
+                        "model": self._model,
+                        "response_body": response.text[:500],
+                    },
+                )
                 response.raise_for_status()
 
             payload = response.json()

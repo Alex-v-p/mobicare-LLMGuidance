@@ -25,6 +25,9 @@ class JsonFormatter(logging.Formatter):
             "error_code",
             "dependency",
             "event",
+            "dependency_endpoint",
+            "model",
+            "response_body",
         ):
             value = getattr(record, key, None)
             if value is not None:

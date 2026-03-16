@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Generic, Optional, TypeVar
+from typing import Callable, Generic, Optional, Protocol, TypeVar
 
 import redis.asyncio as redis
 from pydantic import BaseModel
@@ -9,6 +10,26 @@ from pydantic import BaseModel
 from shared.config import Settings, get_settings
 
 JobRecordT = TypeVar("JobRecordT", bound=BaseModel)
+
+class ReadWriteJobStore(Protocol[JobRecordT]):
+    async def create(self, record: JobRecordT) -> None: ...
+    async def get(self, job_id: str) -> Optional[JobRecordT]: ...
+    async def update(self, record: JobRecordT) -> None: ...
+    async def close(self) -> None: ...
+
+
+StoreT = TypeVar("StoreT", bound=ReadWriteJobStore)
+StoreFactory = Callable[[], StoreT]
+
+
+@asynccontextmanager
+async def managed_store(factory: StoreFactory[StoreT]):
+    store = factory()
+    try:
+        yield store
+    finally:
+        await store.close()
+
 
 _ALLOWED_TRANSITIONS = {
     "queued": {"running", "failed"},
