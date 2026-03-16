@@ -1,32 +1,20 @@
 from __future__ import annotations
 
-import contextlib
-import json
+import asyncio
+import shutil
 import socket
 import subprocess
 import time
 import uuid
-from collections.abc import Iterator
-from dataclasses import dataclass
-from urllib.request import urlopen
+from contextlib import contextmanager
 
-import pytest
-
-
-@dataclass
-class DockerContainer:
-    name: str
-
-    def stop(self) -> None:
-        subprocess.run(["docker", "rm", "-f", self.name], check=False, capture_output=True, text=True)
+import httpx
+import redis.asyncio as redis
 
 
-def docker_available() -> bool:
-    try:
-        result = subprocess.run(["docker", "version", "--format", "{{json .}}"], check=False, capture_output=True, text=True, timeout=10)
-    except Exception:
-        return False
-    return result.returncode == 0
+def require_docker() -> None:
+    if shutil.which("docker") is None:
+        raise RuntimeError("Docker is required for this test")
 
 
 def reserve_tcp_port() -> int:
@@ -36,60 +24,79 @@ def reserve_tcp_port() -> int:
         return int(sock.getsockname()[1])
 
 
-def require_docker() -> None:
-    if not docker_available():
-        pytest.skip("Docker is not available; skipping real-container integration test.")
-
-
-def run_container(*, image: str, ports: dict[int, int], env: dict[str, str] | None = None, command: list[str] | None = None) -> DockerContainer:
+@contextmanager
+def managed_container(
+    *,
+    image: str,
+    ports: dict[int, int],
+    env: dict[str, str] | None = None,
+    command: list[str] | None = None,
+):
     require_docker()
-    name = f"llmguidance-test-{uuid.uuid4().hex[:10]}"
-    cmd = ["docker", "run", "-d", "--name", name]
+
+    name = f"pytest-{uuid.uuid4().hex[:12]}"
+    cmd = ["docker", "run", "--rm", "-d", "--name", name]
+
     for host_port, container_port in ports.items():
-        cmd.extend(["-p", f"127.0.0.1:{host_port}:{container_port}"])
-    for key, value in (env or {}).items():
-        cmd.extend(["-e", f"{key}={value}"])
+        cmd.extend(["-p", f"{host_port}:{container_port}"])
+
+    if env:
+        for key, value in env.items():
+            cmd.extend(["-e", f"{key}={value}"])
+
     cmd.append(image)
+
     if command:
         cmd.extend(command)
-    result = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=120)
-    if result.returncode != 0:
-        raise RuntimeError(f"Failed to start container {image}: {result.stderr or result.stdout}")
-    return DockerContainer(name=name)
 
+    subprocess.check_output(cmd, text=True).strip()
 
-def wait_for_tcp(host: str, port: int, timeout_s: float = 30.0) -> None:
-    deadline = time.time() + timeout_s
-    while time.time() < deadline:
-        with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
-            sock.settimeout(1.0)
-            if sock.connect_ex((host, port)) == 0:
-                return
-        time.sleep(0.2)
-    raise TimeoutError(f"Timed out waiting for TCP {host}:{port}")
-
-
-def wait_for_http_json(url: str, timeout_s: float = 30.0) -> dict | list | str | None:
-    deadline = time.time() + timeout_s
-    last_error: Exception | None = None
-    while time.time() < deadline:
-        try:
-            with urlopen(url, timeout=2) as response:  # noqa: S310 - test helper only
-                body = response.read().decode("utf-8")
-                try:
-                    return json.loads(body)
-                except json.JSONDecodeError:
-                    return body
-        except Exception as exc:  # pragma: no cover - best effort polling helper
-            last_error = exc
-            time.sleep(0.3)
-    raise TimeoutError(f"Timed out waiting for HTTP readiness on {url}: {last_error}")
-
-
-@contextlib.contextmanager
-def managed_container(*, image: str, ports: dict[int, int], env: dict[str, str] | None = None, command: list[str] | None = None) -> Iterator[DockerContainer]:
-    container = run_container(image=image, ports=ports, env=env, command=command)
     try:
-        yield container
+        yield name
     finally:
-        container.stop()
+        subprocess.run(
+            ["docker", "rm", "-f", name],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+
+async def wait_for_redis(host: str, port: int, timeout_s: float = 30.0) -> None:
+    deadline = time.monotonic() + timeout_s
+    last_error: Exception | None = None
+
+    while time.monotonic() < deadline:
+        client = redis.from_url(f"redis://{host}:{port}/0", decode_responses=True)
+        try:
+            if await client.ping():
+                await client.aclose()
+                return
+        except Exception as exc:
+            last_error = exc
+        finally:
+            try:
+                await client.aclose()
+            except Exception:
+                pass
+
+        await asyncio.sleep(0.5)
+
+    raise RuntimeError(f"Redis container did not become ready in time: {last_error}")
+
+
+async def wait_for_http_ok(url: str, timeout_s: float = 30.0) -> None:
+    deadline = time.monotonic() + timeout_s
+    last_error: Exception | None = None
+
+    async with httpx.AsyncClient(timeout=2.0) as client:
+        while time.monotonic() < deadline:
+            try:
+                response = await client.get(url)
+                response.raise_for_status()
+                return
+            except Exception as exc:
+                last_error = exc
+                await asyncio.sleep(0.5)
+
+    raise RuntimeError(f"HTTP endpoint did not become ready in time: {url} ({last_error})")
