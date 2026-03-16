@@ -4,6 +4,7 @@ from api.clients.inference_client import InferenceClient, InferenceClientError
 from api.errors import AppError, ServiceUnavailableError
 from shared.contracts.ingestion import (
     IngestDocumentsRequest,
+    IngestionCollectionDeleteResponse,
     IngestionJobAcceptedResponse,
     IngestionJobRecord,
 )
@@ -25,6 +26,12 @@ class IngestionService:
     async def get_job_status(self, job_id: str) -> IngestionJobRecord:
         try:
             return await self._inference_client.get_ingestion_job_status(job_id)
+        except InferenceClientError as exc:
+            raise self._map_inference_error(exc) from exc
+
+    async def delete_collection(self) -> IngestionCollectionDeleteResponse:
+        try:
+            return await self._inference_client.delete_ingestion_collection()
         except InferenceClientError as exc:
             raise self._map_inference_error(exc) from exc
 

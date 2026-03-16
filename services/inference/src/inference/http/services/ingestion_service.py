@@ -4,17 +4,23 @@ from collections.abc import Callable
 
 from inference.http.exceptions import NotFoundError
 from inference.indexing.ingestion_service import IngestionService
+from inference.storage.qdrant_store import QdrantVectorStore
 from inference.jobstore.redis_ingestion_job_store import RedisIngestionJobStore
 from inference.storage.minio_ingestion_job_results import MinioIngestionJobResultStore
-from shared.contracts.ingestion import IngestDocumentsRequest, IngestionJobRecord, IngestionResponse
+from shared.contracts.ingestion import IngestDocumentsRequest, IngestionCollectionDeleteResponse, IngestionJobRecord, IngestionResponse
 
 
 class IngestionRequestService:
-    def __init__(self, ingestion_service: IngestionService) -> None:
+    def __init__(self, ingestion_service: IngestionService, vector_store: QdrantVectorStore) -> None:
         self._ingestion_service = ingestion_service
+        self._vector_store = vector_store
 
     async def ingest(self, payload: IngestDocumentsRequest) -> IngestionResponse:
         return await self._ingestion_service.ingest(payload)
+
+    async def delete_collection(self) -> IngestionCollectionDeleteResponse:
+        existed = self._vector_store.delete_collection()
+        return IngestionCollectionDeleteResponse(collection=self._vector_store.collection_name, existed=existed)
 
 
 class IngestionJobService:

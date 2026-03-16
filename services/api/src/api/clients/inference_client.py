@@ -8,7 +8,7 @@ from shared.clients.http import create_async_client
 from shared.config import Settings, get_settings
 from shared.contracts.error_codes import ErrorCode
 from shared.contracts.inference import InferenceRequest, InferenceResponse, JobAcceptedResponse, JobRecord
-from shared.contracts.ingestion import IngestDocumentsRequest, IngestionJobAcceptedResponse, IngestionJobRecord
+from shared.contracts.ingestion import IngestDocumentsRequest, IngestionCollectionDeleteResponse, IngestionJobAcceptedResponse, IngestionJobRecord
 from shared.observability import REQUEST_ID_HEADER
 
 
@@ -84,6 +84,11 @@ class InferenceClient:
         async with create_async_client(timeout_s=self._timeout_s) as client:
             response = await self._request(client, method="GET", path=f"/ingestion/jobs/{job_id}")
             return IngestionJobRecord.model_validate(response.json())
+
+    async def delete_ingestion_collection(self) -> IngestionCollectionDeleteResponse:
+        async with create_async_client(timeout_s=self._timeout_s) as client:
+            response = await self._request(client, method="DELETE", path="/ingestion/collection")
+            return IngestionCollectionDeleteResponse.model_validate(response.json())
 
     async def _request(self, client: httpx.AsyncClient, *, method: str, path: str, json: dict[str, Any] | None = None) -> httpx.Response:
         url = f"{self._base_url}{path}"

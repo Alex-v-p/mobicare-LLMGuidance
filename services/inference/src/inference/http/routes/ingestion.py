@@ -6,6 +6,7 @@ from inference.http.dependencies import get_ingestion_job_service, get_ingestion
 from inference.http.services.ingestion_service import IngestionJobService, IngestionRequestService
 from shared.contracts.ingestion import (
     IngestDocumentsRequest,
+    IngestionCollectionDeleteResponse,
     IngestionJobAcceptedResponse,
     IngestionJobRecord,
     IngestionResponse,
@@ -49,3 +50,10 @@ async def get_ingestion_job_status(
     service: IngestionJobService = Depends(get_ingestion_job_service),
 ) -> IngestionJobRecord:
     return await service.get(job_id)
+
+@router.delete("/ingestion/collection", response_model=IngestionCollectionDeleteResponse)
+async def delete_ingestion_collection(
+    service: IngestionRequestService = Depends(get_ingestion_request_service),
+) -> IngestionCollectionDeleteResponse:
+    return await service.delete_collection()
+

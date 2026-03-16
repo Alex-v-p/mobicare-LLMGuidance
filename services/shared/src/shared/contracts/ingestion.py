@@ -73,3 +73,9 @@ class IngestionJobRecord(BaseModel):
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
     updated_at: str = Field(default_factory=utc_now_iso)
+
+class IngestionCollectionDeleteResponse(BaseModel):
+    status: str = "deleted"
+    collection: str
+    existed: bool
+
