@@ -11,6 +11,7 @@ from inference.indexing.document_loader import DocumentLoader
 from inference.indexing.document_preparer import DocumentPreparationService
 from inference.indexing.ingestion_service import IngestionService
 from inference.indexing.vector_indexer import VectorIndexingService
+from inference.jobstore.base import ReadWriteJobStore
 from inference.jobstore.redis_guidance_job_store import RedisGuidanceJobStore
 from inference.jobstore.redis_ingestion_job_store import RedisIngestionJobStore
 from inference.pipeline.components import AnswerGenerator, ExampleResponseBuilder, QueryRewriter, RetrievalOrchestrator, ResponseVerifier
@@ -18,14 +19,15 @@ from inference.pipeline.generate_guidance import GuidancePipeline
 from inference.retrieval.dense import DenseRetriever
 from inference.retrieval.hybrid import HybridRetriever
 from inference.storage.minio_documents import MinioDocumentStore
+from inference.storage.base_minio_job_results import JobResultStore
 from inference.storage.minio_guidance_job_results import MinioGuidanceJobResultStore
 from inference.storage.minio_ingestion_job_results import MinioIngestionJobResultStore
 from inference.storage.qdrant_store import QdrantVectorStore
 from shared.config import Settings, get_settings
 
 
-GuidanceStoreFactory = Callable[[], RedisGuidanceJobStore]
-IngestionStoreFactory = Callable[[], RedisIngestionJobStore]
+GuidanceStoreFactory = Callable[[], ReadWriteJobStore]
+IngestionStoreFactory = Callable[[], ReadWriteJobStore]
 
 
 @lru_cache(maxsize=1)
@@ -173,7 +175,10 @@ def get_guidance_job_service() -> GuidanceJobService:
 
 
 def get_ingestion_request_service() -> IngestionRequestService:
-    return IngestionRequestService(ingestion_service=get_ingestion_service())
+    return IngestionRequestService(
+        ingestion_service=get_ingestion_service(),
+        vector_store=get_vector_store(),
+    )
 
 
 def get_ingestion_job_service() -> IngestionJobService:

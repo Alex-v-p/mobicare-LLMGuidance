@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     minio_results_bucket: str = "guidance-job-results"
     minio_job_retention_days: int = 7
 
+    document_upload_max_bytes: int = 50 * 1024 * 1024
+    document_allowed_extensions_csv: str = ""
+    document_allowed_content_types_csv: str = ""
+
     redis_url: str = "redis://redis:6379/0"
     redis_job_queue: str = "guidance_jobs"
     redis_ingestion_job_queue: str = "ingestion_jobs"
@@ -47,6 +51,13 @@ class Settings(BaseSettings):
     callback_timeout_s: int = 10
     callback_max_attempts: int = 3
 
+    auth_validation_url: str = "http://auth-provider.local/validate"
+    auth_validation_timeout_s: float = 10.0
+    jwt_secret_key: str = "change-me"
+    jwt_access_token_exp_minutes: int = 60
+    jwt_issuer: str = "mobicare-llm-api"
+    jwt_audience: str = "mobicare-gateway"
+
     retrieval_top_k: int = 3
     jobs_dir: str = "/data/jobs"
     worker_id: str | None = None
@@ -55,6 +66,14 @@ class Settings(BaseSettings):
     @property
     def minio_client_endpoint(self) -> str:
         return self.minio_endpoint.replace("http://", "").replace("https://", "")
+
+    @property
+    def document_allowed_extensions(self) -> set[str]:
+        return {value.strip().lower().lstrip(".") for value in self.document_allowed_extensions_csv.split(",") if value.strip()}
+
+    @property
+    def document_allowed_content_types(self) -> set[str]:
+        return {value.strip().lower() for value in self.document_allowed_content_types_csv.split(",") if value.strip()}
 
 
 @lru_cache(maxsize=1)

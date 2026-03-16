@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import json
 from datetime import datetime, timezone
-from typing import Generic, TypeVar
+from typing import Generic, Protocol, TypeVar
 
 from minio import Minio
 from minio.commonconfig import ENABLED, Filter
@@ -11,8 +11,15 @@ from minio.lifecycleconfig import Expiration, LifecycleConfig, Rule
 from pydantic import BaseModel
 
 from shared.config import Settings, get_settings
+from shared.observability import get_logger
 
 JobRecordT = TypeVar("JobRecordT", bound=BaseModel)
+
+logger = get_logger(__name__, service="inference")
+
+
+class JobResultStore(Protocol[JobRecordT]):
+    def get_job_result(self, object_key: str) -> JobRecordT: ...
 
 
 class MinioJobResultStoreBase(Generic[JobRecordT]):
@@ -55,8 +62,15 @@ class MinioJobResultStoreBase(Generic[JobRecordT]):
             self._client.make_bucket(self._bucket)
         try:
             self._client.set_bucket_lifecycle(self._bucket, self._lifecycle_rule())
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "minio_set_bucket_lifecycle_failed",
+                extra={
+                    "event": "minio_set_bucket_lifecycle_failed",
+                    "dependency": "minio",
+                },
+                exc_info=exc,
+            )
 
     def build_object_key(self, job_id: str, completed_at_iso: str | None = None) -> str:
         completed_at = datetime.fromisoformat(completed_at_iso) if completed_at_iso else datetime.now(timezone.utc)

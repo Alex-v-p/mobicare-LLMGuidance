@@ -24,25 +24,6 @@ class GuidanceService:
             options=request.options,
         )
 
-    async def generate(self, request: GuidanceRequest) -> ApiGuidanceResponse:
-        try:
-            inference_response = await self._inference_client.generate_guidance(
-                self._to_inference_request(request)
-            )
-        except InferenceClientError as exc:
-            raise self._map_inference_error(exc) from exc
-        return ApiGuidanceResponse(
-            request_id=inference_response.request_id,
-            status=inference_response.status,
-            answer=inference_response.answer,
-            model=inference_response.model,
-            rag=inference_response.retrieved_context,
-            used_variables=inference_response.used_variables,
-            warnings=inference_response.warnings,
-            metadata=inference_response.metadata,
-            verification=inference_response.verification,
-        )
-
     async def submit_job(self, request: GuidanceRequest) -> JobAcceptedResponse:
         try:
             return await self._inference_client.submit_guidance_job(

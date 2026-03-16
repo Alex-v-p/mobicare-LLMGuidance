@@ -5,6 +5,7 @@ from typing import BinaryIO
 from minio import Minio
 
 from api.repositories.documents import (
+    DocumentAlreadyExistsError,
     DocumentBlob,
     DocumentMetadataMapper,
     DocumentNamer,
@@ -36,13 +37,14 @@ class DocumentRepository:
         )
         self._metadata = DocumentMetadataMapper(namer)
 
-    def list_documents(self) -> list[DocumentMetadata]:
+    def list_documents(self, *, offset: int = 0, limit: int = 100) -> tuple[list[DocumentMetadata], int]:
         documents = [
             self._metadata.build(self._namer.to_location(obj.object_name), obj)
             for obj in self._storage.list_objects()
         ]
         documents.sort(key=lambda doc: doc.object_name)
-        return documents
+        total_count = len(documents)
+        return documents[offset : offset + limit], total_count
 
     def get_document(self, object_name: str) -> DocumentBlob:
         location = self._namer.resolve_location(object_name)
@@ -70,11 +72,14 @@ class DocumentRepository:
         size_bytes: int,
         content_type: str | None = None,
         object_name: str | None = None,
+        overwrite: bool = True,
     ) -> DocumentMetadata:
         if size_bytes < 0:
             raise InvalidDocumentError("Document size must be greater than or equal to zero")
 
         location = self._namer.resolve_location(object_name or filename)
+        if not overwrite and self._storage.object_exists(location):
+            raise DocumentAlreadyExistsError(f"Document '{location.object_name}' already exists")
         resolved_content_type = self._namer.resolve_content_type(location.object_name, content_type)
         self._storage.put_object(
             location=location,

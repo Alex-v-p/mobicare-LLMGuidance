@@ -20,6 +20,28 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
 
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: |
+            requirements.lock
+            requirements-dev.lock
+            pyproject.toml
+
+      - name: Install locked dev dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.lock
+          python -m pip install -e . --no-deps
+
+      - name: Run test suite
+        env:
+          PYTHONPATH: services/api/src:services/inference/src:services/shared/src
+        run: |
+          pytest -vv -l --tb=short
+
       - name: Create CI .env from example
         run: |
           cp .env.example .env

@@ -20,6 +20,10 @@ class DocumentMetadata(BaseModel):
 class DocumentMetadataListResponse(BaseModel):
     documents: list[DocumentMetadata]
     count: int
+    total_count: int
+    offset: int = 0
+    limit: int
+    has_more: bool = False
 
 
 class DocumentUploadResponse(BaseModel):
