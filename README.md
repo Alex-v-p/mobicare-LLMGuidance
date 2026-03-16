@@ -35,11 +35,16 @@ This repository uses:
 
 When dependencies change in `pyproject.toml`, refresh the lock files intentionally.
 
-Using `uv`:
 
 ```bash
-uv pip compile pyproject.toml -o requirements.lock
-uv pip compile pyproject.toml --extra dev -o requirements-dev.lock
+pip install pip-tools
+pip-compile pyproject.toml -o requirements.lock
+pip-compile pyproject.toml --extra dev -o requirements-dev.lock
+```
+
+```bash
+pip install -e .
+pip install -e ".[dev]"
 ```
 
 Commit both lock files together with the dependency change.
