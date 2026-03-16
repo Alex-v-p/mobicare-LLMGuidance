@@ -173,7 +173,10 @@ def get_guidance_job_service() -> GuidanceJobService:
 
 
 def get_ingestion_request_service() -> IngestionRequestService:
-    return IngestionRequestService(ingestion_service=get_ingestion_service())
+    return IngestionRequestService(
+        ingestion_service=get_ingestion_service(),
+        vector_store=get_vector_store(),
+    )
 
 
 def get_ingestion_job_service() -> IngestionJobService:

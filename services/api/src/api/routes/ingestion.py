@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Request
 
 from api.application.services.ingestion_service import IngestionService
 from api.dependencies import get_ingestion_service
-from shared.contracts.ingestion import IngestDocumentsRequest, IngestionJobAcceptedResponse, IngestionJobRecord
+from shared.contracts.ingestion import IngestDocumentsRequest, IngestionCollectionDeleteResponse, IngestionJobAcceptedResponse, IngestionJobRecord
 
 router = APIRouter(tags=["ingestion"])
 
@@ -26,3 +26,10 @@ async def get_ingestion_job_status(
     service: IngestionService = Depends(get_ingestion_service),
 ) -> IngestionJobRecord:
     return await service.get_job_status(job_id)
+
+@router.delete("/ingestion/collection", response_model=IngestionCollectionDeleteResponse)
+async def delete_ingestion_collection(
+    service: IngestionService = Depends(get_ingestion_service),
+) -> IngestionCollectionDeleteResponse:
+    return await service.delete_collection()
+

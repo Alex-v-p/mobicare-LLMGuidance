@@ -66,6 +66,12 @@ class QdrantVectorStore:
         count_result = self._client.count(collection_name=self._collection, exact=False)
         return int(count_result.count)
 
+    def delete_collection(self) -> bool:
+        if not self.collection_exists():
+            return False
+        self._client.delete_collection(collection_name=self._collection)
+        return True
+
     def upsert_chunks(self, chunks: list[TextChunk], embeddings: list[list[float]]) -> int:
         points: list[PointStruct] = []
         for chunk, embedding in zip(chunks, embeddings):
