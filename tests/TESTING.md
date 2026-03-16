@@ -1,42 +1,19 @@
-# Testing
+Run the full suite:
+pytest -vv -l --tb=short
 
-## Commands
+Run with coverage:
+pytest --cov=services/api/src/api --cov=services/inference/src/inference --cov=services/shared/src/shared --cov-report=term-missing -vv
 
-Run everything:
-
-```bash
-pytest tests
-```
-```bash
-pytest -vv
-```
-
-Run only unit tests:
-
-```bash
-pytest tests/unit
-```
-
-Run only route tests:
-
-```bash
-pytest tests/unit/api/routes
-```
+Run only fast unit and route tests:
+pytest -m "unit or route" -vv
 
 Run integration tests:
+pytest -m integration -vv
 
-```bash
-pytest tests/integration
-```
+Run end-to-end tests:
+pytest -m e2e -vv
 
-Run E2E tests:
+Run the optional real-container integration tests only:
+pytest tests/integration/test_real_redis_job_store.py tests/integration/test_real_minio_document_repository.py -vv
 
-```bash
-pytest tests/e2e
-```
-
-Run a single file with verbose output:
-
-```bash
-pytest -v tests/e2e/test_guidance_async_flow.py
-```
+The real-container tests require Docker and will skip automatically when Docker is unavailable.

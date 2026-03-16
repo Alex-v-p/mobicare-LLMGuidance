@@ -1,60 +1,82 @@
 from __future__ import annotations
 
+import importlib.util
 import sys
 import types
 
+
+def _module_available(name: str) -> bool:
+    return importlib.util.find_spec(name) is not None
+
+
 # Lightweight import stubs for optional infrastructure clients not installed in the test environment.
-if "minio" not in sys.modules:
+# Important: only install stubs when the real dependency is unavailable, so integration tests can use
+# the actual Docker-backed libraries when they are installed in the environment.
+if not _module_available("minio"):
     minio_mod = types.ModuleType("minio")
+
     class _Minio: ...
+
     minio_mod.Minio = _Minio
     sys.modules["minio"] = minio_mod
 
     error_mod = types.ModuleType("minio.error")
+
     class S3Error(Exception):
         def __init__(self, *args, code: str = "", **kwargs):
             super().__init__(*args)
             self.code = code
+
     error_mod.S3Error = S3Error
     sys.modules["minio.error"] = error_mod
 
     datatypes_mod = types.ModuleType("minio.datatypes")
+
     class Object: ...
+
     datatypes_mod.Object = Object
     sys.modules["minio.datatypes"] = datatypes_mod
 
     helpers_mod = types.ModuleType("minio.helpers")
+
     class ObjectWriteResult: ...
+
     helpers_mod.ObjectWriteResult = ObjectWriteResult
     sys.modules["minio.helpers"] = helpers_mod
 
     common_mod = types.ModuleType("minio.commonconfig")
     common_mod.ENABLED = "Enabled"
+
     class Filter:
         def __init__(self, prefix=None):
             self.prefix = prefix
+
     common_mod.Filter = Filter
     sys.modules["minio.commonconfig"] = common_mod
 
     life_mod = types.ModuleType("minio.lifecycleconfig")
+
     class Expiration:
         def __init__(self, days=None):
             self.days = days
+
     class Rule:
         def __init__(self, status, rule_filter=None, rule_id=None, expiration=None):
             self.status = status
             self.rule_filter = rule_filter
             self.rule_id = rule_id
             self.expiration = expiration
+
     class LifecycleConfig:
         def __init__(self, rules):
             self.rules = rules
+
     life_mod.Expiration = Expiration
     life_mod.Rule = Rule
     life_mod.LifecycleConfig = LifecycleConfig
     sys.modules["minio.lifecycleconfig"] = life_mod
 
-if "redis" not in sys.modules:
+if not _module_available("redis"):
     redis_pkg = types.ModuleType("redis")
     asyncio_mod = types.ModuleType("redis.asyncio")
 
@@ -100,29 +122,51 @@ if "redis" not in sys.modules:
     sys.modules["redis"] = redis_pkg
     sys.modules["redis.asyncio"] = asyncio_mod
 
-if "qdrant_client" not in sys.modules:
+if not _module_available("qdrant_client"):
     qdrant_mod = types.ModuleType("qdrant_client")
+
     class QdrantClient:
         def __init__(self, *args, **kwargs):
             pass
+
     qdrant_mod.QdrantClient = QdrantClient
     sys.modules["qdrant_client"] = qdrant_mod
     http_models = types.ModuleType("qdrant_client.http.models")
-    for name in ["Distance", "VectorParams", "PointStruct", "Filter", "FieldCondition", "MatchValue", "SparseVector", "NamedVector", "NamedSparseVector", "SparseIndexParams", "Modifier", "SearchRequest", "FusionQuery", "Prefetch", "Fusion"]:
+    for name in [
+        "Distance",
+        "VectorParams",
+        "PointStruct",
+        "Filter",
+        "FieldCondition",
+        "MatchValue",
+        "SparseVector",
+        "NamedVector",
+        "NamedSparseVector",
+        "SparseIndexParams",
+        "Modifier",
+        "SearchRequest",
+        "FusionQuery",
+        "Prefetch",
+        "Fusion",
+    ]:
         http_models.__dict__[name] = type(name, (), {})
     sys.modules["qdrant_client.http.models"] = http_models
     models_mod = types.ModuleType("qdrant_client.models")
+
     class Distance:
         COSINE = "cosine"
+
     class VectorParams:
         def __init__(self, size=None, distance=None):
             self.size = size
             self.distance = distance
+
     class PointStruct:
         def __init__(self, id=None, vector=None, payload=None):
             self.id = id
             self.vector = vector
             self.payload = payload
+
     models_mod.Distance = Distance
     models_mod.VectorParams = VectorParams
     models_mod.PointStruct = PointStruct
