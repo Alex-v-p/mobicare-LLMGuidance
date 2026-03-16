@@ -2,17 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Literal, Optional
-from uuid import uuid4
-
 from pydantic import BaseModel, Field, HttpUrl
 
-
-def new_request_id() -> str:
-    return f"req_{uuid4()}"
-
-
-def new_job_id() -> str:
-    return f"job_{uuid4()}"
+from shared.ids import new_job_id, new_request_id
 
 
 class PatientVariables(BaseModel):

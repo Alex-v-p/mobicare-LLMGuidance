@@ -2,18 +2,14 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any, Literal, Optional
-from uuid import uuid4
-
 from pydantic import BaseModel, Field
+
+from shared.ids import new_ingestion_job_id
 
 
 IngestionJobState = Literal["queued", "running", "completed", "failed", "not_found"]
 CleaningStrategy = Literal["none", "basic", "deep", "medical_guideline_deep"]
 ChunkingStrategy = Literal["naive", "page_indexed", "late"]
-
-
-def new_ingestion_job_id() -> str:
-    return f"ingest_job_{uuid4()}"
 
 
 def utc_now_iso() -> str:
