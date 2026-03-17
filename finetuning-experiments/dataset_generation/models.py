@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
 
 
 @dataclass(slots=True)
 class ExtractedPassage:
     passage_id: str
+    text: str
+    normalized_text: str
     document_id: str
     document_name: str
-    text: str
-    page: int | None = None
-    block_index: int | None = None
+    page: int
+    block_index: int
     section_title: str | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, str | int | float | bool | None] = field(default_factory=dict)

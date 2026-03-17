@@ -3,53 +3,50 @@ from __future__ import annotations
 from .models import ExtractedPassage
 
 
-QUESTION_TYPE_INSTRUCTIONS = {
-    "factual": "Create one direct factual question answerable from the passage alone.",
-    "clinical_scenario": (
-        "Create one short clinical-style question that remains answerable from the passage alone. "
-        "You may frame it as a patient scenario, but do not introduce unsupported facts. "
-        "When natural, include structured patient_variables copied from the scenario."
-    ),
-    "paraphrased_factual": "Create one factual question using different wording than the passage.",
-    "slightly_indirect": (
-        "Create one slightly indirect but still clear question that requires understanding the passage, "
-        "not copying it. When natural, include structured patient_variables copied from the question."
-    ),
-}
-
-
-def build_generation_prompt(passage: ExtractedPassage, question_type: str) -> str:
-    instruction = QUESTION_TYPE_INSTRUCTIONS[question_type]
-    section = passage.section_title or ""
-    return f"""
-Generate one benchmark case from the passage below.
-
-Question type: {question_type}
-Instruction: {instruction}
-Document id: {passage.document_id}
-Document name: {passage.document_name}
-Page: {passage.page}
-Section title: {section}
-
-Return a JSON object with exactly these keys:
-- question: string
-- patient_variables: object (empty object if not needed)
-- reference_answer: string
-- required_facts: array of 1 to 3 short strings
-- forbidden_facts: array of 1 to 2 short strings when a plausible unsupported or contradictory answer exists, otherwise empty array
-- tags: array of 1 to 4 short lowercase topic tags
-
+ANSWERABLE_PROMPT = """You are creating a benchmark case for a medical RAG system.
+Return ONLY valid JSON with keys:
+question, question_type, reasoning_type, difficulty, patient_variables, reference_answer, required_facts, forbidden_facts, query_variants, tags, retrieval_hints, hallucination_metadata.
 Rules:
-- Use only the supplied passage.
-- Do not cite document ids or page numbers in the question.
-- Do not ask about things not stated in the passage.
-- The reference answer must be concise.
-- required_facts should be semantic ideas, not exact quotes.
-- forbidden_facts should include clearly unsupported or contradictory ideas if a realistic wrong answer exists.
-- patient_variables should only include variables explicitly present in the question. Avoid fabricating clinical values.
-- Do not include question type in tags.
-- Tags must be short lowercase topic tags.
-
+- The question MUST be answerable directly from the passage.
+- Keep patient_variables empty unless the requested question_type is clinical-scenario.
+- Use short, concrete required_facts.
+- query_variants should have 0-2 alternative phrasings.
+- retrieval_hints must include key_terms, expected_section, document_scope.
+- hallucination_metadata must include risk_level and likely_failure_modes.
+- Do not invent facts not present in the passage.
+- question_type must equal the requested value.
+- reasoning_type should be one of single-hop, definition, comparison, contraindication-check, scenario-application.
+- difficulty should be easy, medium, or hard.
+Requested question_type: {question_type}
+Passage section: {section_title}
 Passage:
-{passage.text}
-""".strip()
+{passage}
+"""
+
+UNANSWERABLE_PROMPT = """You are creating an out-of-scope benchmark case for a medical RAG system that only knows one heart-failure guideline supplement.
+Return ONLY valid JSON with keys:
+question, question_type, reasoning_type, difficulty, patient_variables, forbidden_facts, query_variants, tags, retrieval_hints, unanswerable_reason, hallucination_metadata.
+Rules:
+- The question MUST NOT be answerable from the heart-failure guideline supplement.
+- Use a medical question from another domain or from a clearly absent heart-failure detail.
+- No gold passage exists for this case.
+- question_type must equal the requested value.
+- reasoning_type should usually be abstention, definition, or single-hop.
+- difficulty should be easy, medium, or hard.
+- retrieval_hints expected_section must be null.
+- hallucination_metadata must include risk_level, likely_failure_modes, unsupported_targets.
+Requested question_type: {question_type}
+Topic seed: {topic}
+"""
+
+
+def build_answerable_prompt(passage: ExtractedPassage, question_type: str) -> str:
+    return ANSWERABLE_PROMPT.format(
+        question_type=question_type,
+        section_title=passage.section_title or "unknown",
+        passage=passage.text,
+    )
+
+
+def build_unanswerable_prompt(question_type: str, topic: str) -> str:
+    return UNANSWERABLE_PROMPT.format(question_type=question_type, topic=topic)

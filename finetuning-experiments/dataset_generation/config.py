@@ -1,79 +1,67 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from pathlib import Path
-
-DEFAULT_MIX = {
-    "factual": 0.40,
-    "clinical_scenario": 0.30,
-    "paraphrased_factual": 0.20,
-    "slightly_indirect": 0.10,
-}
+import json
+from typing import Any
 
 
 @dataclass(slots=True)
-class PdfExtractionConfig:
-    min_words: int = 35
-    max_words: int = 180
-    min_unique_words: int = 10
-    target_block_words: int = 85
-    word_window_overlap: int = 30
-    merge_small_paragraphs: bool = True
-    skip_reference_sections: bool = True
-    skip_initial_pages: int = 5
-    reference_page_markers: list[str] = field(
-        default_factory=lambda: [
-            "references",
-            "bibliography",
-            "to access the supplementary materials",
-            "downloaded from",
-        ]
-    )
-    reject_passage_markers: list[str] = field(
-        default_factory=lambda: [
-            "all rights reserved",
-            "downloaded from",
-            "permissions",
-            "copyright",
-            "doi:",
-        ]
-    )
+class ExtractionConfig:
+    min_words: int = 40
+    max_words: int = 140
+    skip_first_pages: int = 4
+    stop_at_references: bool = True
 
 
 @dataclass(slots=True)
 class GenerationConfig:
-    dataset_size: int = 100
-    mix: dict[str, float] = field(default_factory=lambda: dict(DEFAULT_MIX))
-    temperature: float = 0.2
+    dataset_version: str = "benchmark_v1"
+    dataset_id: str = "benchmark_v1"
+    dataset_size: int = 120
     seed: int = 42
-    retries: int = 3
     provider: str = "ollama"
-    model: str | None = None
-    api_base_url: str | None = None
-    api_key: str | None = None
-    system_prompt: str = (
-        "You generate benchmark cases for a medical RAG system. "
-        "Only use the information in the supplied passage. "
-        "Do not add outside medical knowledge. Return strict JSON only."
-    )
+    api_base_url: str = "http://localhost:11434"
+    model: str = "qwen2.5:7b"
+    timeout_seconds: int = 180
+    temperature: float = 0.2
+    prompt_version: str = "dataset_generation_v4"
+    case_kind_mix: dict[str, float] = field(default_factory=lambda: {"answerable": 0.8, "unanswerable": 0.2})
+    question_mix: dict[str, float] = field(default_factory=lambda: {
+        "factual": 0.4,
+        "clinical-scenario": 0.3,
+        "paraphrased-factual": 0.2,
+        "slightly-indirect": 0.1,
+    })
+    concurrency: int = 1
+    retries: int = 4
+    continue_on_error: bool = True
+    resume_from_jsonl: bool = True
+    ollama_options: dict[str, Any] = field(default_factory=lambda: {
+        "num_predict": 400,
+        "num_ctx": 2048,
+        "temperature": 0.2,
+    })
 
 
 @dataclass(slots=True)
 class DatasetGenerationSettings:
-    input_path: str | None = None
-    output_path: str | None = None
-    extraction: PdfExtractionConfig = field(default_factory=PdfExtractionConfig)
+    input_path: str
+    output_path: str
+    output_jsonl_path: str | None
+    extraction: ExtractionConfig = field(default_factory=ExtractionConfig)
     generation: GenerationConfig = field(default_factory=GenerationConfig)
 
-    @classmethod
-    def from_json(cls, path: str | Path) -> "DatasetGenerationSettings":
-        raw = json.loads(Path(path).read_text(encoding="utf-8"))
-        extraction = PdfExtractionConfig(**raw.get("extraction", {}))
-        generation = GenerationConfig(**raw.get("generation", raw))
-        return cls(
-            input_path=raw.get("input_path"),
-            output_path=raw.get("output_path"),
-            extraction=extraction,
-            generation=generation,
-        )
+
+
+def load_settings(config_path: str | Path, input_path: str, output_path: str, output_jsonl_path: str | None = None) -> DatasetGenerationSettings:
+    raw = json.loads(Path(config_path).read_text(encoding="utf-8")) if config_path else {}
+    extraction = ExtractionConfig(**raw.get("extraction", {}))
+    generation = GenerationConfig(**raw.get("generation", {}))
+    return DatasetGenerationSettings(
+        input_path=input_path,
+        output_path=output_path,
+        output_jsonl_path=output_jsonl_path,
+        extraction=extraction,
+        generation=generation,
+    )
