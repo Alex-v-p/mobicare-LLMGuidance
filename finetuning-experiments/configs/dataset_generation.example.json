@@ -1,0 +1,39 @@
+{
+  "extraction": {
+    "min_words": 40,
+    "max_words": 140,
+    "skip_first_pages": 4,
+    "stop_at_references": true
+  },
+  "generation": {
+    "dataset_version": "benchmark_v1",
+    "dataset_id": "benchmark_v1",
+    "dataset_size": 120,
+    "seed": 42,
+    "provider": "ollama",
+    "api_base_url": "http://localhost:11434",
+    "model": "qwen2.5:7b",
+    "timeout_seconds": 180,
+    "temperature": 0.2,
+    "prompt_version": "dataset_generation_v4",
+    "case_kind_mix": {
+      "answerable": 0.8,
+      "unanswerable": 0.2
+    },
+    "question_mix": {
+      "factual": 0.4,
+      "clinical-scenario": 0.3,
+      "paraphrased-factual": 0.2,
+      "slightly-indirect": 0.1
+    },
+    "concurrency": 1,
+    "retries": 4,
+    "continue_on_error": true,
+    "resume_from_jsonl": true,
+    "ollama_options": {
+      "num_predict": 400,
+      "num_ctx": 2048,
+      "temperature": 0.2
+    }
+  }
+}
