@@ -1,0 +1,23 @@
+{
+  "extraction": {
+    "min_words": 45,
+    "max_words": 220,
+    "merge_small_paragraphs": true,
+    "skip_reference_sections": true
+  },
+  "generation": {
+    "dataset_size": 100,
+    "mix": {
+      "factual": 0.4,
+      "clinical_scenario": 0.3,
+      "paraphrased_factual": 0.2,
+      "slightly_indirect": 0.1
+    },
+    "temperature": 0.2,
+    "seed": 42,
+    "retries": 3,
+    "model": "qwen2.5:7b",
+    "api_base_url": "http://localhost:11434",
+    "provider": "ollama"
+  }
+}
