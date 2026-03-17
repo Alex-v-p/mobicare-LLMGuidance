@@ -41,7 +41,7 @@ pip install -r requirements.txt
 ```bash
 python -m dataset_generation.cli \
   --input-pdf ./dataset_generation/docs/HF_GuidLine_Christof_ehab368_Suppl.pdf \
-  --output ./datasets/benchmark_v1.json \
+  --output ./datasets/document_sets/benchmark_v1.json \
   --config ./configs/dataset_generation.example.json
 ```
 
@@ -50,7 +50,7 @@ You can override the question-type mix directly:
 ```bash
 python -m cli.main generate-dataset \
   --input-pdf ./my-guideline.pdf \
-  --output ./datasets/benchmark_v1.json \
+  --output ./datasets/document_sets/benchmark_v1.json \
   --mix '{"factual":0.35,"clinical_scenario":0.35,"paraphrased_factual":0.2,"slightly_indirect":0.1}'
 ```
 

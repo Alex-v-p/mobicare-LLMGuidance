@@ -307,8 +307,10 @@ class PdfPassageExtractor:
         return ExtractedPassage(
             passage_id=f"{path.stem}_p{page_number:03d}_{local_index:03d}",
             document_id=path.stem,
+            document_name=path.name,
             text=text,
             page=page_number,
+            block_index=local_index,
             section_title=section_title,
             metadata={},
         )
