@@ -2,3 +2,4 @@ pypdf
 requests
 tqdm
 python-dotenv
+qdrant-client
