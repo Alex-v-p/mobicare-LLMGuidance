@@ -3,17 +3,39 @@ from __future__ import annotations
 from statistics import mean
 from typing import Any
 
-from .latency import summarize_latencies
+from .latency import summarize_latencies, summarize_stage_latencies
+
 
 
 def _avg(items: list[float]) -> float:
     return mean(items) if items else 0.0
 
 
+
 def summarize_results(per_case_results: list[dict[str, Any]]) -> dict[str, Any]:
     retrieval_items = [item["retrieval_scores"] for item in per_case_results if "retrieval_scores" in item]
     generation_items = [item["generation_scores"] for item in per_case_results if "generation_scores" in item]
-    total_latencies = [float(item.get("timings", {}).get("total_latency_seconds", 0.0)) for item in per_case_results]
+
+    stage_lists = [list((item.get("telemetry") or {}).get("stages") or []) for item in per_case_results]
+    derived_timings = [dict((item.get("telemetry") or {}).get("derived") or {}) for item in per_case_results]
+    total_latencies = [
+        float(derived.get("total_duration_ms")) / 1000.0
+        for derived in derived_timings
+        if derived.get("total_duration_ms") is not None
+    ]
+    if not total_latencies:
+        total_latencies = [float(item.get("timings", {}).get("total_latency_seconds", 0.0)) for item in per_case_results]
+
+    queue_latencies = [
+        float(derived.get("queue_delay_ms")) / 1000.0
+        for derived in derived_timings
+        if derived.get("queue_delay_ms") is not None
+    ]
+    execution_latencies = [
+        float(derived.get("execution_duration_ms")) / 1000.0
+        for derived in derived_timings
+        if derived.get("execution_duration_ms") is not None
+    ]
 
     retrieval_summary = {
         "case_count": len(retrieval_items),
@@ -36,7 +58,14 @@ def summarize_results(per_case_results: list[dict[str, Any]]) -> dict[str, Any]:
         "exact_pass_rate": _avg([1.0 if x.get("exact_pass") else 0.0 for x in generation_items]),
     }
     api_summary = summarize_latencies(total_latencies)
-    api_summary["case_count"] = len(total_latencies)
+    api_summary.update(
+        {
+            "case_count": len(total_latencies),
+            "queue_delay": summarize_latencies(queue_latencies),
+            "execution_duration": summarize_latencies(execution_latencies),
+            "stage_latency_summary": summarize_stage_latencies(stage_lists),
+        }
+    )
     return {
         "retrieval_summary": retrieval_summary,
         "generation_summary": generation_summary,

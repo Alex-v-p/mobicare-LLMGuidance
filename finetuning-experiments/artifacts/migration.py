@@ -4,6 +4,7 @@ from typing import Any
 
 from artifacts.models import CURRENT_ARTIFACT_VERSION
 from scoring.normalization import normalize_run_metrics
+from telemetry.stage_recorder import extract_guidance_telemetry, extract_ingestion_telemetry
 
 
 
@@ -20,6 +21,17 @@ def migrate_artifact(payload: dict[str, Any]) -> dict[str, Any]:
     migrated.setdefault("generation_summary", {})
     migrated.setdefault("api_summary", {})
     migrated.setdefault("per_case_results", [])
+
+    if migrated.get("ingestion_summary") and not migrated["ingestion_summary"].get("telemetry"):
+        migrated["ingestion_summary"]["telemetry"] = extract_ingestion_telemetry(
+            migrated["ingestion_summary"].get("raw_endpoint_result") or migrated["ingestion_summary"]
+        )
+
+    for item in migrated.get("per_case_results") or []:
+        if not isinstance(item, dict):
+            continue
+        if not item.get("telemetry"):
+            item["telemetry"] = extract_guidance_telemetry(item.get("raw_endpoint_result") or {})
 
     if not migrated.get("normalized_metrics"):
         migrated["normalized_metrics"] = normalize_run_metrics(

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-CURRENT_ARTIFACT_VERSION = "2.0"
+CURRENT_ARTIFACT_VERSION = "2.1"
 
 
 @dataclass(slots=True)
@@ -49,6 +49,7 @@ class RunSummaryArtifact:
     api_summary: dict[str, Any] = field(default_factory=dict)
     ingestion_summary: dict[str, Any] = field(default_factory=dict)
     source_mapping_summary: dict[str, Any] = field(default_factory=dict)
+    telemetry_summary: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

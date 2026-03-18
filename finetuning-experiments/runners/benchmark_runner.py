@@ -16,14 +16,17 @@ from runners.ingestion_runner import run_ingestion_stage
 from runners.retrieval_runner import run_retrieval_stage
 from scoring.aggregation import summarize_results
 from scoring.normalization import normalize_run_metrics
+from telemetry.stage_recorder import extract_guidance_telemetry
 from utils.datetime import utc_now_iso
 from utils.ids import build_run_id
 
 logger = logging.getLogger(__name__)
 
 
+
 def _build_cases(raw_dataset: dict[str, Any]) -> list[BenchmarkCase]:
     return [BenchmarkCase(**case) for case in raw_dataset.get("cases", [])]
+
 
 
 def _build_guidance_payload(case: BenchmarkCase, config: BenchmarkRunConfig) -> dict[str, Any]:
@@ -51,8 +54,10 @@ def _build_guidance_payload(case: BenchmarkCase, config: BenchmarkRunConfig) -> 
     }
 
 
+
 def _timing_seconds(start: float) -> float:
     return max(0.0, time.monotonic() - start)
+
 
 
 def _run_warmups(cases: list[BenchmarkCase], config: BenchmarkRunConfig, guidance_client: GuidanceClient) -> None:
@@ -68,6 +73,7 @@ def _run_warmups(cases: list[BenchmarkCase], config: BenchmarkRunConfig, guidanc
             logger.warning("Warm-up failed for case=%s: %s", case.id, exc)
 
 
+
 def _build_success_case_result(
     *,
     case: BenchmarkCase,
@@ -77,6 +83,8 @@ def _build_success_case_result(
 ) -> dict[str, Any]:
     retrieval_result = run_retrieval_stage(source_mapping, guidance_record)
     generation_result = run_generation_stage(case, guidance_record, retrieval_result.retrieved_chunks)
+    telemetry = extract_guidance_telemetry(guidance_record)
+    derived = telemetry.get("derived") or {}
     return {
         "case_id": case.id,
         "question": case.question,
@@ -91,15 +99,20 @@ def _build_success_case_result(
         "metadata": generation_result.metadata,
         "retrieval_scores": retrieval_result.retrieval_scores,
         "generation_scores": generation_result.generation_scores,
+        "telemetry": telemetry,
         "timings": {
             "total_latency_seconds": total_latency,
             "created_at": guidance_record.get("created_at"),
             "started_at": guidance_record.get("started_at"),
             "completed_at": guidance_record.get("completed_at"),
             "updated_at": guidance_record.get("updated_at"),
+            "queue_delay_ms": derived.get("queue_delay_ms"),
+            "execution_duration_ms": derived.get("execution_duration_ms"),
+            "total_duration_ms": derived.get("total_duration_ms"),
         },
         "raw_endpoint_result": guidance_record,
     }
+
 
 
 def _build_failed_case_result(
@@ -111,6 +124,7 @@ def _build_failed_case_result(
 ) -> dict[str, Any]:
     retrieval_result = run_retrieval_stage(source_mapping, {})
     generation_result = run_generation_stage(case, {}, retrieval_result.retrieved_chunks)
+    failed_record = {"status": "failed", "error": str(error)}
     return {
         "case_id": case.id,
         "question": case.question,
@@ -125,10 +139,12 @@ def _build_failed_case_result(
         "metadata": generation_result.metadata,
         "retrieval_scores": retrieval_result.retrieval_scores,
         "generation_scores": generation_result.generation_scores,
+        "telemetry": extract_guidance_telemetry(failed_record),
         "timings": {"total_latency_seconds": total_latency},
-        "raw_endpoint_result": {"status": "failed", "error": str(error)},
+        "raw_endpoint_result": failed_record,
         "error": str(error),
     }
+
 
 
 def run_benchmark(config: BenchmarkRunConfig) -> Path:

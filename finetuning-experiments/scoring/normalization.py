@@ -23,6 +23,8 @@ _CORE_DEFAULTS: dict[str, float] = {
     "latency.p99": 0.0,
     "latency.min": 0.0,
     "latency.max": 0.0,
+    "latency.queue_delay.average": 0.0,
+    "latency.execution_duration.average": 0.0,
 }
 
 
@@ -42,6 +44,8 @@ def normalize_run_metrics(
     retrieval = retrieval_summary or {}
     generation = generation_summary or {}
     latency = api_summary or {}
+    queue_delay = latency.get("queue_delay") or {}
+    execution_duration = latency.get("execution_duration") or {}
 
     normalized = dict(_CORE_DEFAULTS)
     normalized.update(
@@ -66,6 +70,8 @@ def normalize_run_metrics(
             "latency.p99": _as_float(latency.get("p99"), normalized["latency.p99"]),
             "latency.min": _as_float(latency.get("min"), normalized["latency.min"]),
             "latency.max": _as_float(latency.get("max"), normalized["latency.max"]),
+            "latency.queue_delay.average": _as_float(queue_delay.get("average"), normalized["latency.queue_delay.average"]),
+            "latency.execution_duration.average": _as_float(execution_duration.get("average"), normalized["latency.execution_duration.average"]),
         }
     )
     return normalized

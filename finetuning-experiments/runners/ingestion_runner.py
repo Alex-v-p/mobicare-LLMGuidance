@@ -9,6 +9,7 @@ from adapters.qdrant import QdrantScrollClient
 from configs.schema import BenchmarkRunConfig
 from datasets.schema import BenchmarkCase
 from source_mapping.matcher import SourceMatcher
+from telemetry.stage_recorder import extract_ingestion_telemetry
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ class IngestionStageResult:
         return asdict(self)
 
 
+
 def _build_ingestion_payload(config: BenchmarkRunConfig) -> dict[str, Any]:
     return {
         "options": {
@@ -35,8 +37,11 @@ def _build_ingestion_payload(config: BenchmarkRunConfig) -> dict[str, Any]:
     }
 
 
+
 def _extract_ingestion_summary(result_record: dict[str, Any], *, job_id: str, status: str) -> dict[str, Any]:
     payload = (result_record.get("result") or {}) if isinstance(result_record, dict) else {}
+    telemetry = extract_ingestion_telemetry(result_record)
+    derived = telemetry.get("derived") or {}
     return {
         "job_id": job_id,
         "status": status,
@@ -51,8 +56,13 @@ def _extract_ingestion_summary(result_record: dict[str, Any], *, job_id: str, st
         "started_at": result_record.get("started_at"),
         "completed_at": result_record.get("completed_at"),
         "updated_at": result_record.get("updated_at"),
+        "queue_delay_ms": derived.get("queue_delay_ms"),
+        "execution_duration_ms": derived.get("execution_duration_ms"),
+        "total_duration_ms": derived.get("total_duration_ms"),
+        "telemetry": telemetry,
         "raw_endpoint_result": result_record,
     }
+
 
 
 def _map_sources(config: BenchmarkRunConfig, cases: list[BenchmarkCase]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
@@ -81,6 +91,7 @@ def _map_sources(config: BenchmarkRunConfig, cases: list[BenchmarkCase]) -> tupl
         "case_chunk_assignments": assignments,
     }
     return assignments, summary
+
 
 
 def run_ingestion_stage(config: BenchmarkRunConfig, cases: list[BenchmarkCase]) -> IngestionStageResult:
