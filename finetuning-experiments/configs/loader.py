@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
-from typing import Any
+
+from utils.json import read_json
 
 from .schema import BenchmarkRunConfig, ExecutionConfig, InferenceConfig, IngestionConfig, SourceMappingConfig
+from .validator import validate_run_config
+
 
 
 def load_run_config(path: str | Path) -> BenchmarkRunConfig:
-    raw = json.loads(Path(path).read_text(encoding="utf-8"))
-    return BenchmarkRunConfig(
+    raw = read_json(path)
+    config = BenchmarkRunConfig(
         label=raw["label"],
         dataset_path=raw["dataset_path"],
         documents_version=raw.get("documents_version", "docs_v1"),
@@ -21,3 +23,5 @@ def load_run_config(path: str | Path) -> BenchmarkRunConfig:
         inference=InferenceConfig(**raw.get("inference", {})),
         execution=ExecutionConfig(**raw.get("execution", {})),
     )
+    validate_run_config(config)
+    return config

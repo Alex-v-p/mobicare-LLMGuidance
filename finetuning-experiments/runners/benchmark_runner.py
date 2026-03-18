@@ -2,27 +2,27 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from adapters.gateway import GatewayClient
 from adapters.guidance import GuidanceClient
 from adapters.qdrant import QdrantScrollClient
+from artifacts.models import CURRENT_ARTIFACT_VERSION, RunArtifact
 from artifacts.writer import write_run_artifact
 from configs.schema import BenchmarkRunConfig
 from datasets.loader import load_benchmark_dataset
 from datasets.schema import BenchmarkCase
 from scoring.aggregation import summarize_results
 from scoring.generation import score_generation
+from scoring.normalization import normalize_run_metrics
 from scoring.retrieval import score_retrieval
 from source_mapping.matcher import SourceMatcher
 
+from utils.datetime import utc_now_iso
+from utils.ids import build_run_id
+
 logger = logging.getLogger(__name__)
-
-
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 def _build_cases(raw_dataset: dict[str, Any]) -> list[BenchmarkCase]:
@@ -193,22 +193,31 @@ def run_benchmark(config: BenchmarkRunConfig) -> Path:
             )
 
     summaries = summarize_results(per_case_results)
-    run_id = f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}_{config.label}"
-    artifact = {
-        "run_id": run_id,
-        "label": config.label,
-        "datetime": _utc_now(),
-        "dataset_version": config.dataset_version,
-        "documents_version": config.documents_version,
-        "notes": config.notes,
-        "change_note": config.change_note,
-        "config": config.to_dict(),
-        "ingestion_summary": ingestion_record,
-        "source_mapping_summary": {
+    run_id = build_run_id(config.label)
+    artifact = RunArtifact(
+        artifact_type="run",
+        artifact_version=CURRENT_ARTIFACT_VERSION,
+        run_id=run_id,
+        label=config.label,
+        datetime=utc_now_iso(),
+        dataset_version=config.dataset_version,
+        documents_version=config.documents_version,
+        notes=config.notes,
+        change_note=config.change_note,
+        config=config.to_dict(),
+        ingestion_summary=ingestion_record or {},
+        source_mapping_summary={
             "mapping_label": config.label,
             "case_chunk_assignments": assignments,
         },
-        **summaries,
-        "per_case_results": per_case_results,
-    }
+        retrieval_summary=summaries.get("retrieval_summary") or {},
+        generation_summary=summaries.get("generation_summary") or {},
+        api_summary=summaries.get("api_summary") or {},
+        normalized_metrics=normalize_run_metrics(
+            summaries.get("retrieval_summary"),
+            summaries.get("generation_summary"),
+            summaries.get("api_summary"),
+        ),
+        per_case_results=per_case_results,
+    ).to_dict()
     return write_run_artifact(config.execution.output_dir, run_id, artifact)
