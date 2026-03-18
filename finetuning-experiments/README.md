@@ -25,7 +25,7 @@ Notes:
 Build run-specific chunk assignments from the frozen benchmark dataset after ingestion:
 
 ```bash
-python -m cli.main build-source-maps --dataset ./datasets/document_sets/benchmark_v1.json --mapping-label naive_chunk300_overlap100 --run-ingestion --delete-collection-first --chunking-strategy naive --cleaning-strategy deep --gateway-url http://localhost:8000 --qdrant-url http://localhost:6333 --collection guidance_chunks --output ./artifacts/source_maps/benchmark_v1_naive_chunk300_overlap100.json --max-matches 5 --max-sequence-length 3 --page-window 2 
+python -m cli.main build-source-maps   --dataset ./datasets/document_sets/benchmark_v1.json   --mapping-label naive_chunk300_overlap100   --run-ingestion   --delete-collection-first   --chunking-strategy naive   --cleaning-strategy deep   --output ./artifacts/source_maps/benchmark_v1_naive_chunk300_overlap100.json   --gateway-url http://localhost:8000   --qdrant-url http://localhost:6333   --collection guidance_chunks   --max-matches 5
 ```
 
 What this does:
@@ -47,3 +47,34 @@ Matching behavior now focuses on paragraph reconstruction rather than broad simi
 - sliding windows over chunk text
 - adjacent chunk-pair reconstruction
 - semantic score only as a last-resort optional fallback
+
+
+## Minimal end-to-end benchmark
+
+Run a benchmark from a single config file:
+
+```bash
+python -m cli.main run-benchmark --config ./configs/versions/minimal_benchmark.json --verbose
+```
+
+This will:
+- delete and rebuild the ingestion collection
+- fetch chunk payloads from Qdrant
+- run source mapping against the benchmark dataset
+- call the guidance endpoint for each benchmark case
+- score retrieval and generation outputs
+- write a run artifact to `./artifacts/runs`
+
+Open the Streamlit dashboard:
+
+```bash
+streamlit run ui/streamlit_app.py
+```
+
+The dashboard shows:
+- run overview
+- run comparison
+- per-case drilldown
+- retrieved chunks
+- source match candidates
+- raw endpoint result
