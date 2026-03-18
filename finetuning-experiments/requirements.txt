@@ -3,3 +3,5 @@ requests
 tqdm
 python-dotenv
 qdrant-client
+streamlit
+pandas
