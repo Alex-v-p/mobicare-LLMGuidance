@@ -5,20 +5,17 @@ import time
 from pathlib import Path
 from typing import Any
 
-from adapters.gateway import GatewayClient
 from adapters.guidance import GuidanceClient
-from adapters.qdrant import QdrantScrollClient
 from artifacts.models import CURRENT_ARTIFACT_VERSION, RunArtifact
 from artifacts.writer import write_run_artifact
 from configs.schema import BenchmarkRunConfig
 from datasets.loader import load_benchmark_dataset
 from datasets.schema import BenchmarkCase
+from runners.generation_runner import run_generation_stage
+from runners.ingestion_runner import run_ingestion_stage
+from runners.retrieval_runner import run_retrieval_stage
 from scoring.aggregation import summarize_results
-from scoring.generation import score_generation
 from scoring.normalization import normalize_run_metrics
-from scoring.retrieval import score_retrieval
-from source_mapping.matcher import SourceMatcher
-
 from utils.datetime import utc_now_iso
 from utils.ids import build_run_id
 
@@ -27,45 +24,6 @@ logger = logging.getLogger(__name__)
 
 def _build_cases(raw_dataset: dict[str, Any]) -> list[BenchmarkCase]:
     return [BenchmarkCase(**case) for case in raw_dataset.get("cases", [])]
-
-
-def _ingest(config: BenchmarkRunConfig) -> dict[str, Any] | None:
-    client = GatewayClient(base_url=config.execution.gateway_url)
-    if config.ingestion.delete_collection_first:
-        try:
-            delete_result = client.delete_ingestion_collection()
-            logger.info("Deleted collection collection=%s existed=%s", delete_result.get("collection"), delete_result.get("existed"))
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed deleting collection before ingestion: %s", exc)
-    payload = {
-        "options": {
-            "cleaning_strategy": config.ingestion.cleaning_strategy,
-            "cleaning_params": config.ingestion.cleaning_params,
-            "chunking_strategy": config.ingestion.chunking_strategy,
-            "chunking_params": config.ingestion.chunking_params,
-            "embedding_model": config.ingestion.embedding_model,
-        }
-    }
-    result = client.run_ingestion_and_wait(
-        payload,
-        poll_interval_seconds=config.execution.poll_interval_seconds,
-        max_wait_seconds=config.execution.max_wait_seconds,
-    )
-    return result.record
-
-
-def _map_sources(config: BenchmarkRunConfig, cases: list[BenchmarkCase]) -> list[dict[str, Any]]:
-    qdrant_client = QdrantScrollClient(url=config.execution.qdrant_url, collection_name=config.execution.collection)
-    payloads = qdrant_client.fetch_all_payloads(batch_size=config.execution.batch_size)
-    logger.info("Loaded %s payloads from Qdrant", len(payloads))
-    matcher = SourceMatcher(
-        max_matches=config.source_mapping.max_matches,
-        page_window=config.source_mapping.page_window,
-        page_offset_candidates=tuple(config.source_mapping.page_offset_candidates),
-        semantic_fallback_enabled=config.source_mapping.semantic_fallback_enabled,
-        include_chunk_pairs=config.source_mapping.include_chunk_pairs,
-    )
-    return [matcher.build_chunk_assignment(case=case, mapping_label=config.label, payloads=payloads).to_dict() for case in cases]
 
 
 def _build_guidance_payload(case: BenchmarkCase, config: BenchmarkRunConfig) -> dict[str, Any]:
@@ -93,8 +51,84 @@ def _build_guidance_payload(case: BenchmarkCase, config: BenchmarkRunConfig) -> 
     }
 
 
-def _timing_seconds(record: dict[str, Any], start: float) -> float:
+def _timing_seconds(start: float) -> float:
     return max(0.0, time.monotonic() - start)
+
+
+def _run_warmups(cases: list[BenchmarkCase], config: BenchmarkRunConfig, guidance_client: GuidanceClient) -> None:
+    for case in cases[: config.execution.warmup_cases]:
+        logger.info("Warm-up case=%s", case.id)
+        try:
+            guidance_client.run_guidance_and_wait(
+                _build_guidance_payload(case, config),
+                poll_interval_seconds=config.execution.poll_interval_seconds,
+                max_wait_seconds=config.execution.max_wait_seconds,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Warm-up failed for case=%s: %s", case.id, exc)
+
+
+def _build_success_case_result(
+    *,
+    case: BenchmarkCase,
+    source_mapping: dict[str, Any] | None,
+    guidance_record: dict[str, Any],
+    total_latency: float,
+) -> dict[str, Any]:
+    retrieval_result = run_retrieval_stage(source_mapping, guidance_record)
+    generation_result = run_generation_stage(case, guidance_record, retrieval_result.retrieved_chunks)
+    return {
+        "case_id": case.id,
+        "question": case.question,
+        "answerability": case.answerability,
+        "reference_answer": case.reference_answer,
+        "gold_passage_text": case.gold_passage_text,
+        "source_match_candidates": retrieval_result.source_match_candidates,
+        "generated_answer": generation_result.generated_answer,
+        "retrieved_chunks": retrieval_result.retrieved_chunks,
+        "warnings": generation_result.warnings,
+        "verification": generation_result.verification,
+        "metadata": generation_result.metadata,
+        "retrieval_scores": retrieval_result.retrieval_scores,
+        "generation_scores": generation_result.generation_scores,
+        "timings": {
+            "total_latency_seconds": total_latency,
+            "created_at": guidance_record.get("created_at"),
+            "started_at": guidance_record.get("started_at"),
+            "completed_at": guidance_record.get("completed_at"),
+            "updated_at": guidance_record.get("updated_at"),
+        },
+        "raw_endpoint_result": guidance_record,
+    }
+
+
+def _build_failed_case_result(
+    *,
+    case: BenchmarkCase,
+    source_mapping: dict[str, Any] | None,
+    error: Exception,
+    total_latency: float,
+) -> dict[str, Any]:
+    retrieval_result = run_retrieval_stage(source_mapping, {})
+    generation_result = run_generation_stage(case, {}, retrieval_result.retrieved_chunks)
+    return {
+        "case_id": case.id,
+        "question": case.question,
+        "answerability": case.answerability,
+        "reference_answer": case.reference_answer,
+        "gold_passage_text": case.gold_passage_text,
+        "source_match_candidates": retrieval_result.source_match_candidates,
+        "generated_answer": generation_result.generated_answer,
+        "retrieved_chunks": retrieval_result.retrieved_chunks,
+        "warnings": generation_result.warnings,
+        "verification": generation_result.verification,
+        "metadata": generation_result.metadata,
+        "retrieval_scores": retrieval_result.retrieval_scores,
+        "generation_scores": generation_result.generation_scores,
+        "timings": {"total_latency_seconds": total_latency},
+        "raw_endpoint_result": {"status": "failed", "error": str(error)},
+        "error": str(error),
+    }
 
 
 def run_benchmark(config: BenchmarkRunConfig) -> Path:
@@ -109,26 +143,14 @@ def run_benchmark(config: BenchmarkRunConfig) -> Path:
 
     logger.info("Loaded %s benchmark cases", len(cases))
 
-    ingestion_record = _ingest(config)
-    assignments = _map_sources(config, cases)
-    assignment_by_case = {item["case_id"]: item for item in assignments}
+    ingestion_stage = run_ingestion_stage(config, cases)
+    source_mapping_by_case = {item["case_id"]: item for item in ingestion_stage.assignments}
     guidance_client = GuidanceClient(base_url=config.execution.gateway_url)
-
-    warmup_cases = cases[: config.execution.warmup_cases]
-    for case in warmup_cases:
-        logger.info("Warm-up case=%s", case.id)
-        try:
-            guidance_client.run_guidance_and_wait(
-                _build_guidance_payload(case, config),
-                poll_interval_seconds=config.execution.poll_interval_seconds,
-                max_wait_seconds=config.execution.max_wait_seconds,
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Warm-up failed for case=%s: %s", case.id, exc)
+    _run_warmups(cases, config, guidance_client)
 
     per_case_results: list[dict[str, Any]] = []
     for case in cases:
-        expected_matches = assignment_by_case.get(case.id, {}).get("matches", [])
+        source_mapping = source_mapping_by_case.get(case.id)
         payload = _build_guidance_payload(case, config)
         logger.info("Running case=%s question=%s", case.id, case.question[:100])
         start = time.monotonic()
@@ -138,58 +160,22 @@ def run_benchmark(config: BenchmarkRunConfig) -> Path:
                 poll_interval_seconds=config.execution.poll_interval_seconds,
                 max_wait_seconds=config.execution.max_wait_seconds,
             )
-            record = result.record
-            total_latency = _timing_seconds(record, start)
-            retrieved = record.get("rag") or []
-            answer = record.get("answer") or ""
-            retrieval_scores = score_retrieval(expected_matches, retrieved)
-            generation_scores = score_generation(case.to_dict(), answer, retrieved)
             per_case_results.append(
-                {
-                    "case_id": case.id,
-                    "question": case.question,
-                    "answerability": case.answerability,
-                    "reference_answer": case.reference_answer,
-                    "gold_passage_text": case.gold_passage_text,
-                    "source_match_candidates": expected_matches,
-                    "generated_answer": answer,
-                    "retrieved_chunks": retrieved,
-                    "warnings": record.get("warnings") or [],
-                    "verification": record.get("verification"),
-                    "metadata": record.get("metadata") or {},
-                    "retrieval_scores": retrieval_scores,
-                    "generation_scores": generation_scores,
-                    "timings": {
-                        "total_latency_seconds": total_latency,
-                        "created_at": record.get("created_at"),
-                        "started_at": record.get("started_at"),
-                        "completed_at": record.get("completed_at"),
-                        "updated_at": record.get("updated_at"),
-                    },
-                    "raw_endpoint_result": record,
-                }
+                _build_success_case_result(
+                    case=case,
+                    source_mapping=source_mapping,
+                    guidance_record=result.record,
+                    total_latency=_timing_seconds(start),
+                )
             )
         except Exception as exc:  # noqa: BLE001
-            total_latency = _timing_seconds({}, start)
             per_case_results.append(
-                {
-                    "case_id": case.id,
-                    "question": case.question,
-                    "answerability": case.answerability,
-                    "reference_answer": case.reference_answer,
-                    "gold_passage_text": case.gold_passage_text,
-                    "source_match_candidates": expected_matches,
-                    "generated_answer": "",
-                    "retrieved_chunks": [],
-                    "warnings": [],
-                    "verification": None,
-                    "metadata": {},
-                    "retrieval_scores": score_retrieval(expected_matches, []),
-                    "generation_scores": score_generation(case.to_dict(), "", []),
-                    "timings": {"total_latency_seconds": total_latency},
-                    "raw_endpoint_result": {"status": "failed", "error": str(exc)},
-                    "error": str(exc),
-                }
+                _build_failed_case_result(
+                    case=case,
+                    source_mapping=source_mapping,
+                    error=exc,
+                    total_latency=_timing_seconds(start),
+                )
             )
 
     summaries = summarize_results(per_case_results)
@@ -205,11 +191,8 @@ def run_benchmark(config: BenchmarkRunConfig) -> Path:
         notes=config.notes,
         change_note=config.change_note,
         config=config.to_dict(),
-        ingestion_summary=ingestion_record or {},
-        source_mapping_summary={
-            "mapping_label": config.label,
-            "case_chunk_assignments": assignments,
-        },
+        ingestion_summary=ingestion_stage.ingestion_summary,
+        source_mapping_summary=ingestion_stage.source_mapping_summary,
         retrieval_summary=summaries.get("retrieval_summary") or {},
         generation_summary=summaries.get("generation_summary") or {},
         api_summary=summaries.get("api_summary") or {},
