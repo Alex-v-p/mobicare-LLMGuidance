@@ -19,6 +19,8 @@ _WHITESPACE_RE = re.compile(r"\s+")
 _NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
 _OCR_BREAK_RE = re.compile(r"(?<=[a-z])\s*[-/–—]\s*(?=[a-z])")
 _OCR_CODE_RE = re.compile(r"\bc\s*0\b|/c0|\\c0|\bc0\b")
+_OCR_SINGLE_LETTER_SPLIT_RE = re.compile(r"\b([a-z])\s+([a-z])\b")
+_OCR_DIGIT_UNIT_RE = re.compile(r"(?<=\d)\s+(?=[a-z]{1,3}\b)")
 _STOPWORDS = {
     "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "has", "have", "if", "in",
     "into", "is", "it", "its", "of", "on", "or", "that", "the", "their", "this", "to", "vs", "with",
@@ -88,8 +90,13 @@ def _normalize_for_matching(text: str | None) -> _NormalizedText:
     value = _OCR_CODE_RE.sub(" ", value)
     value = _OCR_BREAK_RE.sub("", value)
     value = re.sub(r"(?<=\d)\s+(?=\d)", "", value)
+    value = _OCR_DIGIT_UNIT_RE.sub("", value)
     value = re.sub(r"(?<=\b[a-z])\s+(?=[a-z]\b)", "", value)
     value = re.sub(r"\b([a-z]{1,3})\s+(?=[a-z]{1,3}\b)", lambda m: m.group(0).replace(" ", ""), value)
+    previous = None
+    while previous != value:
+        previous = value
+        value = _OCR_SINGLE_LETTER_SPLIT_RE.sub(r"\1\2", value)
     value = _NON_ALNUM_RE.sub(" ", value)
     value = _WHITESPACE_RE.sub(" ", value).strip()
     tokens = value.split() if value else []
@@ -174,6 +181,37 @@ def _boundary_ngram_hits(text: str | None, candidate_text: str) -> int:
     return hits
 
 
+
+
+def _find_subsequence_positions(haystack: list[str], needle: list[str], *, min_prefix: int = 3) -> list[int]:
+    if not haystack or not needle:
+        return []
+    sizes: list[int] = []
+    max_len = min(len(needle), 8)
+    for size in range(max_len, min_prefix - 1, -1):
+        sizes.append(size)
+    positions: set[int] = set()
+    for size in sizes:
+        prefix = needle[:size]
+        for index in range(0, max(len(haystack) - size + 1, 0)):
+            if haystack[index:index + size] == prefix:
+                positions.add(index)
+        if positions:
+            break
+    return sorted(positions)
+
+
+def _find_token_positions(haystack: list[str], tokens: list[str]) -> list[int]:
+    if not haystack or not tokens:
+        return []
+    positions: set[int] = set()
+    candidate_tokens = [token for token in tokens if token]
+    for token in candidate_tokens[:10]:
+        try:
+            positions.add(haystack.index(token))
+        except ValueError:
+            continue
+    return sorted(positions)
 def _rare_phrase_hits(gold_text: str | None, candidate_text: str) -> int:
     tokens = informative_tokens(gold_text)
     if len(tokens) < 3:
@@ -313,20 +351,33 @@ class SourceMatcher:
 
         gold_len = len(gold_norm.tokens)
         window_sizes = sorted({
+            max(14, int(gold_len * 0.70)),
             max(18, int(gold_len * 0.85)),
             max(24, int(gold_len * 1.0)),
             max(30, int(gold_len * 1.15)),
             max(36, int(gold_len * 1.3)),
+            max(42, int(gold_len * 1.45)),
         })
-        step = max(3, int(gold_len * self._window_step_ratio))
+        step = max(2, int(gold_len * self._window_step_ratio))
 
-        if len(unit_tokens) <= max(window_sizes):
-            starts = [0]
-        else:
-            starts = list(range(0, max(len(unit_tokens) - min(window_sizes) + 1, 1), step))
-            last_start = max(0, len(unit_tokens) - max(window_sizes))
-            if last_start not in starts:
-                starts.append(last_start)
+        starts: set[int] = {0}
+        if len(unit_tokens) > max(window_sizes):
+            starts.update(range(0, max(len(unit_tokens) - min(window_sizes) + 1, 1), step))
+            starts.add(max(0, len(unit_tokens) - max(window_sizes)))
+
+        for positions in (
+            _find_subsequence_positions(unit_tokens, start_norm.tokens),
+            _find_subsequence_positions(unit_tokens, end_norm.tokens),
+            _find_subsequence_positions(unit_tokens, gold_norm.tokens),
+            _find_subsequence_positions(unit_tokens, reference_norm.tokens, min_prefix=2),
+            _find_token_positions(unit_tokens, hints_norm.tokens),
+        ):
+            for position in positions:
+                starts.add(max(0, position - max(2, gold_len // 10)))
+                starts.add(max(0, position - max(4, gold_len // 5)))
+                starts.add(position)
+
+        starts = sorted(starts)
 
         best: _WindowMetrics | None = None
         for start in starts:
@@ -352,15 +403,15 @@ class SourceMatcher:
                 page_bonus = 1.0 / (1.0 + abs(page_distance)) if page_distance is not None else 0.0
 
                 lexical_score = (
-                    0.34 * passage_coverage
+                    0.30 * passage_coverage
                     + 0.24 * ordered_ratio
-                    + 0.18 * exact_ratio
-                    + 0.08 * max(start_coverage, end_coverage)
-                    + 0.07 * key_term_coverage
-                    + 0.04 * reference_coverage
-                    + 0.03 * min((boundary_hits / 2.0), 1.0)
+                    + 0.20 * exact_ratio
+                    + 0.07 * max(start_coverage, end_coverage)
+                    + 0.08 * key_term_coverage
+                    + 0.06 * reference_coverage
+                    + 0.025 * min((boundary_hits / 2.0), 1.0)
                     + 0.02 * min((phrase_hits / 3.0), 1.0)
-                    + 0.02 * page_bonus
+                    + 0.015 * page_bonus
                 )
                 combined_score = lexical_score
                 if self._semantic_fallback_enabled and lexical_score < self._thresholds.min_lexical_score:
@@ -385,6 +436,8 @@ class SourceMatcher:
                     reasons.append("high_key_term_coverage")
                 if reference_coverage >= 0.5:
                     reasons.append("reference_answer_overlap")
+                if reference_coverage >= 0.9 and key_term_coverage >= 0.5:
+                    reasons.append("definition_answer_lock")
                 if boundary_hits >= 1:
                     reasons.append("boundary_ngram_hit")
                 if phrase_hits >= 1:
@@ -402,6 +455,7 @@ class SourceMatcher:
                     passage_coverage=passage_coverage,
                     start_coverage=start_coverage,
                     end_coverage=end_coverage,
+                    reference_coverage=reference_coverage,
                     key_term_coverage=key_term_coverage,
                     page_distance=page_distance,
                 )
@@ -445,6 +499,7 @@ class SourceMatcher:
         start_coverage: float,
         end_coverage: float,
         key_term_coverage: float,
+        reference_coverage: float,
         page_distance: int | None,
     ) -> str | None:
         anchor_max = max(start_coverage, end_coverage)
@@ -455,6 +510,10 @@ class SourceMatcher:
             return "exact_or_compact_substring"
         if passage_coverage >= self._thresholds.min_passage_coverage and ordered_ratio >= self._thresholds.min_ordered_token_ratio:
             return "strong_reconstruction"
+        if reference_coverage >= 0.92 and key_term_coverage >= 0.50 and ordered_ratio >= 0.35:
+            return "definition_answer_lock"
+        if passage_coverage >= 0.58 and ordered_ratio >= 0.50 and key_term_coverage >= 0.60 and anchor_max >= 0.45:
+            return "keyed_reconstruction"
         if passage_coverage >= self._thresholds.min_partial_passage_coverage and both_anchors >= self._thresholds.min_anchor_pair_coverage and near_page:
             return "anchor_reconstruction_near_page"
         if passage_coverage >= self._thresholds.min_partial_passage_coverage and anchor_max >= self._thresholds.min_anchor_coverage_any and key_term_coverage >= self._thresholds.min_key_term_coverage and near_page:
