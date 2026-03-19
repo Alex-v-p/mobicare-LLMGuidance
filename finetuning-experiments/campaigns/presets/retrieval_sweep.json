@@ -1,0 +1,15 @@
+{
+  "label": "retrieval-sweep",
+  "base_config_path": "../../configs/versions/templates/base.json",
+  "description": "Sweep retrieval knobs with a fixed ingestion setup.",
+  "group_by": ["inference.retrieval_mode", "inference.top_k"],
+  "matrix": {
+    "inference.retrieval_mode": ["dense", "hybrid"],
+    "inference.top_k": [3, 5],
+    "inference.enable_query_rewriting": [false, true]
+  },
+  "run_template": {
+    "label_template": "{campaign_label}-{index:03d}",
+    "change_note_template": "Campaign {campaign_label}: retrieval_mode={inference_retrieval_mode}, top_k={inference_top_k}, query_rewriting={inference_enable_query_rewriting}"
+  }
+}

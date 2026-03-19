@@ -9,8 +9,7 @@ from .validator import validate_run_config
 
 
 
-def load_run_config(path: str | Path) -> BenchmarkRunConfig:
-    raw = read_json(path)
+def build_run_config(raw: dict) -> BenchmarkRunConfig:
     config = BenchmarkRunConfig(
         label=raw["label"],
         dataset_path=raw["dataset_path"],
@@ -25,3 +24,7 @@ def load_run_config(path: str | Path) -> BenchmarkRunConfig:
     )
     validate_run_config(config)
     return config
+
+
+def load_run_config(path: str | Path) -> BenchmarkRunConfig:
+    return build_run_config(read_json(path))

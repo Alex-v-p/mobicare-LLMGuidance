@@ -1,0 +1,26 @@
+{
+  "label": "chunking-sweep",
+  "base_config_path": "../../configs/versions/templates/base.json",
+  "description": "Compare chunking strategies against a fixed dataset and inference configuration.",
+  "group_by": ["ingestion.chunking_strategy"],
+  "matrix": {
+    "ingestion.chunking_strategy": ["naive", "page_index"],
+    "ingestion.chunking_params.chunk_size": [300, 450],
+    "ingestion.chunking_params.chunk_overlap": [100]
+  },
+  "exclude": [
+    {
+      "ingestion.chunking_strategy": "page_index",
+      "ingestion.chunking_params.chunk_size": 450
+    }
+  ],
+  "run_template": {
+    "label_template": "{campaign_label}-{index:03d}",
+    "change_note_template": "Campaign {campaign_label}: chunking_strategy={ingestion_chunking_strategy}, chunk_size={ingestion_chunking_params_chunk_size}, chunk_overlap={ingestion_chunking_params_chunk_overlap}"
+  },
+  "execution": {
+    "fail_fast": false,
+    "continue_on_error": true,
+    "write_expanded_configs": true
+  }
+}
