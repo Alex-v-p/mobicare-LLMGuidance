@@ -21,6 +21,8 @@ class SourceMappingConfig:
     page_offset_candidates: list[int] = field(default_factory=lambda: [0, -1, -2, 1, -3, 2, 3])
     semantic_fallback_enabled: bool = False
     include_chunk_pairs: bool = True
+    llm_second_pass_enabled: bool = False
+    max_soft_candidates: int = 12
 
 
 @dataclass(slots=True)

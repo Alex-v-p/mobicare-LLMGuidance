@@ -15,3 +15,7 @@ class MappingThresholds:
     min_anchor_coverage_any: float = 0.65
     min_key_term_coverage: float = 0.45
     semantic_fallback_min: float = 0.93
+    supporting_combined_min: float = 0.28
+    supporting_semantic_min: float = 0.70
+    tangential_combined_min: float = 0.14
+    tangential_semantic_min: float = 0.52

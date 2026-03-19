@@ -8,6 +8,7 @@ from adapters.gateway import GatewayClient
 from adapters.qdrant import QdrantScrollClient
 from configs.schema import BenchmarkRunConfig
 from datasets.schema import BenchmarkCase
+from source_mapping.llm_labeler import LLMLabelerConfig, OptionalLLMLabeler
 from source_mapping.matcher import SourceMatcher
 from telemetry.stage_recorder import extract_ingestion_telemetry
 
@@ -76,17 +77,41 @@ def _map_sources(config: BenchmarkRunConfig, cases: list[BenchmarkCase]) -> tupl
         semantic_fallback_enabled=config.source_mapping.semantic_fallback_enabled,
         include_chunk_pairs=config.source_mapping.include_chunk_pairs,
     )
-    assignments = [matcher.build_chunk_assignment(case=case, mapping_label=config.label, payloads=payloads).to_dict() for case in cases]
+    llm_labeler = OptionalLLMLabeler(
+        LLMLabelerConfig(
+            enabled=config.source_mapping.llm_second_pass_enabled,
+            max_candidates=config.source_mapping.max_soft_candidates,
+        )
+    )
+    assignments = [
+        matcher.build_case_source_mapping(
+            case=case,
+            mapping_label=config.label,
+            strategy=config.ingestion.chunking_strategy,
+            payloads=payloads,
+            llm_labeler=llm_labeler,
+            max_soft_candidates=config.source_mapping.max_soft_candidates,
+        ).to_dict()
+        for case in cases
+    ]
+    label_totals = {
+        label: sum(len((item.get("source_list") or {}).get(label) or []) for item in assignments)
+        for label in ("direct_evidence", "partial_direct_evidence", "supporting", "tangential", "irrelevant")
+    }
     summary = {
         "mapping_label": config.label,
+        "strategy": config.ingestion.chunking_strategy,
         "case_count": len(assignments),
         "payload_count": len(payloads),
+        "label_totals": label_totals,
         "matcher": {
             "max_matches": config.source_mapping.max_matches,
             "page_window": config.source_mapping.page_window,
             "page_offset_candidates": list(config.source_mapping.page_offset_candidates),
             "semantic_fallback_enabled": config.source_mapping.semantic_fallback_enabled,
             "include_chunk_pairs": config.source_mapping.include_chunk_pairs,
+            "llm_second_pass_enabled": config.source_mapping.llm_second_pass_enabled,
+            "max_soft_candidates": config.source_mapping.max_soft_candidates,
         },
         "case_chunk_assignments": assignments,
     }

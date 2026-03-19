@@ -34,7 +34,9 @@ def build_run_summary(payload: dict[str, Any]) -> dict[str, Any]:
         ingestion_summary=payload.get("ingestion_summary") or {},
         source_mapping_summary={
             "mapping_label": (payload.get("source_mapping_summary") or {}).get("mapping_label"),
+            "strategy": (payload.get("source_mapping_summary") or {}).get("strategy"),
             "case_count": len((payload.get("source_mapping_summary") or {}).get("case_chunk_assignments") or []),
+            "label_totals": (payload.get("source_mapping_summary") or {}).get("label_totals") or {},
         },
         telemetry_summary={
             "queue_delay": api_summary.get("queue_delay") or {},

@@ -46,6 +46,8 @@ def summarize_results(per_case_results: list[dict[str, Any]]) -> dict[str, Any]:
         "strict_success_rate": _avg([1.0 if x.get("strict_success") else 0.0 for x in retrieval_items]),
         "average_overlap_score": _avg([float(x.get("average_overlap_score", 0.0)) for x in retrieval_items]),
         "average_semantic_score": _avg([float(x.get("average_semantic_score", 0.0)) for x in retrieval_items]),
+        "weighted_relevance_score": _avg([float(x.get("weighted_relevance_score", 0.0)) for x in retrieval_items]),
+        "soft_ndcg": _avg([float(x.get("soft_ndcg", 0.0)) for x in retrieval_items]),
     }
     generation_summary = {
         "case_count": len(generation_items),

@@ -48,6 +48,8 @@ def validate_run_config(config: BenchmarkRunConfig) -> None:
         errors.append("source_mapping.page_window cannot be negative.")
     if not config.source_mapping.page_offset_candidates:
         errors.append("source_mapping.page_offset_candidates must not be empty.")
+    if config.source_mapping.max_soft_candidates < 0:
+        errors.append("source_mapping.max_soft_candidates cannot be negative.")
 
     if config.execution.batch_size <= 0:
         errors.append("execution.batch_size must be positive.")
