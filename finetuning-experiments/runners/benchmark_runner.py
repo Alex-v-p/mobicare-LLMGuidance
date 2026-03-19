@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Any
 
 from adapters.guidance import GuidanceClient
+from caching.fingerprints import build_run_fingerprint
+from caching.run_registry import RunRegistry
 from artifacts.models import CURRENT_ARTIFACT_VERSION, RunArtifact
 from artifacts.writer import write_run_artifact
 from configs.schema import BenchmarkRunConfig
@@ -153,6 +155,25 @@ def run_benchmark(config: BenchmarkRunConfig) -> Path:
     raw_dataset = load_benchmark_dataset(config.dataset_path)
     if not config.dataset_version:
         config.dataset_version = raw_dataset.get("dataset_id") or raw_dataset.get("dataset_version")
+
+    run_fingerprint = build_run_fingerprint(config)
+    registries_root = Path(config.execution.output_dir) / "_registries"
+    run_registry = RunRegistry(registries_root)
+    existing_run = run_registry.get(run_fingerprint)
+    if existing_run and existing_run.status in {"completed", "reused", "skipped"} and existing_run.artifact_path:
+        existing_path = Path(existing_run.artifact_path)
+        if existing_path.exists():
+            logger.info("Reusing completed run for fingerprint=%s from run_id=%s", run_fingerprint, existing_run.run_id)
+            run_registry.upsert(
+                fingerprint=run_fingerprint,
+                status="reused",
+                run_id=existing_run.run_id,
+                artifact_path=str(existing_path),
+                ingestion_fingerprint=existing_run.ingestion_fingerprint,
+                metadata={"reused_from_run_id": existing_run.run_id},
+            )
+            return existing_path
+
     cases = _build_cases(raw_dataset)
     if not config.execution.include_unanswerable:
         cases = [case for case in cases if case.answerability == "answerable"]
@@ -161,64 +182,85 @@ def run_benchmark(config: BenchmarkRunConfig) -> Path:
 
     logger.info("Loaded %s benchmark cases", len(cases))
 
-    ingestion_stage = run_ingestion_stage(config, cases)
-    source_mapping_by_case = {item["case_id"]: item for item in ingestion_stage.assignments}
-    guidance_client = GuidanceClient(base_url=config.execution.gateway_url)
-    _run_warmups(cases, config, guidance_client)
-
-    per_case_results: list[dict[str, Any]] = []
-    for case in cases:
-        source_mapping = source_mapping_by_case.get(case.id)
-        payload = _build_guidance_payload(case, config)
-        logger.info("Running case=%s question=%s", case.id, case.question[:100])
-        start = time.monotonic()
-        try:
-            result = guidance_client.run_guidance_and_wait(
-                payload,
-                poll_interval_seconds=config.execution.poll_interval_seconds,
-                max_wait_seconds=config.execution.max_wait_seconds,
-            )
-            per_case_results.append(
-                _build_success_case_result(
-                    case=case,
-                    source_mapping=source_mapping,
-                    guidance_record=result.record,
-                    total_latency=_timing_seconds(start),
-                )
-            )
-        except Exception as exc:  # noqa: BLE001
-            per_case_results.append(
-                _build_failed_case_result(
-                    case=case,
-                    source_mapping=source_mapping,
-                    error=exc,
-                    total_latency=_timing_seconds(start),
-                )
-            )
-
-    summaries = summarize_results(per_case_results)
     run_id = build_run_id(config.label)
-    artifact = RunArtifact(
-        artifact_type="run",
-        artifact_version=CURRENT_ARTIFACT_VERSION,
-        run_id=run_id,
-        label=config.label,
-        datetime=utc_now_iso(),
-        dataset_version=config.dataset_version,
-        documents_version=config.documents_version,
-        notes=config.notes,
-        change_note=config.change_note,
-        config=config.to_dict(),
-        ingestion_summary=ingestion_stage.ingestion_summary,
-        source_mapping_summary=ingestion_stage.source_mapping_summary,
-        retrieval_summary=summaries.get("retrieval_summary") or {},
-        generation_summary=summaries.get("generation_summary") or {},
-        api_summary=summaries.get("api_summary") or {},
-        normalized_metrics=normalize_run_metrics(
-            summaries.get("retrieval_summary"),
-            summaries.get("generation_summary"),
-            summaries.get("api_summary"),
-        ),
-        per_case_results=per_case_results,
-    ).to_dict()
-    return write_run_artifact(config.execution.output_dir, run_id, artifact)
+    run_registry.upsert(fingerprint=run_fingerprint, status="running", run_id=run_id)
+
+    try:
+        ingestion_stage = run_ingestion_stage(config, cases, run_id=run_id)
+        source_mapping_by_case = {item["case_id"]: item for item in ingestion_stage.assignments}
+        guidance_client = GuidanceClient(base_url=config.execution.gateway_url)
+        _run_warmups(cases, config, guidance_client)
+
+        per_case_results: list[dict[str, Any]] = []
+        for case in cases:
+            source_mapping = source_mapping_by_case.get(case.id)
+            payload = _build_guidance_payload(case, config)
+            logger.info("Running case=%s question=%s", case.id, case.question[:100])
+            start = time.monotonic()
+            try:
+                result = guidance_client.run_guidance_and_wait(
+                    payload,
+                    poll_interval_seconds=config.execution.poll_interval_seconds,
+                    max_wait_seconds=config.execution.max_wait_seconds,
+                )
+                per_case_results.append(
+                    _build_success_case_result(
+                        case=case,
+                        source_mapping=source_mapping,
+                        guidance_record=result.record,
+                        total_latency=_timing_seconds(start),
+                    )
+                )
+            except Exception as exc:  # noqa: BLE001
+                per_case_results.append(
+                    _build_failed_case_result(
+                        case=case,
+                        source_mapping=source_mapping,
+                        error=exc,
+                        total_latency=_timing_seconds(start),
+                    )
+                )
+
+        summaries = summarize_results(per_case_results)
+        artifact = RunArtifact(
+            artifact_type="run",
+            artifact_version=CURRENT_ARTIFACT_VERSION,
+            run_id=run_id,
+            label=config.label,
+            datetime=utc_now_iso(),
+            dataset_version=config.dataset_version,
+            documents_version=config.documents_version,
+            notes=config.notes,
+            change_note=config.change_note,
+            config=config.to_dict(),
+            cache={
+                "run_fingerprint": run_fingerprint,
+                "ingestion_fingerprint": ingestion_stage.cache.get("fingerprint"),
+                "run_registry_status": "completed",
+                "ingestion_cache": ingestion_stage.cache,
+            },
+            ingestion_summary=ingestion_stage.ingestion_summary,
+            source_mapping_summary=ingestion_stage.source_mapping_summary,
+            retrieval_summary=summaries.get("retrieval_summary") or {},
+            generation_summary=summaries.get("generation_summary") or {},
+            api_summary=summaries.get("api_summary") or {},
+            normalized_metrics=normalize_run_metrics(
+                summaries.get("retrieval_summary"),
+                summaries.get("generation_summary"),
+                summaries.get("api_summary"),
+            ),
+            per_case_results=per_case_results,
+        ).to_dict()
+        artifact_path = write_run_artifact(config.execution.output_dir, run_id, artifact)
+        run_registry.upsert(
+            fingerprint=run_fingerprint,
+            status="completed",
+            run_id=run_id,
+            artifact_path=str(artifact_path),
+            ingestion_fingerprint=ingestion_stage.cache.get("fingerprint"),
+            metadata={"case_count": len(per_case_results)},
+        )
+        return artifact_path
+    except Exception as exc:  # noqa: BLE001
+        run_registry.upsert(fingerprint=run_fingerprint, status="failed", run_id=run_id, error=str(exc))
+        raise

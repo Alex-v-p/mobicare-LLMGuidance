@@ -27,6 +27,12 @@ def build_run_summary(payload: dict[str, Any]) -> dict[str, Any]:
             "inference": (config.get("inference") or {}),
             "source_mapping": (config.get("source_mapping") or {}),
         },
+        cache={
+            "run_fingerprint": (payload.get("cache") or {}).get("run_fingerprint"),
+            "ingestion_fingerprint": (payload.get("cache") or {}).get("ingestion_fingerprint"),
+            "ingestion_cache_status": ((payload.get("cache") or {}).get("ingestion_cache") or {}).get("status"),
+            "run_registry_status": (payload.get("cache") or {}).get("run_registry_status"),
+        },
         normalized_metrics=payload.get("normalized_metrics") or {},
         retrieval_summary=payload.get("retrieval_summary") or {},
         generation_summary=payload.get("generation_summary") or {},

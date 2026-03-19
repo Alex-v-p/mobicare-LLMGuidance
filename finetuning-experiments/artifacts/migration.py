@@ -29,6 +29,7 @@ def migrate_artifact(payload: dict[str, Any]) -> dict[str, Any]:
     migrated.setdefault("notes", "")
     migrated.setdefault("change_note", "")
     migrated.setdefault("config", {})
+    migrated.setdefault("cache", {})
     migrated.setdefault("ingestion_summary", {})
     migrated.setdefault("source_mapping_summary", {})
     migrated.setdefault("retrieval_summary", {})

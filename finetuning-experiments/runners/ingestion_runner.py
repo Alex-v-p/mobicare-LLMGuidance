@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import logging
 from dataclasses import asdict, dataclass
 from typing import Any
 
 from adapters.gateway import GatewayClient
+from caching.fingerprints import build_ingestion_fingerprint
+from caching.ingestion_registry import IngestionRegistry
 from adapters.qdrant import QdrantScrollClient
 from configs.schema import BenchmarkRunConfig
 from datasets.schema import BenchmarkCase
@@ -20,6 +24,7 @@ class IngestionStageResult:
     ingestion_summary: dict[str, Any]
     source_mapping_summary: dict[str, Any]
     assignments: list[dict[str, Any]]
+    cache: dict[str, Any]
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -119,7 +124,27 @@ def _map_sources(config: BenchmarkRunConfig, cases: list[BenchmarkCase]) -> tupl
 
 
 
-def run_ingestion_stage(config: BenchmarkRunConfig, cases: list[BenchmarkCase]) -> IngestionStageResult:
+def run_ingestion_stage(config: BenchmarkRunConfig, cases: list[BenchmarkCase], *, run_id: str) -> IngestionStageResult:
+    fingerprint = build_ingestion_fingerprint(config)
+    registry = IngestionRegistry(Path(config.execution.output_dir) / "_registries")
+    cached = registry.get(fingerprint)
+    if cached:
+        logger.info("Reusing cached ingestion for fingerprint=%s from run_id=%s", fingerprint, cached.run_id)
+        ingestion_summary = dict(cached.ingestion_summary)
+        ingestion_summary.setdefault("cache", {})
+        ingestion_summary["cache"].update({
+            "fingerprint": fingerprint,
+            "status": "reused",
+            "source_run_id": cached.run_id,
+            "registry_updated_at": cached.updated_at,
+        })
+        return IngestionStageResult(
+            ingestion_summary=ingestion_summary,
+            source_mapping_summary=cached.source_mapping_summary,
+            assignments=cached.assignments,
+            cache={"fingerprint": fingerprint, "status": "reused", "source_run_id": cached.run_id},
+        )
+
     client = GatewayClient(base_url=config.execution.gateway_url)
     if config.ingestion.delete_collection_first:
         try:
@@ -138,12 +163,24 @@ def run_ingestion_stage(config: BenchmarkRunConfig, cases: list[BenchmarkCase]) 
         max_wait_seconds=config.execution.max_wait_seconds,
     )
     assignments, source_mapping_summary = _map_sources(config, cases)
-    return IngestionStageResult(
-        ingestion_summary=_extract_ingestion_summary(
-            ingestion_result.record,
-            job_id=ingestion_result.job_id,
-            status=ingestion_result.status,
-        ),
+    ingestion_summary = _extract_ingestion_summary(
+        ingestion_result.record,
+        job_id=ingestion_result.job_id,
+        status=ingestion_result.status,
+    )
+    ingestion_summary.setdefault("cache", {})
+    ingestion_summary["cache"].update({"fingerprint": fingerprint, "status": "created", "source_run_id": run_id})
+    registry.put(
+        fingerprint=fingerprint,
+        run_id=run_id,
+        documents_version=config.documents_version,
+        ingestion_summary=ingestion_summary,
         source_mapping_summary=source_mapping_summary,
         assignments=assignments,
+    )
+    return IngestionStageResult(
+        ingestion_summary=ingestion_summary,
+        source_mapping_summary=source_mapping_summary,
+        assignments=assignments,
+        cache={"fingerprint": fingerprint, "status": "created", "source_run_id": run_id},
     )

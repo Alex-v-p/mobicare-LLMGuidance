@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-CURRENT_ARTIFACT_VERSION = "2.2"
+CURRENT_ARTIFACT_VERSION = "2.3"
 
 
 @dataclass(slots=True)
@@ -18,6 +18,7 @@ class RunArtifact:
     notes: str = ""
     change_note: str = ""
     config: dict[str, Any] = field(default_factory=dict)
+    cache: dict[str, Any] = field(default_factory=dict)
     ingestion_summary: dict[str, Any] = field(default_factory=dict)
     source_mapping_summary: dict[str, Any] = field(default_factory=dict)
     retrieval_summary: dict[str, Any] = field(default_factory=dict)
@@ -43,6 +44,7 @@ class RunSummaryArtifact:
     change_note: str = ""
     case_count: int = 0
     config_overview: dict[str, Any] = field(default_factory=dict)
+    cache: dict[str, Any] = field(default_factory=dict)
     normalized_metrics: dict[str, Any] = field(default_factory=dict)
     retrieval_summary: dict[str, Any] = field(default_factory=dict)
     generation_summary: dict[str, Any] = field(default_factory=dict)
