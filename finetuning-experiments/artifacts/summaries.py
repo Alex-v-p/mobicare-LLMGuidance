@@ -37,7 +37,10 @@ def build_run_summary(payload: dict[str, Any]) -> dict[str, Any]:
         retrieval_summary=payload.get("retrieval_summary") or {},
         generation_summary=payload.get("generation_summary") or {},
         api_summary=api_summary,
-        ingestion_summary=payload.get("ingestion_summary") or {},
+        ingestion_summary={
+            **(payload.get("ingestion_summary") or {}),
+            "ingestion_metrics": ((payload.get("ingestion_summary") or {}).get("ingestion_metrics") or {}),
+        },
         source_mapping_summary={
             "mapping_label": (payload.get("source_mapping_summary") or {}).get("mapping_label"),
             "strategy": (payload.get("source_mapping_summary") or {}).get("strategy"),
@@ -45,6 +48,7 @@ def build_run_summary(payload: dict[str, Any]) -> dict[str, Any]:
             "label_totals": (payload.get("source_mapping_summary") or {}).get("label_totals") or {},
         },
         telemetry_summary={
+            "success_only": api_summary.get("success_only") or {},
             "queue_delay": api_summary.get("queue_delay") or {},
             "execution_duration": api_summary.get("execution_duration") or {},
             "stage_latency_summary": api_summary.get("stage_latency_summary") or {},

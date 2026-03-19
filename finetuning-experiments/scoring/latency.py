@@ -5,10 +5,13 @@ from typing import Any
 
 
 
-def summarize_latencies(values: list[float]) -> dict[str, float]:
+def summarize_latencies(values: list[float], *, policy: str = "all", outlier_policy: str = "keep_all") -> dict[str, float | int | str]:
     if not values:
-        return {"average": 0.0, "min": 0.0, "max": 0.0, "p50": 0.0, "p95": 0.0, "p99": 0.0}
-    ordered = sorted(values)
+        return {
+            "average": 0.0, "min": 0.0, "max": 0.0, "p50": 0.0, "p95": 0.0, "p99": 0.0,
+            "count": 0, "included_count": 0, "policy": policy, "outlier_policy": outlier_policy,
+        }
+    ordered = sorted(float(value) for value in values)
 
     def pct(p: float) -> float:
         index = int(round((len(ordered) - 1) * p))
@@ -21,6 +24,10 @@ def summarize_latencies(values: list[float]) -> dict[str, float]:
         "p50": pct(0.50),
         "p95": pct(0.95),
         "p99": pct(0.99),
+        "count": len(values),
+        "included_count": len(ordered),
+        "policy": policy,
+        "outlier_policy": outlier_policy,
     }
 
 

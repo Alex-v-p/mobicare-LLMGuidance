@@ -88,6 +88,7 @@ def _build_success_case_result(
     telemetry = extract_guidance_telemetry(guidance_record)
     derived = telemetry.get("derived") or {}
     return {
+        "status": "completed",
         "case_id": case.id,
         "question": case.question,
         "answerability": case.answerability,
@@ -129,6 +130,7 @@ def _build_failed_case_result(
     generation_result = run_generation_stage(case, {}, retrieval_result.retrieved_chunks)
     failed_record = {"status": "failed", "error": str(error)}
     return {
+        "status": "failed",
         "case_id": case.id,
         "question": case.question,
         "answerability": case.answerability,

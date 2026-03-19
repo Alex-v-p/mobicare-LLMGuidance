@@ -65,6 +65,8 @@ def score_retrieval(source_mapping: dict[str, Any] | None, retrieved_chunks: lis
     strict_items = list(source_list.get("direct_evidence") or []) + list(source_list.get("partial_direct_evidence") or [])
     overlap_scores = [float(item.get("metadata", {}).get("passage_coverage", 0.0) or 0.0) for item in strict_items]
     semantic_scores = [float(item.get("semantic_score", 0.0) or 0.0) for item in strict_items]
+    retrieved_overlap_scores = [float(chunk.get("overlap_score", 0.0) or 0.0) for chunk in retrieved_chunks]
+    retrieved_semantic_scores = [float(chunk.get("semantic_score", 0.0) or 0.0) for chunk in retrieved_chunks]
     ideal_weights = [_SOURCE_WEIGHTS.get(label, 0.0) for label, items in source_list.items() for _ in (items or [])]
 
     return {
@@ -73,11 +75,15 @@ def score_retrieval(source_mapping: dict[str, Any] | None, retrieved_chunks: lis
         "hit_at_5": hit_at(5),
         "mrr": (1.0 / first_rank) if first_rank else 0.0,
         "strict_success": bool(first_rank),
+        "strict_hit_rank": first_rank,
         "average_overlap_score": _mean(overlap_scores),
         "average_semantic_score": _mean(semantic_scores),
+        "retrieved_average_overlap_score": _mean(retrieved_overlap_scores),
+        "retrieved_average_semantic_score": _mean(retrieved_semantic_scores),
         "weighted_relevance_score": _mean(ranked_weights),
         "soft_ndcg": _soft_ndcg(ranked_weights, ideal_weights),
         "retrieved_chunk_ids": ranked_chunk_ids,
+        "retrieved_chunk_count": len(ranked_chunk_ids),
         "retrieved_chunk_labels": ranked_labels,
         "strict_chunk_ids": sorted(strict_chunk_ids),
         "source_weight_scheme": dict(_SOURCE_WEIGHTS),

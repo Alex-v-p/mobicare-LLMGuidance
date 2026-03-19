@@ -15,6 +15,7 @@ from datasets.schema import BenchmarkCase
 from source_mapping.llm_labeler import LLMLabelerConfig, OptionalLLMLabeler
 from source_mapping.matcher import SourceMatcher
 from telemetry.stage_recorder import extract_ingestion_telemetry
+from scoring.ingestion import summarize_ingestion_payloads
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +72,7 @@ def _extract_ingestion_summary(result_record: dict[str, Any], *, job_id: str, st
 
 
 
-def _map_sources(config: BenchmarkRunConfig, cases: list[BenchmarkCase]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def _map_sources(config: BenchmarkRunConfig, cases: list[BenchmarkCase]) -> tuple[list[dict[str, Any]], dict[str, Any], list[dict[str, Any]]]:
     qdrant_client = QdrantScrollClient(url=config.execution.qdrant_url, collection_name=config.execution.collection)
     payloads = qdrant_client.fetch_all_payloads(batch_size=config.execution.batch_size)
     logger.info("Loaded %s payloads from Qdrant", len(payloads))
@@ -103,12 +104,14 @@ def _map_sources(config: BenchmarkRunConfig, cases: list[BenchmarkCase]) -> tupl
         label: sum(len((item.get("source_list") or {}).get(label) or []) for item in assignments)
         for label in ("direct_evidence", "partial_direct_evidence", "supporting", "tangential", "irrelevant")
     }
+    ingestion_metrics = summarize_ingestion_payloads(payloads)
     summary = {
         "mapping_label": config.label,
         "strategy": config.ingestion.chunking_strategy,
         "case_count": len(assignments),
         "payload_count": len(payloads),
         "label_totals": label_totals,
+        "ingestion_metrics": ingestion_metrics,
         "matcher": {
             "max_matches": config.source_mapping.max_matches,
             "page_window": config.source_mapping.page_window,
@@ -120,7 +123,7 @@ def _map_sources(config: BenchmarkRunConfig, cases: list[BenchmarkCase]) -> tupl
         },
         "case_chunk_assignments": assignments,
     }
-    return assignments, summary
+    return assignments, summary, payloads
 
 
 
@@ -131,6 +134,7 @@ def run_ingestion_stage(config: BenchmarkRunConfig, cases: list[BenchmarkCase], 
     if cached:
         logger.info("Reusing cached ingestion for fingerprint=%s from run_id=%s", fingerprint, cached.run_id)
         ingestion_summary = dict(cached.ingestion_summary)
+        ingestion_summary.setdefault("ingestion_metrics", (cached.source_mapping_summary or {}).get("ingestion_metrics") or {})
         ingestion_summary.setdefault("cache", {})
         ingestion_summary["cache"].update({
             "fingerprint": fingerprint,
@@ -162,11 +166,17 @@ def run_ingestion_stage(config: BenchmarkRunConfig, cases: list[BenchmarkCase], 
         poll_interval_seconds=config.execution.poll_interval_seconds,
         max_wait_seconds=config.execution.max_wait_seconds,
     )
-    assignments, source_mapping_summary = _map_sources(config, cases)
+    assignments, source_mapping_summary, payloads = _map_sources(config, cases)
     ingestion_summary = _extract_ingestion_summary(
         ingestion_result.record,
         job_id=ingestion_result.job_id,
         status=ingestion_result.status,
+    )
+    ingestion_summary["ingestion_metrics"] = summarize_ingestion_payloads(
+        payloads,
+        documents_found=ingestion_summary.get("documents_found"),
+        failed_documents_count=(ingestion_summary.get("raw_endpoint_result") or {}).get("failed_documents_count"),
+        failed_chunks_count=(ingestion_summary.get("raw_endpoint_result") or {}).get("failed_chunks_count"),
     )
     ingestion_summary.setdefault("cache", {})
     ingestion_summary["cache"].update({"fingerprint": fingerprint, "status": "created", "source_run_id": run_id})
