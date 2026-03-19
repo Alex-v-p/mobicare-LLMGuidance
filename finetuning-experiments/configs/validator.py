@@ -66,6 +66,14 @@ def validate_run_config(config: BenchmarkRunConfig) -> None:
     if not config.execution.output_dir:
         errors.append("execution.output_dir is required.")
 
+    environment = config.execution.environment
+    if not isinstance(environment.capture_enabled, bool):
+        errors.append("execution.environment.capture_enabled must be a boolean.")
+    if environment.container_names and not all(str(name).strip() for name in environment.container_names):
+        errors.append("execution.environment.container_names must not contain empty values.")
+    if environment.docker_compose_path and not Path(environment.docker_compose_path).exists():
+        errors.append(f"execution.environment.docker_compose_path does not exist: {environment.docker_compose_path}")
+
     api_test = config.execution.api_test
     if api_test.warmup_requests < 0:
         errors.append("execution.api_test.warmup_requests cannot be negative.")

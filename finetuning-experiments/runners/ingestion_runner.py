@@ -6,7 +6,7 @@ import logging
 from dataclasses import asdict, dataclass
 from typing import Any
 
-from adapters.gateway import GatewayClient
+from adapters.ingestion import IngestionClient
 from caching.fingerprints import build_ingestion_fingerprint
 from caching.ingestion_registry import IngestionRegistry
 from adapters.qdrant import QdrantScrollClient
@@ -149,10 +149,10 @@ def run_ingestion_stage(config: BenchmarkRunConfig, cases: list[BenchmarkCase], 
             cache={"fingerprint": fingerprint, "status": "reused", "source_run_id": cached.run_id},
         )
 
-    client = GatewayClient(base_url=config.execution.gateway_url)
+    client = IngestionClient(base_url=config.execution.gateway_url)
     if config.ingestion.delete_collection_first:
         try:
-            delete_result = client.delete_ingestion_collection()
+            delete_result = client.delete_collection()
             logger.info(
                 "Deleted collection collection=%s existed=%s",
                 delete_result.get("collection"),
@@ -161,7 +161,7 @@ def run_ingestion_stage(config: BenchmarkRunConfig, cases: list[BenchmarkCase], 
         except Exception as exc:  # noqa: BLE001
             logger.warning("Failed deleting collection before ingestion: %s", exc)
 
-    ingestion_result = client.run_ingestion_and_wait(
+    ingestion_result = client.run_and_wait(
         _build_ingestion_payload(config),
         poll_interval_seconds=config.execution.poll_interval_seconds,
         max_wait_seconds=config.execution.max_wait_seconds,

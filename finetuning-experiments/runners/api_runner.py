@@ -7,7 +7,7 @@ from typing import Any
 
 import requests
 
-from adapters.gateway import GatewayClient
+from adapters.ingestion import IngestionClient
 from adapters.guidance import GuidanceClient
 from adapters.metrics import MetricsClient
 from configs.schema import BenchmarkRunConfig
@@ -175,7 +175,7 @@ def run_api_stage(config: BenchmarkRunConfig, cases: list[BenchmarkCase]) -> dic
         return {}
 
     selected_cases = _choose_cases(cases, config)
-    gateway_client = GatewayClient(base_url=config.execution.gateway_url)
+    gateway_client = IngestionClient(base_url=config.execution.gateway_url)
     guidance_client = GuidanceClient(base_url=config.execution.gateway_url)
     metrics_client = MetricsClient(base_url=config.execution.gateway_url)
     guidance_attempts: list[dict[str, Any]] = []
@@ -222,11 +222,11 @@ def run_api_stage(config: BenchmarkRunConfig, cases: list[BenchmarkCase]) -> dic
         for warmup_index in range(api_test.warmup_requests):
             if api_test.ingestion_delete_collection_each_run:
                 try:
-                    gateway_client.delete_ingestion_collection()
+                    gateway_client.delete_collection()
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("Ingestion API warm-up delete failed: %s", exc)
             try:
-                gateway_client.run_ingestion_and_wait(
+                gateway_client.run_and_wait(
                     _build_ingestion_payload(config),
                     poll_interval_seconds=config.execution.poll_interval_seconds,
                     max_wait_seconds=config.execution.max_wait_seconds,
@@ -237,11 +237,11 @@ def run_api_stage(config: BenchmarkRunConfig, cases: list[BenchmarkCase]) -> dic
         for index in range(api_test.ingestion_repeat_count):
             if api_test.ingestion_delete_collection_each_run:
                 try:
-                    gateway_client.delete_ingestion_collection()
+                    gateway_client.delete_collection()
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("Ingestion delete before repeat failed: %s", exc)
             latency_seconds, result, error = _timed_call(
-                lambda: gateway_client.run_ingestion_and_wait(
+                lambda: gateway_client.run_and_wait(
                     _build_ingestion_payload(config),
                     poll_interval_seconds=config.execution.poll_interval_seconds,
                     max_wait_seconds=config.execution.max_wait_seconds,

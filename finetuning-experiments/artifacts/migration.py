@@ -16,6 +16,7 @@ def migrate_run_artifact(payload: dict[str, Any]) -> dict[str, Any]:
     artifact.setdefault("change_note", "")
     artifact.setdefault("cache", {})
     artifact.setdefault("ingestion_summary", {})
+    artifact.setdefault("environment", {})
     artifact.setdefault("source_mapping_summary", {})
     artifact.setdefault("retrieval_summary", {})
     artifact.setdefault("generation_summary", {})
@@ -40,6 +41,7 @@ def migrate_summary_artifact(payload: dict[str, Any]) -> dict[str, Any]:
     summary.setdefault("artifact_type", "run_summary")
     summary.setdefault("artifact_version", CURRENT_ARTIFACT_VERSION)
     summary.setdefault("api_summary", {})
+    summary.setdefault("environment", {})
     summary.setdefault("telemetry_summary", {})
     summary["artifact_version"] = CURRENT_ARTIFACT_VERSION
     return summary

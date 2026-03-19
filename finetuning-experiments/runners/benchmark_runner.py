@@ -22,6 +22,7 @@ from scoring.normalization import normalize_run_metrics
 from telemetry.stage_recorder import extract_guidance_telemetry
 from utils.datetime import utc_now_iso
 from utils.ids import build_run_id
+from utils.environment import collect_environment_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -232,6 +233,8 @@ def run_benchmark(config: BenchmarkRunConfig) -> Path:
             if api_summary:
                 api_summary["benchmark_case_api"] = benchmark_api_summary
 
+        environment_snapshot = collect_environment_snapshot(config)
+
         artifact = RunArtifact(
             artifact_type="run",
             artifact_version=CURRENT_ARTIFACT_VERSION,
@@ -249,6 +252,7 @@ def run_benchmark(config: BenchmarkRunConfig) -> Path:
                 "run_registry_status": "completed",
                 "ingestion_cache": ingestion_stage.cache,
             },
+            environment=environment_snapshot,
             ingestion_summary=ingestion_stage.ingestion_summary,
             source_mapping_summary=ingestion_stage.source_mapping_summary,
             retrieval_summary=summaries.get("retrieval_summary") or {},

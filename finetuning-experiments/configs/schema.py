@@ -60,6 +60,19 @@ class APITestConfig:
     sample_case_ids: list[str] = field(default_factory=list)
 
 
+
+
+@dataclass(slots=True)
+class EnvironmentCaptureConfig:
+    capture_enabled: bool = True
+    hardware_note: str = ""
+    docker_compose_path: str = "docker-compose.yml"
+    container_names: list[str] = field(default_factory=list)
+    include_minio: bool = False
+    minio_url: str | None = None
+    minio_bucket: str | None = None
+
+
 @dataclass(slots=True)
 class ExecutionConfig:
     gateway_url: str = "http://localhost:8000"
@@ -73,6 +86,7 @@ class ExecutionConfig:
     include_unanswerable: bool = True
     output_dir: str = "./artifacts/runs"
     api_test: APITestConfig = field(default_factory=APITestConfig)
+    environment: EnvironmentCaptureConfig = field(default_factory=EnvironmentCaptureConfig)
 
 
 @dataclass(slots=True)
