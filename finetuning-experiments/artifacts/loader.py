@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from artifacts.migration import migrate_artifact
+from artifacts.migration import migrate_run_artifact
 from utils.json import read_json
 
 
@@ -25,4 +25,4 @@ def list_run_summaries(output_dir: str | Path) -> list[Path]:
 
 
 def load_run_artifact(path: str | Path) -> dict[str, Any]:
-    return migrate_artifact(read_json(path))
+    return migrate_run_artifact(read_json(path))

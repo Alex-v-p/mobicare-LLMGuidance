@@ -66,7 +66,7 @@ class APITestConfig:
 class EnvironmentCaptureConfig:
     capture_enabled: bool = True
     hardware_note: str = ""
-    docker_compose_path: str = "docker-compose.yml"
+    docker_compose_path: str = "../docker-compose.yml"
     container_names: list[str] = field(default_factory=list)
     include_minio: bool = False
     minio_url: str | None = None
