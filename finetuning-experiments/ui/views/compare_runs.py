@@ -23,6 +23,8 @@ COMPARE_COLUMNS = [
     "avg_latency",
     "p95_latency",
     "queue_delay_avg",
+    "api_failure_rate",
+    "api_timeout_rate",
     "chunks_created",
 ]
 
@@ -51,6 +53,8 @@ def render(df: pd.DataFrame) -> None:
         "avg_latency",
         "p95_latency",
         "queue_delay_avg",
+        "api_failure_rate",
+        "api_timeout_rate",
         "chunks_created",
     ]
     for _, row in compare_df.iterrows():
@@ -64,7 +68,7 @@ def render(df: pd.DataFrame) -> None:
     metric_groups = {
         "Retrieval": ["hit@1", "hit@3", "mrr", "weighted_relevance"],
         "Generation": ["avg_answer_similarity", "avg_fact_recall", "exact_pass_rate", "verification_pass_rate"],
-        "Latency": ["avg_latency", "p95_latency", "queue_delay_avg"],
+        "Latency": ["avg_latency", "p95_latency", "queue_delay_avg", "api_failure_rate", "api_timeout_rate"],
         "Ingestion": ["chunks_created"],
     }
     group_name = st.selectbox("Metric group", list(metric_groups.keys()))

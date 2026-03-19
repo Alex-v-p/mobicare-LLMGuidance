@@ -4,12 +4,14 @@ from pathlib import Path
 
 from utils.json import read_json
 
-from .schema import BenchmarkRunConfig, ExecutionConfig, InferenceConfig, IngestionConfig, SourceMappingConfig
+from .schema import APITestConfig, BenchmarkRunConfig, ExecutionConfig, InferenceConfig, IngestionConfig, SourceMappingConfig
 from .validator import validate_run_config
 
 
 
 def build_run_config(raw: dict) -> BenchmarkRunConfig:
+    execution_raw = dict(raw.get("execution", {}))
+    api_test_raw = dict(execution_raw.pop("api_test", {}))
     config = BenchmarkRunConfig(
         label=raw["label"],
         dataset_path=raw["dataset_path"],
@@ -20,7 +22,7 @@ def build_run_config(raw: dict) -> BenchmarkRunConfig:
         ingestion=IngestionConfig(**raw.get("ingestion", {})),
         source_mapping=SourceMappingConfig(**raw.get("source_mapping", {})),
         inference=InferenceConfig(**raw.get("inference", {})),
-        execution=ExecutionConfig(**raw.get("execution", {})),
+        execution=ExecutionConfig(api_test=APITestConfig(**api_test_raw), **execution_raw),
     )
     validate_run_config(config)
     return config

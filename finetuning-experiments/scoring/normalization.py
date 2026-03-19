@@ -22,22 +22,28 @@ _CORE_DEFAULTS: dict[str, float] = {
     "generation.average_warning_count": 0.0,
     "generation.verification_pass_rate": 0.0,
     "generation.exact_pass_rate": 0.0,
-    "latency.average": 0.0,
-    "latency.p50": 0.0,
-    "latency.p95": 0.0,
-    "latency.p99": 0.0,
-    "latency.min": 0.0,
-    "latency.max": 0.0,
-    "latency.queue_delay.average": 0.0,
-    "latency.execution_duration.average": 0.0,
+    "latency.average_ms": 0.0,
+    "latency.p50_ms": 0.0,
+    "latency.p95_ms": 0.0,
+    "latency.p99_ms": 0.0,
+    "latency.min_ms": 0.0,
+    "latency.max_ms": 0.0,
+    "latency.failure_rate": 0.0,
+    "latency.timeout_rate": 0.0,
+    "latency.completion_rate": 0.0,
+    "latency.queue_delay_ms": 0.0,
+    "latency.execution_duration_ms": 0.0,
 }
 
 
-def _as_float(value: Any, default: float) -> float:
+
+def _coerce_float(value: Any) -> float:
     try:
+        if value is None:
+            return 0.0
         return float(value)
     except (TypeError, ValueError):
-        return default
+        return 0.0
 
 
 
@@ -46,42 +52,46 @@ def normalize_run_metrics(
     generation_summary: dict[str, Any] | None,
     api_summary: dict[str, Any] | None,
 ) -> dict[str, float]:
-    retrieval = retrieval_summary or {}
-    generation = generation_summary or {}
-    latency = api_summary or {}
-    queue_delay = latency.get("queue_delay") or {}
-    execution_duration = latency.get("execution_duration") or {}
+    retrieval_summary = retrieval_summary or {}
+    generation_summary = generation_summary or {}
+    api_summary = api_summary or {}
+    primary_latency = api_summary.get("endpoint_summaries", {}).get("guidance_endpoint") or api_summary
+    queue_delay = primary_latency.get("queue_delay") or {}
+    execution_duration = primary_latency.get("execution_duration") or {}
 
     normalized = dict(_CORE_DEFAULTS)
     normalized.update(
         {
-            "retrieval.hit_at_1": _as_float(retrieval.get("hit_at_1"), normalized["retrieval.hit_at_1"]),
-            "retrieval.hit_at_3": _as_float(retrieval.get("hit_at_3"), normalized["retrieval.hit_at_3"]),
-            "retrieval.hit_at_5": _as_float(retrieval.get("hit_at_5"), normalized["retrieval.hit_at_5"]),
-            "retrieval.mrr": _as_float(retrieval.get("mrr"), normalized["retrieval.mrr"]),
-            "retrieval.strict_success_rate": _as_float(retrieval.get("strict_success_rate"), normalized["retrieval.strict_success_rate"]),
-            "retrieval.average_overlap_score": _as_float(retrieval.get("average_overlap_score"), normalized["retrieval.average_overlap_score"]),
-            "retrieval.average_semantic_score": _as_float(retrieval.get("average_semantic_score"), normalized["retrieval.average_semantic_score"]),
-            "retrieval.weighted_relevance_score": _as_float(retrieval.get("weighted_relevance_score"), normalized["retrieval.weighted_relevance_score"]),
-            "retrieval.soft_ndcg": _as_float(retrieval.get("soft_ndcg"), normalized["retrieval.soft_ndcg"]),
-            "generation.average_answer_similarity": _as_float(generation.get("average_answer_similarity"), normalized["generation.average_answer_similarity"]),
-            "generation.average_required_fact_recall": _as_float(generation.get("average_required_fact_recall"), normalized["generation.average_required_fact_recall"]),
-            "generation.forbidden_fact_violation_rate": _as_float(generation.get("forbidden_fact_violation_rate"), normalized["generation.forbidden_fact_violation_rate"]),
-            "generation.average_faithfulness_to_gold_passage": _as_float(generation.get("average_faithfulness_to_gold_passage"), normalized["generation.average_faithfulness_to_gold_passage"]),
-            "generation.average_faithfulness_to_retrieved_context": _as_float(generation.get("average_faithfulness_to_retrieved_context"), normalized["generation.average_faithfulness_to_retrieved_context"]),
-            "generation.hallucination_rate": _as_float(generation.get("hallucination_rate"), normalized["generation.hallucination_rate"]),
-            "generation.average_hallucination_unsupported_token_count": _as_float(generation.get("average_hallucination_unsupported_token_count"), normalized["generation.average_hallucination_unsupported_token_count"]),
-            "generation.average_warning_count": _as_float(generation.get("average_warning_count"), normalized["generation.average_warning_count"]),
-            "generation.verification_pass_rate": _as_float(generation.get("verification_pass_rate"), normalized["generation.verification_pass_rate"]),
-            "generation.exact_pass_rate": _as_float(generation.get("exact_pass_rate"), normalized["generation.exact_pass_rate"]),
-            "latency.average": _as_float(latency.get("average"), normalized["latency.average"]),
-            "latency.p50": _as_float(latency.get("p50"), normalized["latency.p50"]),
-            "latency.p95": _as_float(latency.get("p95"), normalized["latency.p95"]),
-            "latency.p99": _as_float(latency.get("p99"), normalized["latency.p99"]),
-            "latency.min": _as_float(latency.get("min"), normalized["latency.min"]),
-            "latency.max": _as_float(latency.get("max"), normalized["latency.max"]),
-            "latency.queue_delay.average": _as_float(queue_delay.get("average"), normalized["latency.queue_delay.average"]),
-            "latency.execution_duration.average": _as_float(execution_duration.get("average"), normalized["latency.execution_duration.average"]),
+            "retrieval.hit_at_1": _coerce_float(retrieval_summary.get("hit_at_1")),
+            "retrieval.hit_at_3": _coerce_float(retrieval_summary.get("hit_at_3")),
+            "retrieval.hit_at_5": _coerce_float(retrieval_summary.get("hit_at_5")),
+            "retrieval.mrr": _coerce_float(retrieval_summary.get("mrr")),
+            "retrieval.strict_success_rate": _coerce_float(retrieval_summary.get("strict_success_rate")),
+            "retrieval.average_overlap_score": _coerce_float(retrieval_summary.get("average_overlap_score")),
+            "retrieval.average_semantic_score": _coerce_float(retrieval_summary.get("average_semantic_score")),
+            "retrieval.weighted_relevance_score": _coerce_float(retrieval_summary.get("weighted_relevance_score")),
+            "retrieval.soft_ndcg": _coerce_float(retrieval_summary.get("soft_ndcg")),
+            "generation.average_answer_similarity": _coerce_float(generation_summary.get("average_answer_similarity")),
+            "generation.average_required_fact_recall": _coerce_float(generation_summary.get("average_required_fact_recall")),
+            "generation.forbidden_fact_violation_rate": _coerce_float(generation_summary.get("forbidden_fact_violation_rate")),
+            "generation.average_faithfulness_to_gold_passage": _coerce_float(generation_summary.get("average_faithfulness_to_gold_passage")),
+            "generation.average_faithfulness_to_retrieved_context": _coerce_float(generation_summary.get("average_faithfulness_to_retrieved_context")),
+            "generation.hallucination_rate": _coerce_float(generation_summary.get("hallucination_rate")),
+            "generation.average_hallucination_unsupported_token_count": _coerce_float(generation_summary.get("average_hallucination_unsupported_token_count")),
+            "generation.average_warning_count": _coerce_float(generation_summary.get("average_warning_count")),
+            "generation.verification_pass_rate": _coerce_float(generation_summary.get("verification_pass_rate")),
+            "generation.exact_pass_rate": _coerce_float(generation_summary.get("exact_pass_rate")),
+            "latency.average_ms": _coerce_float(primary_latency.get("average")) * 1000.0,
+            "latency.p50_ms": _coerce_float(primary_latency.get("p50")) * 1000.0,
+            "latency.p95_ms": _coerce_float(primary_latency.get("p95")) * 1000.0,
+            "latency.p99_ms": _coerce_float(primary_latency.get("p99")) * 1000.0,
+            "latency.min_ms": _coerce_float(primary_latency.get("min")) * 1000.0,
+            "latency.max_ms": _coerce_float(primary_latency.get("max")) * 1000.0,
+            "latency.failure_rate": _coerce_float(primary_latency.get("failure_rate")),
+            "latency.timeout_rate": _coerce_float(primary_latency.get("timeout_rate")),
+            "latency.completion_rate": _coerce_float(primary_latency.get("completion_rate", 1.0)),
+            "latency.queue_delay_ms": _coerce_float(queue_delay.get("average")) * 1000.0,
+            "latency.execution_duration_ms": _coerce_float(execution_duration.get("average")) * 1000.0,
         }
     )
     return normalized

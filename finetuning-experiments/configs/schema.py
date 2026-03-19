@@ -46,6 +46,21 @@ class InferenceConfig:
 
 
 @dataclass(slots=True)
+class APITestConfig:
+    enabled: bool = False
+    include_guidance_endpoint: bool = True
+    include_ingestion_endpoint: bool = False
+    warmup_requests: int = 1
+    guidance_repeat_count: int = 5
+    ingestion_repeat_count: int = 1
+    percentile_policy: str = "success_only"
+    outlier_policy: str = "keep_all"
+    ingestion_delete_collection_each_run: bool = False
+    metrics_endpoint_path: str | None = None
+    sample_case_ids: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
 class ExecutionConfig:
     gateway_url: str = "http://localhost:8000"
     qdrant_url: str = "http://localhost:6333"
@@ -57,6 +72,7 @@ class ExecutionConfig:
     warmup_cases: int = 0
     include_unanswerable: bool = True
     output_dir: str = "./artifacts/runs"
+    api_test: APITestConfig = field(default_factory=APITestConfig)
 
 
 @dataclass(slots=True)

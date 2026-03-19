@@ -13,6 +13,7 @@ from artifacts.writer import write_run_artifact
 from configs.schema import BenchmarkRunConfig
 from datasets.loader import load_benchmark_dataset
 from datasets.schema import BenchmarkCase
+from runners.api_runner import run_api_stage
 from runners.generation_runner import run_generation_stage
 from runners.ingestion_runner import run_ingestion_stage
 from runners.retrieval_runner import run_retrieval_stage
@@ -224,6 +225,13 @@ def run_benchmark(config: BenchmarkRunConfig) -> Path:
                 )
 
         summaries = summarize_results(per_case_results)
+        benchmark_api_summary = summaries.get("api_summary") or {}
+        api_summary = benchmark_api_summary
+        if config.execution.api_test.enabled:
+            api_summary = run_api_stage(config, cases)
+            if api_summary:
+                api_summary["benchmark_case_api"] = benchmark_api_summary
+
         artifact = RunArtifact(
             artifact_type="run",
             artifact_version=CURRENT_ARTIFACT_VERSION,
@@ -245,11 +253,11 @@ def run_benchmark(config: BenchmarkRunConfig) -> Path:
             source_mapping_summary=ingestion_stage.source_mapping_summary,
             retrieval_summary=summaries.get("retrieval_summary") or {},
             generation_summary=summaries.get("generation_summary") or {},
-            api_summary=summaries.get("api_summary") or {},
+            api_summary=api_summary,
             normalized_metrics=normalize_run_metrics(
                 summaries.get("retrieval_summary"),
                 summaries.get("generation_summary"),
-                summaries.get("api_summary"),
+                api_summary,
             ),
             per_case_results=per_case_results,
         ).to_dict()

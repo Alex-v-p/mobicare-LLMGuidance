@@ -5,6 +5,8 @@ from pathlib import Path
 from .schema import BenchmarkRunConfig
 
 _ALLOWED_RETRIEVAL_MODES = {"dense", "sparse", "hybrid"}
+_ALLOWED_PERCENTILE_POLICIES = {"all", "success_only"}
+_ALLOWED_OUTLIER_POLICIES = {"keep_all", "exclude_failures"}
 
 
 
@@ -63,6 +65,18 @@ def validate_run_config(config: BenchmarkRunConfig) -> None:
         errors.append("execution.warmup_cases cannot be negative.")
     if not config.execution.output_dir:
         errors.append("execution.output_dir is required.")
+
+    api_test = config.execution.api_test
+    if api_test.warmup_requests < 0:
+        errors.append("execution.api_test.warmup_requests cannot be negative.")
+    if api_test.guidance_repeat_count < 0:
+        errors.append("execution.api_test.guidance_repeat_count cannot be negative.")
+    if api_test.ingestion_repeat_count < 0:
+        errors.append("execution.api_test.ingestion_repeat_count cannot be negative.")
+    if api_test.percentile_policy not in _ALLOWED_PERCENTILE_POLICIES:
+        errors.append(f"execution.api_test.percentile_policy must be one of {sorted(_ALLOWED_PERCENTILE_POLICIES)}.")
+    if api_test.outlier_policy not in _ALLOWED_OUTLIER_POLICIES:
+        errors.append(f"execution.api_test.outlier_policy must be one of {sorted(_ALLOWED_OUTLIER_POLICIES)}.")
 
     if not config.ingestion.cleaning_strategy.strip():
         errors.append("ingestion.cleaning_strategy must not be empty.")

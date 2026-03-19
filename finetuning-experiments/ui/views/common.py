@@ -131,6 +131,7 @@ def normalize_run_row(run: dict[str, Any]) -> dict[str, Any]:
     retrieval = payload.get("retrieval_summary") or {}
     generation = payload.get("generation_summary") or {}
     api = payload.get("api_summary") or {}
+    primary_api = (api.get("endpoint_summaries") or {}).get("guidance_endpoint") or api
     ingestion = payload.get("ingestion_summary") or {}
     telemetry = payload.get("telemetry_summary") or {}
     source_mapping = payload.get("source_mapping_summary") or {}
@@ -171,10 +172,13 @@ def normalize_run_row(run: dict[str, Any]) -> dict[str, Any]:
         "verification_pass_rate": safe_float(generation.get("verification_pass_rate")),
         "forbidden_violation_rate": safe_float(generation.get("forbidden_fact_violation_rate")),
         "hallucination_rate": safe_float(generation.get("hallucination_rate")),
-        "avg_latency": safe_float(api.get("average")),
-        "p50_latency": safe_float(api.get("p50")),
-        "p95_latency": safe_float(api.get("p95")),
-        "p99_latency": safe_float(api.get("p99")),
+        "avg_latency": safe_float(primary_api.get("average")),
+        "p50_latency": safe_float(primary_api.get("p50")),
+        "p95_latency": safe_float(primary_api.get("p95")),
+        "p99_latency": safe_float(primary_api.get("p99")),
+        "api_failure_rate": safe_float(primary_api.get("failure_rate")),
+        "api_timeout_rate": safe_float(primary_api.get("timeout_rate")),
+        "api_completion_rate": safe_float(primary_api.get("completion_rate")),
         "queue_delay_avg": safe_float(get_nested(telemetry, "queue_delay", "average")),
         "execution_duration_avg": safe_float(get_nested(telemetry, "execution_duration", "average")),
         "chunks_created": safe_float(ingestion.get("chunks_created")),
@@ -236,6 +240,7 @@ def build_case_dataframe(artifact: dict[str, Any]) -> pd.DataFrame:
                 "total_latency_ms": safe_float(timings.get("total_latency_ms") or derived.get("total_duration_ms")),
                 "queue_delay_ms": safe_float(derived.get("queue_delay_ms")),
                 "execution_duration_ms": safe_float(derived.get("execution_duration_ms")),
+                "api_failure_category": safe_str((case.get("raw_endpoint_result") or {}).get("error")),
                 "generated_answer": safe_str(case.get("generated_answer")),
             }
         )

@@ -6,10 +6,20 @@ from typing import Any
 
 
 def summarize_latencies(values: list[float], *, policy: str = "all", outlier_policy: str = "keep_all") -> dict[str, float | int | str]:
+    if outlier_policy == "exclude_failures":
+        values = [value for value in values if value is not None]
     if not values:
         return {
-            "average": 0.0, "min": 0.0, "max": 0.0, "p50": 0.0, "p95": 0.0, "p99": 0.0,
-            "count": 0, "included_count": 0, "policy": policy, "outlier_policy": outlier_policy,
+            "average": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "count": 0,
+            "included_count": 0,
+            "policy": policy,
+            "outlier_policy": outlier_policy,
         }
     ordered = sorted(float(value) for value in values)
 
