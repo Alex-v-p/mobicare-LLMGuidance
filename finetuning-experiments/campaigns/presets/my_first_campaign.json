@@ -1,0 +1,29 @@
+{
+  "label": "chunking_baseline_comparison",
+  "description": "Compare chunk sizes and overlap to evaluate retrieval and generation performance",
+
+  "base_config_path": "../../configs/versions/minimal_benchmark.json",
+
+  "matrix": {
+    "ingestion.chunking_strategy": ["naive", "page_indexed"],
+    "ingestion.chunking_params.chunk_size": [300, 450],
+    "ingestion.chunking_params.chunk_overlap": [100]
+  },
+
+  "exclude": [
+    {
+      "ingestion.chunking_params.chunk_size": 256,
+      "ingestion.chunking_params.chunk_overlap": 64
+    }
+  ],
+
+  "group_by": [
+    "ingestion.chunking_params.chunk_size"
+  ],
+
+  "run_label_template": "chunk_{ingestion.chunking_params.chunk_size}_overlap_{ingestion.chunking_params.chunk_overlap}",
+
+  "execution": {
+    "continue_on_error": true
+  }
+}

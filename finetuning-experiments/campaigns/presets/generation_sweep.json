@@ -1,0 +1,22 @@
+{
+  "label": "generation-sweep",
+  "base_config_path": "../../configs/versions/templates/base.json",
+  "description": "Sweep generation and verification controls.",
+  "group_by": ["inference.llm_model", "inference.prompt_engineering_label"],
+  "matrix": {
+    "inference.enable_response_verification": [false, true],
+    "inference.enable_regeneration": [false, true],
+    "inference.max_regeneration_attempts": [1, 2],
+    "inference.prompt_engineering_label": ["default", "prompt_v2"]
+  },
+  "exclude": [
+    {
+      "inference.enable_regeneration": false,
+      "inference.max_regeneration_attempts": 2
+    }
+  ],
+  "run_template": {
+    "label_template": "{campaign_label}-{index:03d}",
+    "change_note_template": "Campaign {campaign_label}: verification={inference_enable_response_verification}, regeneration={inference_enable_regeneration}, max_regeneration_attempts={inference_max_regeneration_attempts}, prompt={inference_prompt_engineering_label}"
+  }
+}

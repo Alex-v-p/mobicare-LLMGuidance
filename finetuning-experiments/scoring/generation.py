@@ -41,15 +41,24 @@ def score_generation(case: dict[str, Any], answer: str, retrieved_context: list[
     answer_tokens = _informative(answer)
     faith_gold = _coverage(answer_tokens, set(_informative(case.get("gold_passage_text", ""))))
     faith_context = _coverage(answer_tokens, set(_informative(context_norm)))
-    unsupported = max(0, len(set(answer_tokens) - set(_informative(context_norm))))
+    context_tokens = set(_informative(context_norm))
+    unsupported_tokens = sorted(set(answer_tokens) - context_tokens)
+    unsupported = max(0, len(unsupported_tokens))
+    unsupported_rate = (unsupported / len(set(answer_tokens))) if answer_tokens else 0.0
 
     return {
         "answer_similarity": similarity,
         "required_fact_recall": (required_hits / len(required)) if required else 1.0,
         "required_fact_hits": required_hits,
+        "required_fact_total": len(required),
+        "required_fact_misses": max(0, len(required) - required_hits),
         "forbidden_fact_violations": forbidden_hits,
+        "forbidden_fact_total": len(forbidden),
         "faithfulness_to_gold_passage": faith_gold,
         "faithfulness_to_retrieved_context": faith_context,
         "hallucination_unsupported_token_count": unsupported,
-        "exact_pass": similarity >= 0.95 and forbidden_hits == 0,
+        "hallucination_rate": unsupported_rate,
+        "unsupported_tokens": unsupported_tokens[:25],
+        "retrieved_context_chunk_count": len(retrieved_context),
+        "exact_pass": similarity >= 0.95 and forbidden_hits == 0 and unsupported == 0,
     }

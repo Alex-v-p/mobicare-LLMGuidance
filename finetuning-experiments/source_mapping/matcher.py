@@ -9,7 +9,8 @@ from difflib import SequenceMatcher
 from typing import Any, Iterable
 
 from datasets.schema import BenchmarkCase
-from .models import CaseChunkAssignment, RankedChunkMatch
+from .llm_labeler import LLMLabelerConfig, OptionalLLMLabeler
+from .models import ALL_LABELS, CaseSourceMapping, SourceEvidenceItem
 from .thresholds import MappingThresholds
 
 
@@ -253,18 +254,26 @@ class SourceMatcher:
         self._max_sequence_length = max(1, max_sequence_length)
         self._window_step_ratio = min(max(window_step_ratio, 0.05), 0.5)
 
-    def build_chunk_assignment(
+    def build_case_source_mapping(
         self,
         *,
         case: BenchmarkCase,
         mapping_label: str,
         payloads: Iterable[dict[str, Any]],
-    ) -> CaseChunkAssignment:
+        strategy: str = "unknown",
+        llm_labeler: OptionalLLMLabeler | None = None,
+        max_soft_candidates: int = 12,
+    ) -> CaseSourceMapping:
         chunks = self._filter_and_prepare_chunks(case, payloads)
         logger.info("Case %s: evaluating %s document-local chunks for mapping_label=%s", case.id, len(chunks), mapping_label)
 
         if not chunks or not (case.gold_passage_text or "").strip():
-            return CaseChunkAssignment(case_id=case.id, mapping_label=mapping_label, matches=[])
+            return CaseSourceMapping(
+                case_id=case.id,
+                mapping_label=mapping_label,
+                strategy=strategy,
+                source_list={label: [] for label in ALL_LABELS},
+            )
 
         candidate_units = self._build_candidate_units(chunks)
         metrics = [self._score_candidate_unit(case, unit) for unit in candidate_units]
@@ -278,11 +287,23 @@ class SourceMatcher:
                 deduped[key] = metric
 
         ranked = sorted(deduped.values(), key=self._metrics_sort_key, reverse=True)
-        selected = self._select_matches(ranked)
-        return CaseChunkAssignment(
+        strict_matches = self._select_matches(ranked)
+        source_list = self._build_source_list(
+            ranked,
+            strict_matches,
+            llm_labeler=llm_labeler,
+            max_soft_candidates=max_soft_candidates,
+        )
+        return CaseSourceMapping(
             case_id=case.id,
             mapping_label=mapping_label,
-            matches=[self._to_ranked_match(match) for match in selected],
+            strategy=strategy,
+            source_list=source_list,
+            metadata={
+                "strict_match_count": len(source_list["direct_evidence"]) + len(source_list["partial_direct_evidence"]),
+                "soft_match_count": len(source_list["supporting"]) + len(source_list["tangential"]),
+                "llm_second_pass_enabled": bool(llm_labeler and llm_labeler.enabled),
+            },
         )
 
     def _filter_and_prepare_chunks(self, case: BenchmarkCase, payloads: Iterable[dict[str, Any]]) -> list[_ChunkRecord]:
@@ -544,14 +565,68 @@ class SourceMatcher:
                 return [metric]
         return []
 
-    def _to_ranked_match(self, metric: _WindowMetrics) -> RankedChunkMatch:
+    def _build_source_list(
+        self,
+        ranked: list[_WindowMetrics],
+        strict_matches: list[_WindowMetrics],
+        *,
+        llm_labeler: OptionalLLMLabeler | None,
+        max_soft_candidates: int,
+    ) -> dict[str, list[SourceEvidenceItem]]:
+        buckets: dict[str, list[SourceEvidenceItem]] = {label: [] for label in ALL_LABELS}
+        seen: set[tuple[str, ...]] = set()
+        for metric in strict_matches:
+            label = self._determine_strict_label(metric)
+            item = self._to_source_evidence(metric, label=label)
+            buckets[label].append(item)
+            seen.add(tuple(metric.chunk_ids))
+
+        unresolved: list[dict[str, Any]] = []
+        for metric in ranked:
+            key = tuple(metric.chunk_ids)
+            if key in seen:
+                continue
+            if len(unresolved) >= max_soft_candidates:
+                break
+            unresolved.append(self._to_source_evidence(metric, label="irrelevant").to_dict())
+            seen.add(key)
+
+        classifier = llm_labeler or OptionalLLMLabeler(LLMLabelerConfig(enabled=False, max_candidates=max_soft_candidates))
+        for item in classifier.classify(unresolved):
+            label = str(item.get("label") or "irrelevant")
+            if label not in buckets:
+                label = "irrelevant"
+            buckets[label].append(
+                SourceEvidenceItem(
+                    chunk_ids=list(item.get("chunk_ids") or []),
+                    label=label,
+                    combined_score=float(item.get("combined_score", 0.0) or 0.0),
+                    lexical_score=float(item.get("lexical_score", 0.0) or 0.0),
+                    semantic_score=float(item.get("semantic_score", 0.0) or 0.0),
+                    metadata=dict(item.get("metadata") or {}),
+                    llm_label=item.get("llm_label"),
+                )
+            )
+        return buckets
+
+    def _determine_strict_label(self, metric: _WindowMetrics) -> str:
+        if (
+            metric.exact_substring_ratio >= 0.9
+            or metric.passage_coverage >= self._thresholds.min_passage_coverage
+            or metric.acceptance_rule in {"exact_or_compact_substring", "strong_reconstruction", "definition_answer_lock"}
+        ):
+            return "direct_evidence"
+        return "partial_direct_evidence"
+
+    def _to_source_evidence(self, metric: _WindowMetrics, *, label: str) -> SourceEvidenceItem:
         page_span = [min(metric.page_numbers), max(metric.page_numbers)] if metric.page_numbers else []
         preview_words = metric.text.split()
         preview = " ".join(preview_words[:60])
         if len(preview_words) > 60:
             preview += " ..."
-        return RankedChunkMatch(
+        return SourceEvidenceItem(
             chunk_ids=metric.chunk_ids,
+            label=label,
             combined_score=metric.combined_score,
             lexical_score=metric.lexical_score,
             semantic_score=metric.semantic_score,
@@ -608,6 +683,22 @@ class SourceMatcher:
             return None
         distances = [abs((source_page + offset) - payload_page) for offset in self._page_offset_candidates]
         return min(distances) if distances else abs(source_page - payload_page)
+
+
+
+    def build_chunk_assignment(
+        self,
+        *,
+        case: BenchmarkCase,
+        mapping_label: str,
+        payloads: Iterable[dict[str, Any]],
+    ) -> CaseSourceMapping:
+        return self.build_case_source_mapping(
+            case=case,
+            mapping_label=mapping_label,
+            payloads=payloads,
+            strategy="unknown",
+        )
 
     @staticmethod
     def _safe_int(value: Any) -> int | None:

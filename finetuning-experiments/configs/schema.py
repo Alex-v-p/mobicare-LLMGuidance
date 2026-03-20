@@ -21,6 +21,8 @@ class SourceMappingConfig:
     page_offset_candidates: list[int] = field(default_factory=lambda: [0, -1, -2, 1, -3, 2, 3])
     semantic_fallback_enabled: bool = False
     include_chunk_pairs: bool = True
+    llm_second_pass_enabled: bool = False
+    max_soft_candidates: int = 12
 
 
 @dataclass(slots=True)
@@ -44,6 +46,34 @@ class InferenceConfig:
 
 
 @dataclass(slots=True)
+class APITestConfig:
+    enabled: bool = False
+    include_guidance_endpoint: bool = True
+    include_ingestion_endpoint: bool = False
+    warmup_requests: int = 1
+    guidance_repeat_count: int = 5
+    ingestion_repeat_count: int = 1
+    percentile_policy: str = "success_only"
+    outlier_policy: str = "keep_all"
+    ingestion_delete_collection_each_run: bool = False
+    metrics_endpoint_path: str | None = None
+    sample_case_ids: list[str] = field(default_factory=list)
+
+
+
+
+@dataclass(slots=True)
+class EnvironmentCaptureConfig:
+    capture_enabled: bool = True
+    hardware_note: str = ""
+    docker_compose_path: str = "../docker-compose.yml"
+    container_names: list[str] = field(default_factory=list)
+    include_minio: bool = False
+    minio_url: str | None = None
+    minio_bucket: str | None = None
+
+
+@dataclass(slots=True)
 class ExecutionConfig:
     gateway_url: str = "http://localhost:8000"
     qdrant_url: str = "http://localhost:6333"
@@ -55,6 +85,8 @@ class ExecutionConfig:
     warmup_cases: int = 0
     include_unanswerable: bool = True
     output_dir: str = "./artifacts/runs"
+    api_test: APITestConfig = field(default_factory=APITestConfig)
+    environment: EnvironmentCaptureConfig = field(default_factory=EnvironmentCaptureConfig)
 
 
 @dataclass(slots=True)

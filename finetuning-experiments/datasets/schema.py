@@ -1,34 +1,34 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from typing import Any
 
 
 @dataclass(slots=True)
 class BenchmarkCase:
     id: str
-    dataset_version: str
     question: str
-    question_type: str
-    reasoning_type: str
-    difficulty: str
-    answerability: str
-    expected_behavior: str
-    expected_abstention_style: str | None
-    case_weight: float
-    review_status: str
-    patient_variables: dict[str, Any]
-    gold_passage_id: str | None
-    gold_passage_text: str | None
-    gold_passage_normalized: str | None
-    gold_passage_hash: str | None
-    anchor_start_text: str | None
-    anchor_end_text: str | None
-    source_document_id: str | None
-    source_document_name: str | None
-    source_page: int | None
-    source_block_index: int | None
     reference_answer: str
+    dataset_version: str = "unknown"
+    question_type: str = "unknown"
+    reasoning_type: str = "unknown"
+    difficulty: str = "unknown"
+    answerability: str = "answerable"
+    expected_behavior: str = "answer_question"
+    expected_abstention_style: str | None = None
+    case_weight: float = 1.0
+    review_status: str = "approved"
+    patient_variables: dict[str, Any] = field(default_factory=dict)
+    gold_passage_id: str | None = None
+    gold_passage_text: str | None = None
+    gold_passage_normalized: str | None = None
+    gold_passage_hash: str | None = None
+    anchor_start_text: str | None = None
+    anchor_end_text: str | None = None
+    source_document_id: str | None = None
+    source_document_name: str | None = None
+    source_page: int | None = None
+    source_block_index: int | None = None
     required_facts: list[str] = field(default_factory=list)
     forbidden_facts: list[str] = field(default_factory=list)
     query_variants: list[str] = field(default_factory=list)
@@ -39,7 +39,7 @@ class BenchmarkCase:
     passage_metadata: dict[str, Any] = field(default_factory=dict)
     hallucination_metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "dataset_version": self.dataset_version,
