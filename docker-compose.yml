@@ -126,13 +126,13 @@ services:
       - "${OLLAMA_PORT:-11434}:11434"
 
     # Uncomment this block to allow Ollama to use NVIDIA GPU
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
 
     # environment:
     #   NVIDIA_VISIBLE_DEVICES: all

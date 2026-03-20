@@ -9,6 +9,18 @@ import streamlit as st
 from ui.views.common import build_case_dataframe, load_full_run, load_source_maps, safe_str
 
 
+def _classify_bottleneck(row: pd.Series) -> str:
+    if float(row.get("retrieval_hit@3", 0.0)) < 0.5:
+        return "Retrieval bottleneck"
+    if float(row.get("answer_similarity", 0.0)) < 0.6 or float(row.get("fact_recall", 0.0)) < 0.6:
+        return "Generation bottleneck"
+    if float(row.get("hallucination_rate", 0.0)) > 0.15:
+        return "Grounding risk"
+    if float(row.get("total_latency_ms", 0.0)) > 8000:
+        return "Latency bottleneck"
+    return "Healthy"
+
+
 def render(run_df: pd.DataFrame, output_dir: str) -> None:
     st.subheader("Per-case analysis")
     if run_df.empty:
@@ -32,24 +44,48 @@ def render(run_df: pd.DataFrame, output_dir: str) -> None:
         st.info("This run has no per-case results.")
         return
 
-    filter1, filter2 = st.columns(2)
+    cases = cases.copy()
+    cases["bottleneck"] = cases.apply(_classify_bottleneck, axis=1)
+
+    top1, top2, top3, top4 = st.columns(4)
+    with top1:
+        st.metric("Cases", len(cases))
+    with top2:
+        st.metric("Healthy cases", int((cases["bottleneck"] == "Healthy").sum()))
+    with top3:
+        st.metric("Retrieval bottlenecks", int((cases["bottleneck"] == "Retrieval bottleneck").sum()))
+    with top4:
+        st.metric("Generation bottlenecks", int((cases["bottleneck"] == "Generation bottleneck").sum()))
+
+    filter1, filter2, filter3 = st.columns(3)
     with filter1:
         statuses = sorted(x for x in cases["status"].dropna().unique().tolist() if x)
         selected_statuses = st.multiselect("Status", statuses, default=statuses)
     with filter2:
+        bottlenecks = sorted(x for x in cases["bottleneck"].dropna().unique().tolist() if x)
+        selected_bottlenecks = st.multiselect("Bottleneck type", bottlenecks, default=bottlenecks)
+    with filter3:
         min_similarity = st.slider("Minimum answer similarity", 0.0, 1.0, 0.0, 0.01)
 
     filtered = cases.copy()
     if selected_statuses:
         filtered = filtered[filtered["status"].isin(selected_statuses)]
+    if selected_bottlenecks:
+        filtered = filtered[filtered["bottleneck"].isin(selected_bottlenecks)]
     filtered = filtered[filtered["answer_similarity"] >= min_similarity]
 
+    if filtered.empty:
+        st.warning("Current filters removed all cases.")
+        return
+
+    st.markdown("### Case health table")
     st.dataframe(
         filtered[
             [
                 "case_id",
                 "status",
                 "answerability",
+                "bottleneck",
                 "retrieval_hit@3",
                 "mrr",
                 "answer_similarity",
@@ -58,26 +94,72 @@ def render(run_df: pd.DataFrame, output_dir: str) -> None:
                 "hallucination_rate",
                 "exact_pass",
                 "warning_count",
+                "retrieved_chunk_count",
                 "total_latency_ms",
             ]
-        ],
+        ].sort_values(["answer_similarity", "retrieval_hit@3"], ascending=[True, True]),
         use_container_width=True,
         hide_index=True,
     )
 
-    scatter = (
-        alt.Chart(filtered)
-        .mark_circle(size=80)
-        .encode(
-            x=alt.X("retrieval_hit@3:Q"),
-            y=alt.Y("answer_similarity:Q"),
-            color="status:N",
-            tooltip=["case_id", "question", "retrieval_hit@3", "answer_similarity", "total_latency_ms"],
+    left, right = st.columns(2)
+    with left:
+        scatter = (
+            alt.Chart(filtered)
+            .mark_circle(size=90)
+            .encode(
+                x=alt.X("retrieval_hit@3:Q", title="retrieval hit@3"),
+                y=alt.Y("answer_similarity:Q", title="answer similarity"),
+                color=alt.Color("bottleneck:N", title="Bottleneck"),
+                size=alt.Size("total_latency_ms:Q", title="Latency (ms)"),
+                tooltip=[
+                    "case_id",
+                    "question",
+                    "bottleneck",
+                    "retrieval_hit@3",
+                    "answer_similarity",
+                    "fact_recall",
+                    "hallucination_rate",
+                    "total_latency_ms",
+                ],
+            )
+            .properties(title="Where each case breaks down")
+            .interactive()
         )
-        .properties(title="Answer similarity vs retrieval hit@3")
-        .interactive()
-    )
-    st.altair_chart(scatter, use_container_width=True)
+        st.altair_chart(scatter, use_container_width=True)
+
+    with right:
+        bottleneck_counts = filtered.groupby("bottleneck").size().reset_index(name="count")
+        bar = (
+            alt.Chart(bottleneck_counts)
+            .mark_bar()
+            .encode(
+                x=alt.X("bottleneck:N", sort="-y", title="Failure mode"),
+                y=alt.Y("count:Q", title="Cases"),
+                tooltip=["bottleneck", "count"],
+            )
+            .properties(title="Dominant failure modes")
+        )
+        st.altair_chart(bar, use_container_width=True)
+
+    cohort_left, cohort_right = st.columns(2)
+    with cohort_left:
+        answerability_summary = (
+            filtered.groupby("answerability")[["retrieval_hit@3", "answer_similarity", "fact_recall", "total_latency_ms"]]
+            .mean(numeric_only=True)
+            .reset_index()
+        )
+        st.markdown("### Performance by answerability")
+        st.dataframe(answerability_summary, use_container_width=True, hide_index=True)
+
+    with cohort_right:
+        hard_cases = filtered.sort_values(["answer_similarity", "fact_recall", "retrieval_hit@3"], ascending=True).head(10)
+        st.markdown("### Lowest-confidence cases")
+        st.dataframe(
+            hard_cases[["case_id", "bottleneck", "question", "retrieval_hit@3", "answer_similarity", "fact_recall", "hallucination_rate"]],
+            use_container_width=True,
+            hide_index=True,
+        )
 
     case_id = st.selectbox("Case drilldown", filtered["case_id"].tolist())
     case = next((item for item in artifact.get("per_case_results") or [] if safe_str(item.get("case_id")) == case_id), None)
