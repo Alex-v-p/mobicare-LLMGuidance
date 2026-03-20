@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 from inference.clinical import ClinicalProfile
+from inference.pipeline.prompt_formatting import bullet_block, context_lines, patient_lines, profile_lines
 from shared.contracts.inference import RetrievedContext
-
 
 DISALLOWED_SOURCE_REFERENCES = [
     "document",
@@ -15,33 +15,6 @@ DISALLOWED_SOURCE_REFERENCES = [
     "retrieved context",
     "most relevant document",
 ]
-
-
-def _patient_lines(patient_variables: dict[str, Any]) -> list[str]:
-    lines = [f"- {key}: {value}" for key, value in sorted(patient_variables.items()) if value is not None]
-    return lines or ["- No patient variables were provided."]
-
-
-def _profile_lines(clinical_profile: ClinicalProfile) -> list[str]:
-    lines: list[str] = []
-    if clinical_profile.abnormal_variables:
-        lines.append("Abnormal / clinically relevant findings:")
-        lines.extend(f"- {finding.summary}" for finding in clinical_profile.abnormal_variables)
-    elif clinical_profile.recognized_variables:
-        lines.append("Recognized variables:")
-        lines.extend(f"- {finding.summary}" for finding in clinical_profile.recognized_variables[:6])
-    if clinical_profile.informational_variables:
-        lines.append("Context variables:")
-        lines.extend(f"- {finding.label}={finding.value}" for finding in clinical_profile.informational_variables[:8])
-    if clinical_profile.unknown_variables:
-        lines.append("Variables without configured interpretation:")
-        lines.extend(f"- {key}" for key in clinical_profile.unknown_variables[:10])
-    return lines or ["- No interpreted clinical findings were derived from the patient variables."]
-
-
-def _context_lines(retrieved_context: list[RetrievedContext]) -> list[str]:
-    lines = [f"Excerpt {index}: {item.snippet}" for index, item in enumerate(retrieved_context, start=1)]
-    return lines or ["No retrieval context was provided."]
 
 
 def build_query_rewrite_prompt(question: str, patient_variables: dict[str, Any]) -> str:
@@ -57,8 +30,43 @@ def build_query_rewrite_prompt(question: str, patient_variables: dict[str, Any])
         {question}
 
         Patient variables:
-        {chr(10).join(_patient_lines(patient_variables))}
+        {bullet_block(patient_lines(patient_variables))}
         """.strip()
+
+
+
+def _render_context_assessment(context_assessment: Any | None) -> str:
+    if context_assessment is None:
+        return ""
+    cluster_text = ", ".join(
+        f"{name}={count}" for name, count in context_assessment.cluster_coverage.items()
+    ) or "none"
+    return (
+        "\nContext sufficiency assessment:\n"
+        f"- sufficient: {context_assessment.sufficient}\n"
+        f"- confidence: {context_assessment.confidence}\n"
+        f"- reasons: {', '.join(context_assessment.reasons) if context_assessment.reasons else 'none'}\n"
+        f"- cluster coverage: {cluster_text}\n"
+    )
+
+
+
+def _render_rewrite_block(question: str, rewritten_query: str | None) -> str:
+    if not rewritten_query or rewritten_query.strip() == question.strip():
+        return ""
+    return f"\nRetrieval-focused task interpretation:\n{rewritten_query}\n"
+
+
+
+def _render_retry_block(verification_feedback: list[str] | None) -> str:
+    if not verification_feedback:
+        return ""
+    return (
+        "\nProblems found in the previous draft:\n"
+        + "\n".join(f"- {item}" for item in verification_feedback)
+        + "\nRevise the answer so these problems are fixed.\n"
+    )
+
 
 
 def build_generation_prompt(
@@ -73,31 +81,6 @@ def build_generation_prompt(
     allow_general_guidance: bool = True,
     context_assessment: Any | None = None,
 ) -> str:
-    retry_block = ""
-    if verification_feedback:
-        retry_block = (
-            "\nProblems found in the previous draft:\n"
-            + "\n".join(f"- {item}" for item in verification_feedback)
-            + "\nRevise the answer so these problems are fixed.\n"
-        )
-
-    rewrite_block = ""
-    if rewritten_query and rewritten_query.strip() and rewritten_query.strip() != question.strip():
-        rewrite_block = f"\nRetrieval-focused task interpretation:\n{rewritten_query}\n"
-
-    assessment_block = ""
-    if context_assessment is not None:
-        cluster_text = ", ".join(
-            f"{name}={count}" for name, count in context_assessment.cluster_coverage.items()
-        ) or "none"
-        assessment_block = (
-            "\nContext sufficiency assessment:\n"
-            f"- sufficient: {context_assessment.sufficient}\n"
-            f"- confidence: {context_assessment.confidence}\n"
-            f"- reasons: {', '.join(context_assessment.reasons) if context_assessment.reasons else 'none'}\n"
-            f"- cluster coverage: {cluster_text}\n"
-        )
-
     general_guidance_instruction = (
         "Give short practical guidance that stays grounded in the excerpts and does not over-claim patient-specific precision."
         if allow_general_guidance
@@ -116,18 +99,18 @@ def build_generation_prompt(
         If evidence is weak or incomplete, say so clearly.
         Acknowledge every abnormal finding cluster that is present in the interpreted findings, even if the evidence is limited for some of them.
         This is generation attempt #{attempt_number}.
-        {rewrite_block}{assessment_block}{retry_block}
+        {_render_rewrite_block(question, rewritten_query)}{_render_context_assessment(context_assessment)}{_render_retry_block(verification_feedback)}
         User task:
         {question}
 
         Patient variables:
-        {chr(10).join(_patient_lines(patient_variables))}
+        {bullet_block(patient_lines(patient_variables))}
 
         Clinical interpretation:
-        {chr(10).join(_profile_lines(clinical_profile))}
+        {bullet_block(profile_lines(clinical_profile))}
 
         Grounding excerpts:
-        {chr(10).join(_context_lines(retrieved_context))}
+        {bullet_block(context_lines(retrieved_context))}
 
         Respond in plain text with exactly these section headings:
         1. Direct answer
@@ -146,6 +129,7 @@ def build_generation_prompt(
         - Never describe a file or evidence as the 'best' or 'most relevant'.
         - Never introduce a treatment-specific name unless it already appears in the supplied excerpts.
         """.strip()
+
 
 
 def build_verification_prompt(
@@ -180,13 +164,13 @@ def build_verification_prompt(
         {question}
 
         Patient variables:
-        {chr(10).join(_patient_lines(patient_variables))}
+        {bullet_block(patient_lines(patient_variables))}
 
         Interpreted findings:
-        {chr(10).join(_profile_lines(clinical_profile))}
+        {bullet_block(profile_lines(clinical_profile))}
 
         Evidence excerpts:
-        {chr(10).join(_context_lines(retrieved_context))}
+        {bullet_block(context_lines(retrieved_context))}
 
         Draft answer:
         {answer}
