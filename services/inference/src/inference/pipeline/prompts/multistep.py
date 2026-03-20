@@ -44,11 +44,6 @@ def _context_lines(retrieved_context: list[RetrievedContext]) -> list[str]:
     return lines or ["No retrieval context was provided."]
 
 
-def _cluster_lines(clusters: list[Any]) -> list[str]:
-    lines = [f"- {cluster.label}: {', '.join(f.label for f in cluster.findings[:4])}" for cluster in clusters]
-    return lines or ["- No abnormality clusters were derived."]
-
-
 def build_query_rewrite_prompt(question: str, patient_variables: dict[str, Any]) -> str:
     return f"""
         You rewrite the task into a single retrieval-optimized search query.
@@ -72,7 +67,6 @@ def build_generation_prompt(
     patient_variables: dict[str, Any],
     clinical_profile: ClinicalProfile,
     retrieved_context: list[RetrievedContext],
-    clusters: list[Any],
     rewritten_query: str | None = None,
     verification_feedback: list[str] | None = None,
     attempt_number: int = 1,
@@ -93,29 +87,34 @@ def build_generation_prompt(
 
     assessment_block = ""
     if context_assessment is not None:
+        cluster_text = ", ".join(
+            f"{name}={count}" for name, count in context_assessment.cluster_coverage.items()
+        ) or "none"
         assessment_block = (
             "\nContext sufficiency assessment:\n"
             f"- sufficient: {context_assessment.sufficient}\n"
             f"- confidence: {context_assessment.confidence}\n"
             f"- reasons: {', '.join(context_assessment.reasons) if context_assessment.reasons else 'none'}\n"
-            f"- cluster coverage: {context_assessment.cluster_coverage or 'n/a'}\n"
+            f"- cluster coverage: {cluster_text}\n"
         )
 
     general_guidance_instruction = (
-        "Give short practical advice that stays cautious and does not over-claim patient-specific precision."
+        "Give short practical guidance that stays grounded in the excerpts and does not over-claim patient-specific precision."
         if allow_general_guidance
-        else "Write 'Unavailable from the retrieved evidence.'"
+        else "If grounded general guidance is not possible, write 'Unavailable from the retrieved evidence.'"
     )
 
     return f"""
         You are a clinical guidance prototype for internal testing.
-        Use only the supplied patient variables, interpreted findings, abnormality clusters, and excerpted evidence.
+        Use only the supplied patient variables, interpreted findings, and excerpted evidence.
         Give a direct answer grounded in the excerpts.
         Do not mention files, PDFs, documents, sources, excerpts, chunks, pages, or which evidence is 'best'.
         Do not say 'the document says', 'the PDF says', or 'the most relevant source'.
+        Synthesize the answer as straightforward guidance.
+        Be cautious, concise, and explicit about uncertainty.
         Do not invent missing values, diagnoses, medication names, dosages, or interventions.
-        Never introduce a treatment-specific drug or therapy name unless that same name appears verbatim in the excerpts.
-        Keep the answer short, structured, and clinically cautious.
+        If evidence is weak or incomplete, say so clearly.
+        Acknowledge every abnormal finding cluster that is present in the interpreted findings, even if the evidence is limited for some of them.
         This is generation attempt #{attempt_number}.
         {rewrite_block}{assessment_block}{retry_block}
         User task:
@@ -127,9 +126,6 @@ def build_generation_prompt(
         Clinical interpretation:
         {chr(10).join(_profile_lines(clinical_profile))}
 
-        Abnormality clusters:
-        {chr(10).join(_cluster_lines(clusters))}
-
         Grounding excerpts:
         {chr(10).join(_context_lines(retrieved_context))}
 
@@ -140,14 +136,15 @@ def build_generation_prompt(
         4. General advice
 
         Section rules:
-        - Section 1 must directly answer the task in 2-4 short bullet points.
+        - Section 1 must answer the task directly in 2-4 short bullet points or sentences.
         - When no explicit question was supplied, infer the likely task from the patient variables, but do not mention retrieval or source selection.
-        - Address each important abnormality cluster if evidence supports it.
-        - Section 2 must explain why the direct answer follows from the interpreted findings and excerpts in 2-4 bullets.
-        - Section 3 must state what cannot be concluded, what details are missing, and include the words "I don't know" at least once.
+        - Explicitly address each abnormality cluster when evidence supports it; if coverage is weak, say that in the caution section.
+        - Section 2 must briefly connect the answer to the interpreted findings and grounded excerpts.
+        - Section 3 must list missing patient details, explain evidence limitations, and say "I don't know" when the evidence does not support a stronger conclusion.
         - Section 4: {general_guidance_instruction}
-        - Never mention any filename, title, page number, source identifier, or that one source is best.
-        - Prefer generic actions like monitor, review, compare with baseline, or reassess, unless the exact treatment term appears in the excerpts.
+        - Never mention any filename, title, page number, or source identifier.
+        - Never describe a file or evidence as the 'best' or 'most relevant'.
+        - Never introduce a treatment-specific name unless it already appears in the supplied excerpts.
         """.strip()
 
 
@@ -158,20 +155,20 @@ def build_verification_prompt(
     clinical_profile: ClinicalProfile,
     retrieved_context: list[RetrievedContext],
     answer: str,
-    clusters: list[Any],
 ) -> str:
     return f"""
         You are verifying a draft answer for a clinical guidance prototype.
-        Check whether the draft is grounded in the supplied task, patient variables, interpreted findings, abnormality clusters, and evidence excerpts.
+        Check whether the draft is grounded in the supplied task, patient variables, interpreted findings, and evidence excerpts.
         Do not add new medical advice.
 
         Verification rules:
-        - FAIL if the answer introduces unsupported facts, values, medication names, or recommendations.
-        - FAIL if the answer ignores important abnormality clusters that have supporting evidence.
+        - FAIL if the answer introduces unsupported facts, values, or recommendations.
+        - FAIL if the answer ignores important supplied patient variables or abnormality clusters.
         - FAIL if the answer does not use the required 4-section structure.
         - FAIL if the answer mentions files, PDFs, sources, chunks, pages, or 'best' evidence.
-        - FAIL if the answer does not clearly communicate uncertainty.
-        - PASS only if the answer is cautious, direct, grounded, and concise.
+        - FAIL if the answer contradicts obvious patient facts such as elevated potassium being described as hypokalemia.
+        - FAIL if the answer does not clearly communicate uncertainty when evidence is insufficient.
+        - PASS only if the answer is cautious, direct, and adequately supported.
 
         Return exactly this format:
         VERDICT: PASS or FAIL
@@ -187,9 +184,6 @@ def build_verification_prompt(
 
         Interpreted findings:
         {chr(10).join(_profile_lines(clinical_profile))}
-
-        Abnormality clusters:
-        {chr(10).join(_cluster_lines(clusters))}
 
         Evidence excerpts:
         {chr(10).join(_context_lines(retrieved_context))}

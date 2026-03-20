@@ -122,9 +122,7 @@ class GuidancePipeline:
                     retrieval_query=query_plan.base_query,
                     clinical_profile=query_plan.clinical_profile,
                     minimum_results=request.options.retrieval_low_context_min_results,
-                    clusters=query_plan.clusters,
                 ),
-                clusters=query_plan.clusters,
             )
             final_verification = await self._response_verifier.verify(
                 request=request,
@@ -132,7 +130,6 @@ class GuidancePipeline:
                 clinical_profile=query_plan.clinical_profile,
                 retrieved_context=retrieved_context,
                 answer=final_answer,
-                clusters=query_plan.clusters,
             )
             if final_verification.verdict == "pass" or attempt == attempt_limit:
                 break

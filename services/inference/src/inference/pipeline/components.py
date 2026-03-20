@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from inference.clinical import ClinicalFinding, ClinicalProfile, build_clinical_profile, build_question_from_patient_data
+from inference.clinical import ClinicalProfile, ClinicalFinding, build_clinical_profile, build_question_from_patient_data
 from inference.http.clients.ollama_client import OllamaClient
 from inference.pipeline.prompts.multistep import (
     DISALLOWED_SOURCE_REFERENCES,
@@ -33,21 +33,12 @@ class QueryRewriteResult:
 
 
 @dataclass(slots=True)
-class AbnormalityCluster:
-    key: str
-    label: str
-    findings: list[ClinicalFinding]
-    terms: list[str]
-    query: str
-
-
-@dataclass(slots=True)
 class QueryPlan:
     effective_question: str
     base_query: str
     expanded_queries: list[str]
     clinical_profile: ClinicalProfile
-    clusters: list[AbnormalityCluster]
+    clusters: list[str]
 
 
 @dataclass(slots=True)
@@ -56,7 +47,7 @@ class ContextAssessment:
     confidence: str
     reasons: list[str]
     topical_terms: list[str]
-    cluster_coverage: dict[str, int] | None = None
+    cluster_coverage: dict[str, int]
 
 
 class ExampleResponseBuilder:
@@ -96,7 +87,7 @@ class QueryPlanner:
             profile,
         )
         base_query = effective_question.strip()
-        clusters = _build_abnormality_clusters(profile)
+        abnormal_clusters = _detected_clusters(profile)
 
         expanded_queries: list[str] = []
         if request.options.adaptive_retrieval_enabled:
@@ -108,8 +99,11 @@ class QueryPlanner:
                 expanded_queries.append(
                     f"{base_query} Focus on abnormal or clinically relevant findings: {', '.join(abnormal_terms[:4])}."
                 )
-            for cluster in clusters:
-                expanded_queries.append(cluster.query)
+            for cluster_name, findings in list(abnormal_clusters.items())[:4]:
+                focus = ", ".join(finding.label for finding in findings[:3])
+                expanded_queries.append(
+                    f"Clinical management or follow-up guidance for {cluster_name} with focus on {focus}."
+                )
             for finding in profile.abnormal_variables[:3]:
                 expanded_queries.append(
                     f"Clinical management or follow-up guidance for {finding.label} with patient value {finding.value}."
@@ -126,7 +120,7 @@ class QueryPlanner:
             base_query=base_query,
             expanded_queries=deduped,
             clinical_profile=profile,
-            clusters=clusters,
+            clusters=list(abnormal_clusters.keys()),
         )
 
 
@@ -163,24 +157,21 @@ class ContextJudge:
         retrieval_query: str,
         clinical_profile: ClinicalProfile,
         minimum_results: int,
-        clusters: list[AbnormalityCluster] | None = None,
     ) -> ContextAssessment:
         query_terms = _extract_terms(retrieval_query)
         profile_terms = {term.lower() for term in clinical_profile.relevant_terms()}
-        combined_texts = [f"{item.title} {item.snippet}".lower() for item in retrieved_context]
+        abnormal_clusters = _detected_clusters(clinical_profile)
         coverage_hits = 0
-        for combined in combined_texts:
+        cluster_coverage = {cluster: 0 for cluster in abnormal_clusters}
+        for item in retrieved_context:
+            combined = f"{item.title} {item.snippet}".lower()
             if query_terms & _extract_terms(combined):
                 coverage_hits += 1
             elif any(term in combined for term in profile_terms):
                 coverage_hits += 1
-
-        cluster_coverage: dict[str, int] = {}
-        if clusters:
-            for cluster in clusters:
-                cluster_coverage[cluster.label] = sum(
-                    1 for combined in combined_texts if any(term in combined for term in cluster.terms)
-                )
+            for cluster_name, findings in abnormal_clusters.items():
+                if _context_matches_findings(combined, findings):
+                    cluster_coverage[cluster_name] += 1
 
         reasons: list[str] = []
         if len(retrieved_context) < minimum_results:
@@ -189,7 +180,7 @@ class ContextJudge:
             reasons.append("no_clear_query_term_overlap")
         if clinical_profile.has_abnormal_variables and not profile_terms:
             reasons.append("no_abnormal_terms_available")
-        if cluster_coverage and any(hits == 0 for hits in cluster_coverage.values()):
+        if cluster_coverage and any(count == 0 for count in cluster_coverage.values()):
             reasons.append("incomplete_cluster_coverage")
 
         sufficient = not reasons
@@ -201,7 +192,7 @@ class ContextJudge:
             confidence=confidence,
             reasons=reasons,
             topical_terms=sorted(profile_terms or query_terms)[:8],
-            cluster_coverage=cluster_coverage or None,
+            cluster_coverage=cluster_coverage,
         )
 
 
@@ -213,55 +204,34 @@ class ChunkRelevanceRanker:
         retrieval_query: str,
         clinical_profile: ClinicalProfile,
         limit: int,
-        clusters: list[AbnormalityCluster] | None = None,
     ) -> tuple[list[RetrievedContext], list[dict[str, Any]]]:
         query_terms = _extract_terms(retrieval_query)
         profile_terms = {term.lower() for term in clinical_profile.relevant_terms()}
+        abnormal_clusters = _detected_clusters(clinical_profile)
         scored: list[tuple[float, RetrievedContext, dict[str, Any]]] = []
         for item in contexts:
             combined = f"{item.title} {item.snippet}".lower()
             overlap = len(query_terms & _extract_terms(combined))
             profile_overlap = sum(1 for term in profile_terms if term in combined)
-            cluster_hits = 0
-            cluster_labels: list[str] = []
-            for cluster in clusters or []:
-                if any(term in combined for term in cluster.terms):
-                    cluster_hits += 1
-                    cluster_labels.append(cluster.label)
-            score = float(overlap) + (1.5 * float(profile_overlap)) + (1.25 * float(cluster_hits))
+            covered_clusters = [
+                cluster_name
+                for cluster_name, findings in abnormal_clusters.items()
+                if _context_matches_findings(combined, findings)
+            ]
+            cluster_hits = len(covered_clusters)
+            score = float(overlap) + (1.5 * float(profile_overlap)) + float(cluster_hits)
             details = {
                 "chunk_id": item.chunk_id,
                 "source_id": item.source_id,
                 "query_term_overlap": overlap,
                 "clinical_term_overlap": profile_overlap,
                 "cluster_hits": cluster_hits,
-                "clusters": cluster_labels,
+                "clusters": covered_clusters,
                 "score": score,
             }
             scored.append((score, item, details))
         ranked = sorted(scored, key=lambda entry: entry[0], reverse=True)
-
-        selected: list[tuple[float, RetrievedContext, dict[str, Any]]] = []
-        seen_ids: set[tuple[str, str | None, str]] = set()
-        for cluster in clusters or []:
-            for score, item, details in ranked:
-                identity = _context_key(item)
-                if identity in seen_ids:
-                    continue
-                if cluster.label in details["clusters"]:
-                    selected.append((score, item, details))
-                    seen_ids.add(identity)
-                    break
-        for score, item, details in ranked:
-            identity = _context_key(item)
-            if identity in seen_ids:
-                continue
-            selected.append((score, item, details))
-            seen_ids.add(identity)
-            if len(selected) >= limit:
-                break
-        selected = selected[:limit]
-        return [item for _, item, _ in selected], [details for _, _, details in selected]
+        return [item for _, item, _ in ranked[:limit]], [details for _, _, details in ranked[:limit]]
 
 
 class RetrievalOrchestrator:
@@ -285,14 +255,12 @@ class RetrievalOrchestrator:
         retrieval_query: str,
         clinical_profile: ClinicalProfile,
         minimum_results: int,
-        clusters: list[AbnormalityCluster] | None = None,
     ) -> ContextAssessment:
         return self._context_judge.assess(
             retrieved_context=retrieved_context,
             retrieval_query=retrieval_query,
             clinical_profile=clinical_profile,
             minimum_results=minimum_results,
-            clusters=clusters,
         )
 
     async def retrieve_context(
@@ -306,7 +274,7 @@ class RetrievalOrchestrator:
             "retrieval_mode": request.options.retrieval_mode,
             "use_graph_augmentation": request.options.use_graph_augmentation,
             "retrieval_queries": list(retrieval_plan.expanded_queries),
-            "retrieval_clusters": [cluster.label for cluster in retrieval_plan.clusters],
+            "retrieval_clusters": list(retrieval_plan.clusters),
         }
         if not request.options.use_retrieval:
             assessment = self._context_judge.assess(
@@ -314,7 +282,6 @@ class RetrievalOrchestrator:
                 retrieval_query=retrieval_plan.base_query,
                 clinical_profile=retrieval_plan.clinical_profile,
                 minimum_results=request.options.retrieval_low_context_min_results,
-                clusters=retrieval_plan.clusters,
             )
             retrieval_metadata["context_assessment"] = {
                 "sufficient": assessment.sufficient,
@@ -340,20 +307,26 @@ class RetrievalOrchestrator:
                     continue
                 seen.add(identity)
                 combined.append(item)
+            assessment = self._context_judge.assess(
+                retrieved_context=combined,
+                retrieval_query=query,
+                clinical_profile=retrieval_plan.clinical_profile,
+                minimum_results=request.options.retrieval_low_context_min_results,
+            )
+            if assessment.sufficient or not request.options.adaptive_retrieval_enabled:
+                break
 
         ranked_contexts, ranking_details = self._chunk_ranker.rank(
             contexts=combined,
             retrieval_query=retrieval_plan.base_query,
             clinical_profile=retrieval_plan.clinical_profile,
             limit=max(request.options.top_k, request.options.retrieval_low_context_min_results),
-            clusters=retrieval_plan.clusters,
         )
         final_assessment = self._context_judge.assess(
             retrieved_context=ranked_contexts,
             retrieval_query=retrieval_plan.base_query,
             clinical_profile=retrieval_plan.clinical_profile,
             minimum_results=request.options.retrieval_low_context_min_results,
-            clusters=retrieval_plan.clusters,
         )
         return ranked_contexts[: request.options.top_k], {
             **retrieval_metadata,
@@ -416,7 +389,6 @@ class AnswerGenerator:
         verification_feedback: list[str] | None,
         attempt_number: int,
         context_assessment: ContextAssessment,
-        clusters: list[AbnormalityCluster],
     ) -> tuple[str, int]:
         prompt = build_generation_prompt(
             question=effective_question,
@@ -428,7 +400,6 @@ class AnswerGenerator:
             attempt_number=attempt_number,
             allow_general_guidance=request.options.enable_general_guidance_section,
             context_assessment=context_assessment,
-            clusters=clusters,
         )
         llm_response = await self._get_llm_client(request).generate(
             prompt=prompt,
@@ -438,10 +409,21 @@ class AnswerGenerator:
         normalized_answer = _normalize_generated_answer(
             llm_response.response,
             retrieved_context=retrieved_context,
+            patient_variables=request.patient_variables,
+        )
+        if _should_force_deterministic_answer(
+            answer=normalized_answer,
+            patient_variables=request.patient_variables,
             clinical_profile=clinical_profile,
             context_assessment=context_assessment,
-            clusters=clusters,
-        )
+        ):
+            normalized_answer = _build_deterministic_answer(
+                question=effective_question,
+                patient_variables=request.patient_variables,
+                clinical_profile=clinical_profile,
+                retrieved_context=retrieved_context,
+                context_assessment=context_assessment,
+            )
         return normalized_answer, len(prompt)
 
 
@@ -450,30 +432,24 @@ class ResponseVerifier:
         self._ollama_client = ollama_client
 
     def _get_llm_client(self, request: InferenceRequest) -> OllamaClient:
-        assert self._ollama_client is not None
+        if self._ollama_client is None:
+            raise RuntimeError("Response verification requested without an Ollama client.")
         return self._ollama_client.with_model(request.options.llm_model)
 
-    def heuristic_verify(self, answer: str, retrieved_context: list[RetrievedContext] | None = None) -> VerificationResult:
-        issues: list[str] = []
-        normalized = answer.strip()
-        lowered = normalized.lower()
-        required_sections = ["direct answer", "rationale", "caution", "general advice"]
-        if not normalized:
-            issues.append("Answer is empty.")
-        for section in required_sections:
-            if section not in lowered:
-                issues.append(f"Answer is missing the '{section}' section.")
-        if len(normalized.split()) < 45:
-            issues.append("Answer is too short to be useful.")
-        if any(term in lowered for term in DISALLOWED_SOURCE_REFERENCES):
-            issues.append("Answer mentions sources or document-selection language instead of giving direct guidance.")
-        if "main answer" in lowered or "general guidance" in lowered or "uncertainty and missing data" in lowered:
-            issues.append("Answer still contains legacy section labels instead of the required final structure.")
-        if normalized.lower().count("1. direct answer") > 1:
-            issues.append("Answer structure is malformed or duplicated.")
-        issues.extend(_unsupported_treatment_specific_issues(normalized, retrieved_context or []))
-        if "i don't know" not in lowered and "uncertain" not in lowered and "missing" not in lowered:
-            issues.append("Answer may not clearly communicate uncertainty.")
+    def heuristic_verify(
+        self,
+        answer: str,
+        *,
+        patient_variables: dict[str, Any] | None = None,
+        clinical_profile: ClinicalProfile | None = None,
+        retrieved_context: list[RetrievedContext] | None = None,
+    ) -> VerificationResult:
+        issues = _collect_answer_issues(
+            answer=answer,
+            patient_variables=patient_variables or {},
+            clinical_profile=clinical_profile,
+            retrieved_context=retrieved_context or [],
+        )
         return VerificationResult(
             verdict="fail" if issues else "pass",
             issues=issues or ["none"],
@@ -510,10 +486,15 @@ class ResponseVerifier:
         clinical_profile: ClinicalProfile,
         retrieved_context: list[RetrievedContext],
         answer: str,
-        clusters: list[AbnormalityCluster],
     ) -> VerificationResult:
-        if not request.options.enable_response_verification or self._ollama_client is None:
-            return self.heuristic_verify(answer, retrieved_context)
+        heuristic = self.heuristic_verify(
+            answer,
+            patient_variables=request.patient_variables,
+            clinical_profile=clinical_profile,
+            retrieved_context=retrieved_context,
+        )
+        if heuristic.verdict == "fail" or not request.options.enable_response_verification or self._ollama_client is None:
+            return heuristic
 
         prompt = build_verification_prompt(
             question=effective_question,
@@ -521,79 +502,21 @@ class ResponseVerifier:
             clinical_profile=clinical_profile,
             retrieved_context=retrieved_context,
             answer=answer,
-            clusters=clusters,
         )
         response = await self._get_llm_client(request).generate(
             prompt=prompt,
             temperature=0.0,
             max_tokens=160,
         )
-        return self.parse(response.response) or self.heuristic_verify(answer, retrieved_context)
-
-
-def _build_abnormality_clusters(profile: ClinicalProfile) -> list[AbnormalityCluster]:
-    grouped: dict[str, list[ClinicalFinding]] = {}
-    labels = {
-        "renal": "Renal function and potassium",
-        "anemia": "Anemia and iron status",
-        "inflammation": "Inflammation",
-        "electrolytes": "Electrolytes",
-        "cardiac": "Cardiac status",
-        "glycemic": "Glycemic control",
-        "lipids": "Lipids",
-        "other": "Other abnormalities",
-    }
-    for finding in profile.abnormal_variables:
-        group = _cluster_key_for_finding(finding)
-        grouped.setdefault(group, []).append(finding)
-
-    clusters: list[AbnormalityCluster] = []
-    for key, findings in grouped.items():
-        terms = list({_sanitize_term(f.label) for f in findings} | set(_cluster_terms_for_key(key)))
-        focus = ", ".join(f.label for f in findings[:3])
-        query = f"Clinical management or follow-up guidance for {labels.get(key, key)} with focus on {focus}."
-        clusters.append(
-            AbnormalityCluster(
-                key=key,
-                label=labels.get(key, key.title()),
-                findings=findings,
-                terms=[term.lower() for term in terms if term],
-                query=query,
-            )
-        )
-    return clusters
-
-
-def _cluster_key_for_finding(finding: ClinicalFinding) -> str:
-    key = finding.key.lower()
-    if key in {"creatinine", "urea", "bun", "egfr", "cysc", "cystatin_c", "potassium"}:
-        return "renal"
-    if key in {"hemoglobin", "hb", "hematocrit", "ferritin", "transferrin", "tsat", "iron"}:
-        return "anemia"
-    if key in {"crp", "hscrp", "c_reactive_protein", "il6", "il_6"}:
-        return "inflammation"
-    if key in {"sodium", "chloride", "magnesium", "calcium"}:
-        return "electrolytes"
-    if key in {"bnp", "nt_pro_bnp", "hs_tnt", "troponin", "ef", "ejection_fraction", "qrs"}:
-        return "cardiac"
-    if key in {"hba1c", "glucose"}:
-        return "glycemic"
-    if key in {"cholesterol", "ldl", "hdl", "triglycerides"}:
-        return "lipids"
-    return "other"
-
-
-def _cluster_terms_for_key(key: str) -> list[str]:
-    return {
-        "renal": ["creatinine", "potassium", "renal", "kidney", "hyperkalaemia", "hyperkalemia", "diuretic", "nephrotoxic"],
-        "anemia": ["hemoglobin", "ferritin", "iron", "anemia", "transferrin"],
-        "inflammation": ["crp", "c-reactive protein", "inflammation", "il-6"],
-        "electrolytes": ["sodium", "electrolyte", "hyponatremia", "potassium"],
-        "cardiac": ["heart failure", "bnp", "nt-pro-bnp", "ejection fraction", "troponin"],
-        "glycemic": ["glucose", "hba1c", "diabetes", "glycemic"],
-        "lipids": ["cholesterol", "ldl", "hdl", "lipid"],
-        "other": [],
-    }.get(key, [])
+        parsed = self.parse(response.response)
+        if parsed is None:
+            return heuristic
+        if parsed.verdict == "pass" and heuristic.verdict == "fail":
+            return heuristic
+        if parsed.verdict == "pass":
+            return parsed
+        combined = sorted({*heuristic.issues, *parsed.issues})
+        return VerificationResult(verdict="fail", issues=combined, confidence="medium")
 
 
 def _context_key(item: RetrievedContext) -> tuple[str, str | None, str]:
@@ -608,27 +531,19 @@ _STOPWORDS = {
     "about", "according", "after", "all", "and", "are", "based", "been", "for", "from",
     "guidance", "has", "have", "into", "most", "not", "that", "the", "their", "this", "treatment",
     "what", "with", "would", "patient", "variables", "management", "follow", "relevant", "document",
-    "grounded", "available", "data", "should", "could", "regarding", "focus", "clinical", "main",
-    "answer", "direct", "general", "advice", "rationale", "caution",
+    "grounded", "available", "data", "should", "could", "regarding", "focus", "clinical",
 }
-
-_MEDICATION_TERMS = [
-    "aliskiren", "arb", "ace-i", "ace inhibitor", "arni", "spironolactone", "eplerenone", "amiloride",
-    "triamterene", "nsaid", "nsaids", "diuretic", "beta blocker", "sglt2", "sacubitril", "valsartan",
-]
 
 
 def _normalize_generated_answer(
     answer: str,
     *,
     retrieved_context: list[RetrievedContext],
-    clinical_profile: ClinicalProfile,
-    context_assessment: ContextAssessment,
-    clusters: list[AbnormalityCluster],
+    patient_variables: dict[str, Any],
 ) -> str:
     normalized = answer.strip()
     if not normalized:
-        return _build_fallback_answer(clinical_profile, retrieved_context, context_assessment, clusters)
+        return normalized
 
     replacements = {
         "Evidence-based recommendation": "Direct answer",
@@ -653,167 +568,216 @@ def _normalize_generated_answer(
         r"this document provides",
         r"the pdf provides",
         r"the available evidence is the [^.\n]*",
+        r"###\s*Direct\s*Answer",
+        r"###\s*Rationale",
+        r"###\s*Caution",
+        r"###\s*General\s*Advice",
     ]
     for pattern in cleanup_patterns:
         normalized = re.sub(pattern, "", normalized, flags=re.IGNORECASE)
 
-    normalized = _remove_unsupported_treatment_specifics(normalized, retrieved_context)
-    normalized = _coerce_section_structure(normalized)
+    # Contradiction guard: high potassium must not trigger hypokalemia language.
+    potassium_value = _to_float(patient_variables.get("potassium"))
+    if potassium_value is not None and potassium_value >= 5.0:
+        normalized = re.sub(r"[^.\n]*hypokalemia[^.\n]*[.\n]?", "", normalized, flags=re.IGNORECASE)
+
     normalized = re.sub(r"\n{3,}", "\n\n", normalized)
-    normalized = re.sub(r"[ \t]{2,}", " ", normalized).strip()
-    verification = ResponseVerifier(None).heuristic_verify(normalized, retrieved_context)
-    if verification.verdict == "fail":
-        return _build_fallback_answer(clinical_profile, retrieved_context, context_assessment, clusters)
-    return normalized
+    normalized = re.sub(r"[ \t]{2,}", " ", normalized)
+    return normalized.strip()
 
 
-def _coerce_section_structure(answer: str) -> str:
-    headings = [
-        ("1. Direct answer", ["1. direct answer", "direct answer"]),
-        ("2. Rationale", ["2. rationale", "rationale"]),
-        ("3. Caution", ["3. caution", "caution", "uncertainty and missing data"]),
-        ("4. General advice", ["4. general advice", "general advice", "general guidance"]),
-    ]
-    lowered = answer.lower()
-    if all(any(alias in lowered for alias in aliases) for _, aliases in headings):
-        return answer
-    body = answer.strip()
-    body = re.sub(r"(?im)^\s*\d+\.\s*(main answer|general guidance|general advice|uncertainty and missing data|caution|rationale)\s*$", "", body)
-    body = re.sub(r"(?im)^\s*(main answer|general guidance|general advice|uncertainty and missing data|caution|rationale)\s*$", "", body)
-    body = re.sub(r"\n{2,}", "\n", body).strip()
-    return (
-        "1. Direct answer\n"
-        f"{body or '- Direct evidence-based answer could not be extracted from the model output.'}\n\n"
-        "2. Rationale\n"
-        "- The answer above should be grounded in the retrieved evidence and interpreted patient findings.\n\n"
-        "3. Caution\n"
-        "- I don't know the full conclusion because key clinical details may be missing.\n\n"
-        "4. General advice\n"
-        "- Review the patient values together with symptoms, medication history, and prior results."
+def _should_force_deterministic_answer(
+    *,
+    answer: str,
+    patient_variables: dict[str, Any],
+    clinical_profile: ClinicalProfile,
+    context_assessment: ContextAssessment,
+) -> bool:
+    issues = _collect_answer_issues(
+        answer=answer,
+        patient_variables=patient_variables,
+        clinical_profile=clinical_profile,
+        retrieved_context=[],
     )
+    if issues:
+        return True
+    if not context_assessment.sufficient:
+        return True
+    abnormal_clusters = _detected_clusters(clinical_profile)
+    return any(context_assessment.cluster_coverage.get(cluster, 0) == 0 for cluster in abnormal_clusters)
 
 
-def _unsupported_treatment_specific_issues(answer: str, retrieved_context: list[RetrievedContext]) -> list[str]:
-    lowered_answer = answer.lower()
-    context_text = " ".join(f"{item.title} {item.snippet}" for item in retrieved_context).lower()
+def _collect_answer_issues(
+    *,
+    answer: str,
+    patient_variables: dict[str, Any],
+    clinical_profile: ClinicalProfile | None,
+    retrieved_context: list[RetrievedContext],
+) -> list[str]:
     issues: list[str] = []
-    for term in _MEDICATION_TERMS:
-        if term in lowered_answer and term not in context_text:
-            issues.append(f"Answer introduces unsupported treatment-specific term: {term}.")
-    return issues
+    normalized = answer.strip()
+    lowered = normalized.lower()
+    required_sections = ["direct answer", "rationale", "caution", "general advice"]
+    if not normalized:
+        issues.append("Answer is empty.")
+    for section in required_sections:
+        if section not in lowered:
+            issues.append(f"Answer is missing the '{section}' section.")
+    if len(normalized.split()) < 35:
+        issues.append("Answer is too short to be useful.")
+    if any(term in lowered for term in DISALLOWED_SOURCE_REFERENCES):
+        issues.append("Answer mentions sources or document-selection language instead of giving direct guidance.")
+    if "i don't know" not in lowered and "missing" not in lowered and "uncertain" not in lowered and "limited" not in lowered:
+        issues.append("Answer may not clearly communicate uncertainty.")
+
+    potassium_value = _to_float(patient_variables.get("potassium"))
+    if potassium_value is not None and potassium_value >= 5.0 and "hypokalemia" in lowered:
+        issues.append("Answer contradicts the patient potassium value.")
+
+    if clinical_profile is not None:
+        for cluster_name, findings in _detected_clusters(clinical_profile).items():
+            if any(finding.status in {"low", "high"} for finding in findings):
+                cluster_word = cluster_name.lower().split(" and ")[0]
+                mention_targets = {cluster_word, *(finding.label.lower() for finding in findings[:3])}
+                if not any(target in lowered for target in mention_targets):
+                    issues.append(f"Answer does not acknowledge the '{cluster_name}' abnormality cluster.")
+
+    unsupported_terms = [
+        "mra",
+        "mineralocorticoid receptor antagonist",
+        "aliskiren",
+    ]
+    if retrieved_context:
+        context_text = " ".join(f"{item.title} {item.snippet}" for item in retrieved_context).lower()
+        for term in unsupported_terms:
+            if term in lowered and term not in context_text:
+                issues.append("Answer introduces unsupported treatment-specific wording.")
+                break
+    return sorted(set(issues))
 
 
-def _remove_unsupported_treatment_specifics(answer: str, retrieved_context: list[RetrievedContext]) -> str:
-    context_text = " ".join(f"{item.title} {item.snippet}" for item in retrieved_context).lower()
-    parts = re.split(r"(?<=[.!?])\s+", answer)
-    kept: list[str] = []
-    for part in parts:
-        lowered = part.lower()
-        if any(term in lowered and term not in context_text for term in _MEDICATION_TERMS):
-            continue
-        kept.append(part)
-    return " ".join(kept).strip()
-
-
-def _build_fallback_answer(
+def _build_deterministic_answer(
+    *,
+    question: str,
+    patient_variables: dict[str, Any],
     clinical_profile: ClinicalProfile,
     retrieved_context: list[RetrievedContext],
     context_assessment: ContextAssessment,
-    clusters: list[AbnormalityCluster],
 ) -> str:
-    direct_lines: list[str] = []
+    clusters = _detected_clusters(clinical_profile)
+    cluster_lines: list[str] = []
     rationale_lines: list[str] = []
-    caution_lines: list[str] = []
-    general_lines: list[str] = []
+    for cluster_name, findings in clusters.items():
+        labels = ", ".join(_finding_phrase(finding) for finding in findings[:3])
+        cluster_lines.append(f"- {cluster_name}: {labels}.")
+        rationale_lines.append(f"- {cluster_name}: " + "; ".join(finding.summary for finding in findings[:2]))
 
-    for cluster in clusters:
-        snippets = _context_snippets_for_cluster(cluster, retrieved_context)
-        if snippets:
-            direct_lines.extend(_direct_lines_for_cluster(cluster))
-            rationale_lines.append(
-                f"- Current evidence is most clearly aligned with {cluster.label.lower()}: {', '.join(f.label for f in cluster.findings[:3])}."
-            )
-        else:
-            caution_lines.append(
-                f"- I don't know the specific next step for {cluster.label.lower()} from the current retrieved evidence."
-            )
+    evidence_points = _evidence_points(retrieved_context, patient_variables)
+    if evidence_points:
+        cluster_lines.extend(f"- {point}" for point in evidence_points[:2])
 
-    if not direct_lines:
-        if clinical_profile.abnormal_variables:
-            direct_lines.append(
-                "- Several abnormal findings need follow-up, but the current retrieved evidence is too limited to support a specific management recommendation."
-            )
-        else:
-            direct_lines.append("- No clear abnormal finding was identified from the supplied variables.")
+    missing_bits = _missing_details(patient_variables)
+    caution_lines = []
+    if context_assessment.reasons:
+        caution_lines.append(
+            "- I don't know the full conclusion because the retrieved evidence is incomplete for some abnormal findings."
+        )
+    uncovered = [cluster for cluster, count in context_assessment.cluster_coverage.items() if count == 0]
+    if uncovered:
+        caution_lines.append(f"- Evidence is limited for: {', '.join(uncovered)}.")
+    caution_lines.extend(f"- Missing detail: {item}." for item in missing_bits[:3])
+    if not caution_lines:
+        caution_lines.append("- I don't know the full conclusion because symptoms, medication history, and baseline trends are still missing.")
 
-    if clinical_profile.abnormal_variables:
-        summarized = ", ".join(f"{f.label} ({f.status})" for f in clinical_profile.abnormal_variables[:6])
-        rationale_lines.insert(0, f"- Interpreted abnormal findings include: {summarized}.")
-    else:
-        rationale_lines.insert(0, "- No interpreted abnormal biomarkers were available to drive focused guidance.")
-
-    if context_assessment.confidence != "high":
-        caution_lines.insert(0, "- The retrieved evidence is incomplete, so the answer should be treated cautiously.")
-    caution_lines.append("- I don't know the full clinical conclusion without symptoms, medication list, diagnosis, baseline values, and trend over time.")
-    caution_lines.append("- Avoid inferring a specific diagnosis or medication change from these values alone.")
-
-    if clusters:
-        general_lines.append("- Recheck abnormal results against baseline values and the current medication or supplement list.")
-        general_lines.append("- Prioritize the most urgent abnormalities first and correlate them with symptoms and examination findings.")
-    else:
-        general_lines.append("- Review the values together with symptoms, medical history, medications, and previous measurements.")
-
-    return (
-        "1. Direct answer\n" + "\n".join(_dedupe_lines(direct_lines)[:4]) + "\n\n"
-        "2. Rationale\n" + "\n".join(_dedupe_lines(rationale_lines)[:4]) + "\n\n"
-        "3. Caution\n" + "\n".join(_dedupe_lines(caution_lines)[:4]) + "\n\n"
-        "4. General advice\n" + "\n".join(_dedupe_lines(general_lines)[:3])
-    )
-
-
-def _context_snippets_for_cluster(cluster: AbnormalityCluster, retrieved_context: list[RetrievedContext]) -> list[str]:
-    snippets: list[str] = []
-    for item in retrieved_context:
-        combined = f"{item.title} {item.snippet}".lower()
-        if any(term in combined for term in cluster.terms):
-            snippets.append(item.snippet.strip())
-    return snippets[:2]
-
-
-def _direct_lines_for_cluster(cluster: AbnormalityCluster) -> list[str]:
-    if cluster.key == "renal":
-        return [
-            "- Elevated renal-function markers and potassium warrant close monitoring and medication review.",
-            "- Review nephrotoxic drugs, potassium-raising agents, and whether diuretic adjustment is appropriate if congestion is absent.",
-        ]
-    if cluster.key == "anemia":
-        return [
-            "- Low hemoglobin and iron-related markers need follow-up because they are compatible with anemia or iron deficiency.",
-        ]
-    if cluster.key == "inflammation":
-        return [
-            "- Inflammatory markers are elevated, so an underlying inflammatory or infectious driver should be considered in the clinical context.",
-        ]
-    if cluster.key == "electrolytes":
-        return [
-            "- Electrolyte abnormalities should be rechecked and interpreted with symptoms, fluid status, and current treatment.",
-        ]
-    return [
-        f"- The abnormal findings in {cluster.label.lower()} need follow-up, but the exact next step depends on the broader clinical picture.",
+    general_advice = [
+        "- Review these results together with symptoms, medication history, and prior laboratory trends.",
+        "- Repeat or trend abnormal values when clinically appropriate, especially renal function, potassium, sodium, and inflammatory markers.",
     ]
+    if not context_assessment.sufficient:
+        general_advice.append("- Do not over-interpret findings that are not well covered by the retrieved guidance.")
+
+    rationale_block = rationale_lines[:4] if rationale_lines else ["- The answer is based on the interpreted patient findings and the available grounded excerpts."]
+    lines = [
+        "1. Direct answer",
+        *cluster_lines[:4],
+        "",
+        "2. Rationale",
+        *rationale_block,
+        "",
+        "3. Caution",
+        *caution_lines,
+        "",
+        "4. General advice",
+        *general_advice,
+    ]
+    return "\n".join(lines).strip()
 
 
-def _sanitize_term(label: str) -> str:
-    return re.sub(r"[^a-z0-9\- ]+", "", label.lower())
+def _evidence_points(retrieved_context: list[RetrievedContext], patient_variables: dict[str, Any]) -> list[str]:
+    if not retrieved_context:
+        return []
+    combined = " ".join(item.snippet for item in retrieved_context).lower()
+    points: list[str] = []
+    if any(term in combined for term in ["creatinine", "renal function", "electrolytes"]):
+        points.append("The grounded guidance supports close monitoring of renal function and electrolytes")
+    if "nephrotoxic" in combined:
+        points.append("The grounded guidance supports reviewing nephrotoxic medicines or other contributors to renal stress")
+    if "potassium" in combined and (_to_float(patient_variables.get("potassium")) or 0) >= 5.0:
+        points.append("The grounded guidance supports follow-up of elevated potassium rather than assuming it is benign")
+    return points
 
 
-def _dedupe_lines(lines: list[str]) -> list[str]:
-    seen: set[str] = set()
-    result: list[str] = []
-    for line in lines:
-        normalized = re.sub(r"\s+", " ", line.strip().lower())
-        if not normalized or normalized in seen:
-            continue
-        seen.add(normalized)
-        result.append(line)
-    return result
+def _missing_details(patient_variables: dict[str, Any]) -> list[str]:
+    expected = ["symptoms", "medication_history", "baseline_creatinine", "prior_results", "diagnosis"]
+    missing = [item.replace("_", " ") for item in expected if item not in patient_variables]
+    return missing
+
+
+def _finding_phrase(finding: ClinicalFinding) -> str:
+    unit = f" {finding.unit}" if finding.unit else ""
+    return f"{finding.label} {finding.status} ({finding.value}{unit})"
+
+
+def _to_float(value: Any) -> float | None:
+    try:
+        return float(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _detected_clusters(clinical_profile: ClinicalProfile) -> dict[str, list[ClinicalFinding]]:
+    clusters: dict[str, list[ClinicalFinding]] = {}
+    for finding in clinical_profile.abnormal_variables:
+        cluster = _cluster_for_finding(finding)
+        clusters.setdefault(cluster, []).append(finding)
+    return clusters
+
+
+def _cluster_for_finding(finding: ClinicalFinding) -> str:
+    key = finding.key.lower()
+    label = finding.label.lower()
+    if key in {"creatinine", "urea", "bun", "egfr", "cysc", "cystatin_c", "potassium"} or "creatin" in label:
+        return "Renal function and potassium"
+    if key in {"ferritin", "hemoglobin", "hb", "haemoglobin", "hematocrit", "haematocrit", "transferrin"}:
+        return "Anemia and iron status"
+    if key in {"crp", "hscrp", "hs_crp", "il6", "il_6", "c_reactive_protein"} or "reactive protein" in label:
+        return "Inflammation"
+    if key in {"sodium", "chloride", "magnesium"}:
+        return "Electrolytes"
+    if key in {"bnp", "nt_pro_bnp", "troponin", "hstnt", "ef", "qrs"}:
+        return "Cardiac status"
+    if key in {"hba1c", "glucose"}:
+        return "Glycemic status"
+    if key in {"cholesterol", "ldl", "hdl", "triglycerides"}:
+        return "Lipids"
+    return "Other findings"
+
+
+def _context_matches_findings(combined: str, findings: list[ClinicalFinding]) -> bool:
+    for finding in findings:
+        tokens = {finding.key.lower(), finding.label.lower()}
+        if any(token in combined for token in tokens):
+            return True
+        if finding.key.lower() == "potassium" and "renal function" in combined:
+            return True
+    return False
