@@ -30,11 +30,15 @@ class GenerationOptions(BaseModel):
     embedding_model: Optional[str] = None
     callback_url: Optional[HttpUrl] = None
     callback_headers: Dict[str, str] = Field(default_factory=dict)
+    adaptive_retrieval_enabled: bool = True
+    retrieval_low_context_min_results: int = 2
+    enable_general_guidance_section: bool = True
+    enable_unknown_fallback: bool = True
 
 
 class GuidanceRequest(BaseModel):
     request_id: str = Field(default_factory=new_request_id)
-    question: str
+    question: str = ""
     patient: PatientVariables = Field(default_factory=PatientVariables)
     options: GenerationOptions = Field(default_factory=GenerationOptions)
 
@@ -49,7 +53,7 @@ class RetrievedContext(BaseModel):
 
 class InferenceRequest(BaseModel):
     request_id: str
-    question: str
+    question: str = ""
     patient_variables: Dict[str, Any] = Field(default_factory=dict)
     retrieved_context: List[RetrievedContext] = Field(default_factory=list)
     options: GenerationOptions = Field(default_factory=GenerationOptions)
