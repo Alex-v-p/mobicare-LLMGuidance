@@ -15,6 +15,7 @@ from inference.pipeline.answer_support import (
     normalize_generated_answer,
     should_force_deterministic_answer,
     build_deterministic_answer,
+    infer_specialty_focus,
 )
 from inference.pipeline.prompts.multistep import (
     build_generation_prompt,
@@ -48,6 +49,7 @@ class QueryPlan:
     expanded_queries: list[str]
     clinical_profile: ClinicalProfile
     clusters: list[str]
+    specialty_focus: str
 
 
 @dataclass(slots=True)
@@ -97,6 +99,7 @@ class QueryPlanner:
         )
         base_query = effective_question.strip()
         abnormal_clusters = detected_clusters(profile)
+        specialty_focus = infer_specialty_focus(request.patient_variables, profile)
 
         expanded_queries: list[str] = []
         if request.options.adaptive_retrieval_enabled:
@@ -110,9 +113,23 @@ class QueryPlanner:
                 )
             for cluster_name, findings in list(abnormal_clusters.items())[:4]:
                 focus = ", ".join(finding.label for finding in findings[:3])
+                prefix = "Heart failure" if specialty_focus.is_heart_failure else "Clinical"
                 expanded_queries.append(
-                    f"Clinical management or follow-up guidance for {cluster_name} with focus on {focus}."
+                    f"{prefix} management or follow-up guidance for {cluster_name} with focus on {focus}."
                 )
+            if specialty_focus.is_heart_failure:
+                focus_terms = ", ".join(finding.label for finding in profile.abnormal_variables[:4])
+                expanded_queries.append(
+                    f"Heart failure guidance for this patient profile, especially cardio-renal safety, congestion, and GDMT considerations for {focus_terms}."
+                )
+                if any(cluster in abnormal_clusters for cluster in {"HF severity and congestion", "Cardio-renal and electrolyte safety"}):
+                    expanded_queries.append(
+                        "Heart failure monitoring and follow-up guidance for congestion, renal function, creatinine, potassium, sodium, and diuretic or RAAS-related safety."
+                    )
+                if any(cluster in abnormal_clusters for cluster in {"Rhythm and conduction"}):
+                    expanded_queries.append(
+                        "Heart failure rhythm or conduction guidance including QRS, atrial fibrillation, heart rate, and device-related considerations."
+                    )
             for finding in profile.abnormal_variables[:3]:
                 expanded_queries.append(
                     f"Clinical management or follow-up guidance for {finding.label} with patient value {finding.value}."
@@ -130,6 +147,7 @@ class QueryPlanner:
             expanded_queries=deduped,
             clinical_profile=profile,
             clusters=list(abnormal_clusters.keys()),
+            specialty_focus=specialty_focus.name,
         )
 
 
@@ -140,11 +158,11 @@ class QueryRewriter:
     def _get_llm_client(self, request: InferenceRequest) -> OllamaClient:
         return self._ollama_client.with_model(request.options.llm_model)
 
-    async def rewrite(self, request: InferenceRequest, query: str) -> QueryRewriteResult:
+    async def rewrite(self, request: InferenceRequest, query: str, specialty_focus: str | None = None) -> QueryRewriteResult:
         if not request.options.enable_query_rewriting:
             return QueryRewriteResult(query=query, rewritten=False)
 
-        prompt = build_query_rewrite_prompt(query, request.patient_variables)
+        prompt = build_query_rewrite_prompt(query, request.patient_variables, type("Specialty", (), {"is_heart_failure": specialty_focus == "heart_failure"})())
         response = await self._get_llm_client(request).generate(
             prompt=prompt,
             temperature=0.0,
@@ -217,6 +235,7 @@ class ChunkRelevanceRanker:
         query_terms = extract_terms(retrieval_query)
         profile_terms = {term.lower() for term in clinical_profile.relevant_terms()}
         abnormal_clusters = detected_clusters(clinical_profile)
+        specialty_focus = infer_specialty_focus({}, clinical_profile, contexts)
         scored: list[tuple[float, RetrievedContext, dict[str, Any]]] = []
         for item in contexts:
             combined = f"{item.title} {item.snippet}".lower()
@@ -228,7 +247,11 @@ class ChunkRelevanceRanker:
                 if context_matches_findings(combined, findings)
             ]
             cluster_hits = len(covered_clusters)
-            score = float(overlap) + (1.5 * float(profile_overlap)) + float(cluster_hits)
+            heart_failure_overlap = int(
+                specialty_focus.is_heart_failure
+                and any(term in combined for term in {"heart failure", "hf", "hfr ef", "hfref", "congestion", "diuretic", "raas", "arni", "mra", "sglt2"})
+            )
+            score = float(overlap) + (1.5 * float(profile_overlap)) + float(cluster_hits) + (1.25 * float(heart_failure_overlap))
             details = {
                 "chunk_id": item.chunk_id,
                 "source_id": item.source_id,
@@ -236,11 +259,31 @@ class ChunkRelevanceRanker:
                 "clinical_term_overlap": profile_overlap,
                 "cluster_hits": cluster_hits,
                 "clusters": covered_clusters,
+                "heart_failure_overlap": heart_failure_overlap,
                 "score": score,
             }
             scored.append((score, item, details))
+
         ranked = sorted(scored, key=lambda entry: entry[0], reverse=True)
-        return [item for _, item, _ in ranked[:limit]], [details for _, _, details in ranked[:limit]]
+        selected: list[tuple[float, RetrievedContext, dict[str, Any]]] = []
+        seen_ids: set[tuple[str, str | None, str]] = set()
+        covered_once: set[str] = set()
+        for entry in ranked:
+            _, item, details = entry
+            if any(cluster not in covered_once for cluster in details["clusters"]):
+                selected.append(entry)
+                seen_ids.add(context_key(item))
+                covered_once.update(details["clusters"])
+            if len(selected) >= limit:
+                break
+        for entry in ranked:
+            _, item, _ = entry
+            if context_key(item) in seen_ids:
+                continue
+            selected.append(entry)
+            if len(selected) >= limit:
+                break
+        return [item for _, item, _ in selected[:limit]], [details for _, _, details in selected[:limit]]
 
 
 class RetrievalOrchestrator:
@@ -284,6 +327,7 @@ class RetrievalOrchestrator:
             "use_graph_augmentation": request.options.use_graph_augmentation,
             "retrieval_queries": list(retrieval_plan.expanded_queries),
             "retrieval_clusters": list(retrieval_plan.clusters),
+            "specialty_focus": retrieval_plan.specialty_focus,
         }
         if not request.options.use_retrieval:
             assessment = self._context_judge.assess(
@@ -409,6 +453,7 @@ class AnswerGenerator:
             attempt_number=attempt_number,
             allow_general_guidance=request.options.enable_general_guidance_section,
             context_assessment=context_assessment,
+            specialty_focus=infer_specialty_focus(request.patient_variables, clinical_profile, retrieved_context),
         )
         llm_response = await self._get_llm_client(request).generate(
             prompt=prompt,

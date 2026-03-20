@@ -17,11 +17,18 @@ DISALLOWED_SOURCE_REFERENCES = [
 ]
 
 
-def build_query_rewrite_prompt(question: str, patient_variables: dict[str, Any]) -> str:
+
+def build_query_rewrite_prompt(question: str, patient_variables: dict[str, Any], specialty_focus: Any | None = None) -> str:
+    specialty_instruction = (
+        "If the case is heart-failure-oriented, prefer search wording such as heart failure, HFrEF, congestion, cardio-renal safety, GDMT, hyperkalaemia, or decompensation when justified by the variables."
+        if specialty_focus is not None and specialty_focus.is_heart_failure
+        else "Prefer specialty-specific terminology only when the variables clearly support it."
+    )
     return f"""
         You rewrite the task into a single retrieval-optimized search query.
         Preserve the original clinical intent.
         Prefer concrete clinical terms over vague wording.
+        {specialty_instruction}
         Do not answer the task.
         Do not invent patient facts.
         Return only one line starting with: REWRITTEN_QUERY:
@@ -32,7 +39,6 @@ def build_query_rewrite_prompt(question: str, patient_variables: dict[str, Any])
         Patient variables:
         {bullet_block(patient_lines(patient_variables))}
         """.strip()
-
 
 
 def _render_context_assessment(context_assessment: Any | None) -> str:
@@ -80,12 +86,15 @@ def build_generation_prompt(
     attempt_number: int = 1,
     allow_general_guidance: bool = True,
     context_assessment: Any | None = None,
+    specialty_focus: Any | None = None,
 ) -> str:
     general_guidance_instruction = (
         "Give short practical guidance that stays grounded in the excerpts and does not over-claim patient-specific precision."
         if allow_general_guidance
         else "If grounded general guidance is not possible, write 'Unavailable from the retrieved evidence.'"
     )
+
+    specialty_block = "\n".join(f"- {item}" for item in (specialty_focus.prompt_priorities if specialty_focus else []))
 
     return f"""
         You are a clinical guidance prototype for internal testing.
@@ -99,6 +108,9 @@ def build_generation_prompt(
         If evidence is weak or incomplete, say so clearly.
         Acknowledge every abnormal finding cluster that is present in the interpreted findings, even if the evidence is limited for some of them.
         This is generation attempt #{attempt_number}.
+        Dominant clinical lens: {specialty_focus.summary if specialty_focus else "General multi-specialty interpretation."}
+        Priority rules for this lens:
+        {specialty_block or "- Stay direct, grounded, and cautious."}
         {_render_rewrite_block(question, rewritten_query)}{_render_context_assessment(context_assessment)}{_render_retry_block(verification_feedback)}
         User task:
         {question}

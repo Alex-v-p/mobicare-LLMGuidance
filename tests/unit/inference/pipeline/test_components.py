@@ -1,4 +1,5 @@
 from inference.clinical import build_clinical_profile, build_question_from_patient_data
+from inference.pipeline.answer_support import infer_specialty_focus
 from inference.pipeline.components import ChunkRelevanceRanker, ContextJudge, QueryPlanner, ResponseVerifier
 from shared.contracts.inference import GenerationOptions, InferenceRequest, RetrievedContext
 
@@ -43,7 +44,7 @@ def test_query_planner_adds_targeted_adaptive_queries_for_abnormal_variables():
     assert plan.effective_question
     assert len(plan.expanded_queries) >= 3
     assert any("clinical management" in query.lower() for query in plan.expanded_queries)
-    assert any("cardiac status" in query.lower() for query in plan.expanded_queries)
+    assert any("heart failure" in query.lower() or "hf severity and congestion" in query.lower() for query in plan.expanded_queries)
 
 
 def test_context_judge_marks_context_as_insufficient_when_overlap_is_missing():
@@ -104,3 +105,26 @@ def test_response_verifier_flags_potassium_contradiction():
 
     assert result.verdict == "fail"
     assert any("potassium value" in issue for issue in result.issues)
+
+
+def test_infer_specialty_focus_prefers_heart_failure_when_cardiac_variables_dominate():
+    profile = build_clinical_profile({"ef": 28, "nt_pro_bnp": 2400, "creatinine": 1.7, "potassium": 5.4})
+
+    focus = infer_specialty_focus({"ef": 28, "nt_pro_bnp": 2400, "creatinine": 1.7, "potassium": 5.4}, profile)
+
+    assert focus.name == "heart_failure"
+
+
+def test_query_planner_marks_heart_failure_specialty_focus_for_cardiac_cases():
+    planner = QueryPlanner()
+    request = InferenceRequest(
+        request_id="req-hf",
+        question="",
+        patient_variables={"ef": 28, "nt_pro_bnp": 2400, "creatinine": 1.7, "potassium": 5.4},
+        options=GenerationOptions(adaptive_retrieval_enabled=True),
+    )
+
+    plan = planner.create_plan(request)
+
+    assert plan.specialty_focus == "heart_failure"
+    assert any("heart failure" in query.lower() for query in plan.expanded_queries)

@@ -117,3 +117,33 @@ async def test_guidance_pipeline_falls_back_to_deterministic_answer_on_contradic
     assert "2. Rationale" in response.answer
     assert "3. Caution" in response.answer
     assert "4. General advice" in response.answer
+
+
+@pytest.mark.asyncio
+async def test_guidance_pipeline_surfaces_heart_failure_specialty_focus_metadata():
+    retrieved = [
+        RetrievedContext(
+            source_id="doc-1",
+            title="Heart failure guideline",
+            snippet="In patients with HFrEF and hyperkalaemia, review nephrotoxic drugs and monitor creatinine and electrolytes.",
+            chunk_id="c1",
+        )
+    ]
+    pipeline = GuidancePipeline(
+        retriever=FakeDenseRetriever(retrieved),
+        hybrid_retriever=FakeHybridRetriever(retrieved),
+        ollama_client=FakeOllamaClient([
+            "1. Direct answer\n- Heart-failure-oriented guidance.\n\n2. Rationale\n- Creatinine and potassium need follow-up.\n\n3. Caution\n- I don't know the full picture.\n\n4. General advice\n- Review symptoms and medications."
+        ]),
+    )
+
+    response = await pipeline.run(
+        InferenceRequest(
+            request_id="req-hf-focus",
+            question="",
+            patient_variables={"ef": 28, "nt_pro_bnp": 2400, "creatinine": 1.7, "potassium": 5.4},
+            options=GenerationOptions(use_retrieval=True, retrieval_mode="dense", top_k=1),
+        )
+    )
+
+    assert response.metadata["specialty_focus"] == "heart_failure"

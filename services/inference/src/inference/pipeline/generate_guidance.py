@@ -48,7 +48,7 @@ class GuidancePipeline:
             return self._build_example_response(request, query_plan)
 
         warnings = self._build_initial_warnings(request, query_plan)
-        rewrite_result = await self._query_rewriter.rewrite(request, query_plan.base_query)
+        rewrite_result = await self._query_rewriter.rewrite(request, query_plan.base_query, query_plan.specialty_focus)
         if rewrite_result.rewritten:
             warnings.append(f"Query rewritten for retrieval: {rewrite_result.query}")
             query_plan.expanded_queries[0] = rewrite_result.query
@@ -83,6 +83,7 @@ class GuidancePipeline:
                 "clinical_abnormal_variables": [finding.label for finding in query_plan.clinical_profile.abnormal_variables],
                 "clinical_unknown_variables": query_plan.clinical_profile.unknown_variables,
                 "response_regeneration_attempts": attempts,
+                "specialty_focus": query_plan.specialty_focus,
                 "prompt_character_count": prompt_length,
                 **retrieval_metadata,
             },
