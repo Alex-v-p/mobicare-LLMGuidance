@@ -4,6 +4,7 @@ from inference.http.clients.ollama_client import OllamaClient
 from inference.pipeline.components import (
     AnswerGenerator,
     ExampleResponseBuilder,
+    QueryPlanner,
     QueryRewriter,
     RetrievalOrchestrator,
     ResponseVerifier,
@@ -19,6 +20,7 @@ class GuidancePipeline:
         retriever: DenseRetriever | None = None,
         hybrid_retriever: HybridRetriever | None = None,
         ollama_client: OllamaClient | None = None,
+        query_planner: QueryPlanner | None = None,
         query_rewriter: QueryRewriter | None = None,
         retrieval_orchestrator: RetrievalOrchestrator | None = None,
         answer_generator: AnswerGenerator | None = None,
@@ -28,6 +30,7 @@ class GuidancePipeline:
         shared_ollama_client = ollama_client or OllamaClient()
         shared_retriever = retriever or DenseRetriever()
         shared_hybrid_retriever = hybrid_retriever or HybridRetriever()
+        self._query_planner = query_planner or QueryPlanner()
         self._query_rewriter = query_rewriter or QueryRewriter(shared_ollama_client)
         self._retrieval_orchestrator = retrieval_orchestrator or RetrievalOrchestrator(
             retriever=shared_retriever,
@@ -40,6 +43,7 @@ class GuidancePipeline:
         self._default_embedding_model = shared_retriever._embedding_client.model
 
     async def run(self, request: InferenceRequest) -> InferenceResponse:
+        query_plan = self._query_planner.create_plan(request)
         if request.options.use_example_response:
             retrieved_context = list(request.retrieved_context)
             warnings = ["Example response mode enabled; retrieval and model generation were skipped."]
@@ -47,6 +51,8 @@ class GuidancePipeline:
                 warnings.append("No patient variables were supplied.")
             if not retrieved_context:
                 warnings.append("No retrieval context was supplied.")
+            if not request.question.strip():
+                warnings.append("No explicit question was supplied; a patient-data-driven task was inferred.")
 
             return InferenceResponse(
                 request_id=request.request_id,
@@ -58,6 +64,8 @@ class GuidancePipeline:
                 warnings=warnings,
                 metadata={
                     "mock_response": True,
+                    "effective_question": query_plan.effective_question,
+                    "clinical_abnormal_variables": [finding.label for finding in query_plan.clinical_profile.abnormal_variables],
                     "use_retrieval": request.options.use_retrieval,
                     "retrieval_top_k": request.options.top_k,
                     "temperature": request.options.temperature,
@@ -71,33 +79,55 @@ class GuidancePipeline:
             )
 
         warnings: list[str] = []
-        rewrite_result = await self._query_rewriter.rewrite(request)
+        rewrite_result = await self._query_rewriter.rewrite(request, query_plan.base_query)
         if rewrite_result.rewritten:
             warnings.append(f"Query rewritten for retrieval: {rewrite_result.query}")
 
+        if query_plan.clinical_profile.abnormal_variables:
+            abnormal_names = ", ".join(finding.label for finding in query_plan.clinical_profile.abnormal_variables[:5])
+            warnings.append(f"Adaptive retrieval focused on clinically relevant findings: {abnormal_names}")
+        if not request.question.strip() and request.patient_variables:
+            warnings.append("No explicit question was supplied; a patient-data-driven task was inferred.")
+
+        query_plan.expanded_queries[0] = rewrite_result.query
         retrieved_context, retrieval_metadata = await self._retrieval_orchestrator.retrieve_context(
             request=request,
-            retrieval_query=rewrite_result.query,
+            retrieval_plan=query_plan,
         )
+        context_assessment_meta = retrieval_metadata.get("context_assessment") or {}
+        context_sufficient = bool(context_assessment_meta.get("sufficient"))
         if not retrieved_context:
             warnings.append("No relevant retrieval context was found.")
+        elif not context_sufficient:
+            warnings.append("Retrieved context appears weak or incomplete; answer should be treated cautiously.")
 
         verification_feedback: list[str] | None = None
         attempt_limit = 1 + (request.options.max_regeneration_attempts if request.options.enable_regeneration else 0)
         final_answer = ""
         final_prompt_length = 0
         final_verification = None
+        attempt = 0
 
         for attempt in range(1, attempt_limit + 1):
             final_answer, final_prompt_length = await self._answer_generator.generate(
                 request=request,
+                effective_question=query_plan.effective_question,
+                clinical_profile=query_plan.clinical_profile,
                 retrieved_context=retrieved_context,
                 rewritten_query=rewrite_result.query if rewrite_result.rewritten else None,
                 verification_feedback=verification_feedback,
                 attempt_number=attempt,
+                context_assessment=self._retrieval_orchestrator.assess_context(
+                    retrieved_context=retrieved_context,
+                    retrieval_query=query_plan.base_query,
+                    clinical_profile=query_plan.clinical_profile,
+                    minimum_results=request.options.retrieval_low_context_min_results,
+                ),
             )
             final_verification = await self._response_verifier.verify(
                 request=request,
+                effective_question=query_plan.effective_question,
+                clinical_profile=query_plan.clinical_profile,
                 retrieved_context=retrieved_context,
                 answer=final_answer,
             )
@@ -124,6 +154,9 @@ class GuidancePipeline:
                 "max_tokens": request.options.max_tokens,
                 "query_rewritten": rewrite_result.rewritten,
                 "retrieval_query": rewrite_result.query,
+                "effective_question": query_plan.effective_question,
+                "clinical_abnormal_variables": [finding.label for finding in query_plan.clinical_profile.abnormal_variables],
+                "clinical_unknown_variables": query_plan.clinical_profile.unknown_variables,
                 "response_regeneration_attempts": attempt,
                 "prompt_character_count": final_prompt_length,
                 "llm_model": request.options.llm_model or self._default_llm_model,
