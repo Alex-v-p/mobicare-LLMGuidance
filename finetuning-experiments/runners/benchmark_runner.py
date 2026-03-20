@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from adapters.guidance import GuidanceClient
+from adapters.guidance_payloads import normalize_guidance_record
 from caching.fingerprints import build_run_fingerprint
 from caching.run_registry import RunRegistry
 from artifacts.models import CURRENT_ARTIFACT_VERSION, RunArtifact
@@ -85,9 +86,10 @@ def _build_success_case_result(
     guidance_record: dict[str, Any],
     total_latency: float,
 ) -> dict[str, Any]:
-    retrieval_result = run_retrieval_stage(source_mapping, guidance_record)
-    generation_result = run_generation_stage(case, guidance_record, retrieval_result.retrieved_chunks)
-    telemetry = extract_guidance_telemetry(guidance_record)
+    normalized_record = normalize_guidance_record(guidance_record)
+    retrieval_result = run_retrieval_stage(source_mapping, normalized_record)
+    generation_result = run_generation_stage(case, normalized_record, retrieval_result.retrieved_chunks)
+    telemetry = extract_guidance_telemetry(normalized_record)
     derived = telemetry.get("derived") or {}
     return {
         "status": "completed",
@@ -108,15 +110,16 @@ def _build_success_case_result(
         "telemetry": telemetry,
         "timings": {
             "total_latency_seconds": total_latency,
-            "created_at": guidance_record.get("created_at"),
-            "started_at": guidance_record.get("started_at"),
-            "completed_at": guidance_record.get("completed_at"),
-            "updated_at": guidance_record.get("updated_at"),
+            "created_at": normalized_record.get("created_at"),
+            "started_at": normalized_record.get("started_at"),
+            "completed_at": normalized_record.get("completed_at"),
+            "updated_at": normalized_record.get("updated_at"),
             "queue_delay_ms": derived.get("queue_delay_ms"),
             "execution_duration_ms": derived.get("execution_duration_ms"),
             "total_duration_ms": derived.get("total_duration_ms"),
         },
-        "raw_endpoint_result": guidance_record,
+        "raw_endpoint_result": normalized_record,
+        "endpoint_envelope": normalized_record.get("endpoint_envelope") or {},
     }
 
 

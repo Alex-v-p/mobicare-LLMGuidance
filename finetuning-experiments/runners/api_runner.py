@@ -9,6 +9,7 @@ import requests
 
 from adapters.ingestion import IngestionClient
 from adapters.guidance import GuidanceClient
+from adapters.guidance_payloads import extract_retrieved_context, normalize_guidance_record
 from adapters.metrics import MetricsClient
 from configs.schema import BenchmarkRunConfig
 from datasets.schema import BenchmarkCase
@@ -97,7 +98,7 @@ def _categorize_failure(error: Exception | None, record: dict[str, Any] | None, 
             return "worker_anomaly"
         return "generation_failure" if endpoint == "guidance_endpoint" else "ingestion_failure"
 
-    rag = snapshot.get("rag") or []
+    rag = extract_retrieved_context(snapshot)
     if endpoint == "guidance_endpoint" and isinstance(rag, list) and not rag:
         return "empty_retrieval"
 
@@ -202,7 +203,7 @@ def run_api_stage(config: BenchmarkRunConfig, cases: list[BenchmarkCase]) -> dic
                     max_wait_seconds=config.execution.max_wait_seconds,
                 )
             )
-            record = (result.record if result is not None else {"status": "failed", "error": str(error)})
+            record = normalize_guidance_record(result.record) if result is not None else {"status": "failed", "error": str(error)}
             telemetry = extract_guidance_telemetry(record)
             guidance_attempts.append(
                 {
@@ -214,7 +215,7 @@ def run_api_stage(config: BenchmarkRunConfig, cases: list[BenchmarkCase]) -> dic
                     "telemetry_derived": telemetry.get("derived") or {},
                     "telemetry_stages": telemetry.get("stages") or [],
                     "warning_count": len(record.get("warnings") or []),
-                    "rag_count": len(record.get("rag") or []),
+                    "rag_count": len(extract_retrieved_context(record)),
                 }
             )
 

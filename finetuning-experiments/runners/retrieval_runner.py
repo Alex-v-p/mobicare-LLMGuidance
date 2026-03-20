@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any
 
+from adapters.guidance_payloads import extract_retrieved_context
 from scoring.retrieval import score_retrieval
 
 
@@ -21,7 +22,7 @@ def run_retrieval_stage(source_mapping: dict[str, Any] | None, guidance_record: 
     mapping = source_mapping or {}
     source_list = dict(mapping.get("source_list") or {})
     expected_matches = list(mapping.get("matches") or [])
-    retrieved_chunks = list(guidance_record.get("rag") or [])
+    retrieved_chunks = extract_retrieved_context(guidance_record)
     return RetrievalStageResult(
         retrieved_chunks=retrieved_chunks,
         retrieval_scores=score_retrieval(mapping, retrieved_chunks),

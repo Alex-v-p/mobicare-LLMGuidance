@@ -23,6 +23,9 @@ def migrate_run_artifact(payload: dict[str, Any]) -> dict[str, Any]:
     artifact.setdefault("api_summary", {})
     artifact.setdefault("normalized_metrics", {})
     artifact.setdefault("per_case_results", [])
+    for case in artifact["per_case_results"]:
+        if isinstance(case, dict):
+            case.setdefault("endpoint_envelope", {})
     artifact["cache"].setdefault("run_fingerprint", None)
     artifact["cache"].setdefault("ingestion_fingerprint", None)
     artifact["cache"].setdefault("ingestion_cache", {})
