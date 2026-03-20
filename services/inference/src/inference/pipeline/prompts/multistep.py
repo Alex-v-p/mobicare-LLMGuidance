@@ -57,6 +57,21 @@ def _render_context_assessment(context_assessment: Any | None) -> str:
 
 
 
+def _render_synthesis_block(clinical_synthesis: Any | None, actionable_reasoning: list[str] | None) -> str:
+    if clinical_synthesis is None and not actionable_reasoning:
+        return ""
+    lines = ["\nClinical synthesis:"]
+    if clinical_synthesis is not None:
+        lines.append(f"- headline: {clinical_synthesis.headline}")
+        for item in getattr(clinical_synthesis, "interpretation_points", ())[:4]:
+            lines.append(f"- interpretation: {item}")
+    if actionable_reasoning:
+        lines.append("Actionable reasoning priorities:")
+        for item in actionable_reasoning[:4]:
+            lines.append(f"- {item}")
+    return "\n".join(lines) + "\n"
+
+
 def _render_rewrite_block(question: str, rewritten_query: str | None) -> str:
     if not rewritten_query or rewritten_query.strip() == question.strip():
         return ""
@@ -81,6 +96,8 @@ def build_generation_prompt(
     patient_variables: dict[str, Any],
     clinical_profile: ClinicalProfile,
     retrieved_context: list[RetrievedContext],
+    clinical_synthesis: Any | None = None,
+    actionable_reasoning: list[str] | None = None,
     rewritten_query: str | None = None,
     verification_feedback: list[str] | None = None,
     attempt_number: int = 1,
@@ -111,7 +128,7 @@ def build_generation_prompt(
         Dominant clinical lens: {specialty_focus.summary if specialty_focus else "General multi-specialty interpretation."}
         Priority rules for this lens:
         {specialty_block or "- Stay direct, grounded, and cautious."}
-        {_render_rewrite_block(question, rewritten_query)}{_render_context_assessment(context_assessment)}{_render_retry_block(verification_feedback)}
+        {_render_rewrite_block(question, rewritten_query)}{_render_context_assessment(context_assessment)}{_render_synthesis_block(clinical_synthesis, actionable_reasoning)}{_render_retry_block(verification_feedback)}
         User task:
         {question}
 
@@ -131,10 +148,10 @@ def build_generation_prompt(
         4. General advice
 
         Section rules:
-        - Section 1 must answer the task directly in 2-4 short bullet points or sentences.
+        - Section 1 must answer the task directly in 2-4 short bullet points or sentences. Start with a brief clinical interpretation, then give the most relevant next-step priorities.
         - When no explicit question was supplied, infer the likely task from the patient variables, but do not mention retrieval or source selection.
         - Explicitly address each abnormality cluster when evidence supports it; if coverage is weak, say that in the caution section.
-        - Section 2 must briefly connect the answer to the interpreted findings and grounded excerpts.
+        - Section 2 must briefly connect the answer to the interpreted findings and grounded excerpts, using the clinical synthesis as the main reasoning frame rather than merely repeating raw abnormalities.
         - Section 3 must list missing patient details, explain evidence limitations, and say "I don't know" when the evidence does not support a stronger conclusion.
         - Section 4: {general_guidance_instruction}
         - Never mention any filename, title, page number, or source identifier.

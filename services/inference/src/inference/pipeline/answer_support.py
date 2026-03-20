@@ -45,6 +45,14 @@ class SpecialtyFocus:
         return self.name == "heart_failure"
 
 
+@dataclass(frozen=True, slots=True)
+class ClinicalSynthesis:
+    headline: str
+    interpretation_points: tuple[str, ...]
+    action_points: tuple[str, ...]
+    covered_clusters: tuple[str, ...]
+
+
 def extract_terms(text: str) -> set[str]:
     return {term for term in re.findall(r"[a-z0-9]{3,}", text.lower()) if term not in _STOPWORDS}
 
@@ -119,6 +127,109 @@ def infer_specialty_focus(
     )
 
 
+def synthesize_clinical_state(
+    *,
+    patient_variables: dict[str, Any],
+    clinical_profile: ClinicalProfile,
+    retrieved_context: list[RetrievedContext],
+    context_assessment: Any | None = None,
+    specialty: SpecialtyFocus | None = None,
+) -> ClinicalSynthesis:
+    specialty = specialty or infer_specialty_focus(patient_variables, clinical_profile, retrieved_context)
+    clusters = detected_clusters(clinical_profile)
+    covered_clusters = tuple(clusters.keys())
+    interpretation_points: list[str] = []
+    action_points: list[str] = []
+
+    hf_findings = clusters.get("HF severity and congestion", [])
+    renal_findings = clusters.get("Cardio-renal and electrolyte safety", [])
+    rhythm_findings = clusters.get("Rhythm and conduction", [])
+    anemia_findings = clusters.get("Anemia and iron status", [])
+    inflammation_findings = clusters.get("Inflammation and injury", [])
+    glycemic_findings = clusters.get("Glycemic and cardiometabolic risk", [])
+
+    sodium_low = any(f.key.lower() == "sodium" and f.status == "low" for f in renal_findings)
+    potassium_high = any(f.key.lower() == "potassium" and f.status == "high" for f in renal_findings)
+    hr_high = any(f.key.lower() in {"heart_rate", "heartrate", "pulse"} and f.status == "high" for f in rhythm_findings)
+
+    if specialty.is_heart_failure and hf_findings:
+        interpretation_points.append(
+            "The overall profile is compatible with significant heart-failure burden or congestion risk rather than an isolated laboratory abnormality."
+        )
+        action_points.append(
+            "Assess heart-failure severity, congestion or volume status, and tolerance of current therapy as a near-term priority."
+        )
+    if renal_findings:
+        renal_text = "Renal function and electrolyte safety appear clinically important in this case"
+        if potassium_high or sodium_low:
+            renal_text += ", especially because the abnormalities include"
+            qualifiers=[]
+            if potassium_high:
+                qualifiers.append("elevated potassium")
+            if sodium_low:
+                qualifiers.append("low sodium")
+            renal_text += " " + " and ".join(qualifiers)
+        interpretation_points.append(renal_text + ".")
+        action_points.append(
+            "Monitor renal function, potassium, and sodium closely and review treatment tolerance or contributors that could worsen cardio-renal safety."
+        )
+    if rhythm_findings and hr_high:
+        interpretation_points.append(
+            "The elevated heart rate may reflect hemodynamic stress, rhythm-related burden, or decompensation in the broader clinical picture."
+        )
+        action_points.append(
+            "Reassess heart rate or rhythm together with blood pressure, symptoms, and overall hemodynamic status."
+        )
+    if anemia_findings:
+        interpretation_points.append(
+            "The low hemoglobin or iron markers suggest anemia or iron deficiency that may worsen symptoms, exercise tolerance, and overall cardiovascular risk."
+        )
+        action_points.append(
+            "Work up iron deficiency or anemia in the broader clinical context instead of treating it as a minor incidental finding."
+        )
+    if inflammation_findings:
+        interpretation_points.append(
+            "Inflammatory or injury markers are elevated, but the cause cannot be determined from biomarkers alone."
+        )
+        action_points.append(
+            "Interpret inflammatory or injury markers together with symptoms, examination findings, and the rest of the clinical picture before drawing stronger conclusions."
+        )
+    if glycemic_findings:
+        interpretation_points.append(
+            "Glycemic or cardiometabolic abnormalities may be contributing comorbidity rather than the main driver, but they still add to overall risk and follow-up needs."
+        )
+        action_points.append(
+            "Review glycemic and cardiometabolic control as part of follow-up, especially if these findings are persistent or already known."
+        )
+
+    if not interpretation_points:
+        interpretation_points.append(
+            "The main value abnormalities point to a clinically relevant pattern that should be interpreted as a whole rather than marker by marker."
+        )
+    if not action_points:
+        action_points.append(
+            "Use the retrieved guidance to prioritize the most abnormal findings first, while keeping uncertainty explicit where evidence is thin."
+        )
+
+    headline = interpretation_points[0]
+    return ClinicalSynthesis(
+        headline=headline,
+        interpretation_points=tuple(interpretation_points[:4]),
+        action_points=tuple(action_points[:4]),
+        covered_clusters=covered_clusters,
+    )
+
+
+def has_actionable_guidance(answer: str) -> bool:
+    lowered = answer.lower()
+    action_terms = [
+        "monitor", "review", "assess", "reassess", "trend", "follow-up", "follow up",
+        "evaluate", "check", "prioritize", "seek", "consider", "tolerance", "contributors",
+    ]
+    return any(term in lowered for term in action_terms)
+
+
+
 def normalize_generated_answer(
     answer: str,
     *,
@@ -184,6 +295,8 @@ def should_force_deterministic_answer(
     )
     if issues or not context_assessment.sufficient:
         return True
+    if not has_actionable_guidance(answer):
+        return True
     abnormal_clusters = detected_clusters(clinical_profile)
     return any(context_assessment.cluster_coverage.get(cluster, 0) == 0 for cluster in abnormal_clusters)
 
@@ -208,8 +321,11 @@ def collect_answer_issues(
         issues.append("Answer is too short to be useful.")
     if any(term in lowered for term in DISALLOWED_SOURCE_REFERENCES):
         issues.append("Answer mentions sources or document-selection language instead of giving direct guidance.")
-    if all(token not in lowered for token in ["i don't know", "missing", "uncertain", "limited"]):
+    if all(token not in lowered for token in ["i don't know", "missing", "uncertain", "limited", "cautious"]):
         issues.append("Answer may not clearly communicate uncertainty.")
+    direct_answer_block = normalized.lower().split("2. rationale")[0]
+    if not has_actionable_guidance(direct_answer_block):
+        issues.append("Direct answer summarizes findings but does not provide actionable guidance.")
 
     potassium_value = to_float(patient_variables.get("potassium"))
     if potassium_value is not None and potassium_value >= 5.0 and "hypokalemia" in lowered:
@@ -242,14 +358,22 @@ def build_deterministic_answer(
 ) -> str:
     clusters = detected_clusters(clinical_profile)
     specialty = infer_specialty_focus(patient_variables, clinical_profile, retrieved_context)
+    synthesis = synthesize_clinical_state(
+        patient_variables=patient_variables,
+        clinical_profile=clinical_profile,
+        retrieved_context=retrieved_context,
+        context_assessment=context_assessment,
+        specialty=specialty,
+    )
     direct_lines = build_direct_answer_lines(
         clusters=clusters,
         patient_variables=patient_variables,
         retrieved_context=retrieved_context,
         specialty=specialty,
         context_assessment=context_assessment,
+        synthesis=synthesis,
     )
-    rationale_lines = build_rationale_lines(clusters=clusters, specialty=specialty)
+    rationale_lines = build_rationale_lines(clusters=clusters, specialty=specialty, synthesis=synthesis)
     caution_lines = build_caution_lines(patient_variables, context_assessment, clinical_profile, specialty)
     general_advice = build_general_advice(context_assessment, clinical_profile, specialty)
     lines = [
@@ -275,10 +399,27 @@ def build_direct_answer_lines(
     retrieved_context: list[RetrievedContext],
     specialty: SpecialtyFocus,
     context_assessment: Any,
+    synthesis: ClinicalSynthesis,
 ) -> list[str]:
     evidence_points = build_evidence_points(retrieved_context, patient_variables, specialty)
-    cluster_lines: list[str] = []
-    if specialty.is_heart_failure:
+    direct_lines: list[str] = []
+
+    if synthesis.headline:
+        direct_lines.append(f"- {synthesis.headline}")
+
+    for point in synthesis.action_points[:3]:
+        direct_lines.append(f"- {point}")
+
+    if specialty.is_heart_failure and not synthesis.action_points:
+        direct_lines.append("- Prioritize assessment of congestion, cardio-renal safety, blood pressure tolerance, and near-term follow-up needs.")
+
+    if evidence_points:
+        direct_lines.extend(f"- {point}" for point in evidence_points[:2])
+
+    if not context_assessment.sufficient:
+        direct_lines.append("- Treatment decisions should stay cautious because only part of the clinical picture is directly covered by the retrieved guidance.")
+
+    if len(direct_lines) < 3:
         for cluster_name in [
             "HF severity and congestion",
             "Cardio-renal and electrolyte safety",
@@ -286,25 +427,30 @@ def build_direct_answer_lines(
             "Anemia and iron status",
             "Inflammation and injury",
             "Glycemic and cardiometabolic risk",
-        ]:
+        ] if specialty.is_heart_failure else list(clusters.keys())[:4]:
             findings = clusters.get(cluster_name)
             if findings:
-                cluster_lines.append(f"- {cluster_name}: {', '.join(finding_phrase(finding) for finding in findings[:3])}.")
-        if evidence_points:
-            cluster_lines.extend(f"- {point}" for point in evidence_points[:2])
-        if not context_assessment.sufficient:
-            cluster_lines.append("- The safest grounded conclusion is limited because only part of the heart-failure picture is covered by the retrieved guidance.")
-        return cluster_lines[:5]
+                direct_lines.append(f"- {cluster_name}: {', '.join(finding_phrase(finding) for finding in findings[:3])}.")
+            if len(direct_lines) >= 5:
+                break
 
-    for cluster_name, findings in list(clusters.items())[:4]:
-        cluster_lines.append(f"- {cluster_name}: {', '.join(finding_phrase(finding) for finding in findings[:3])}.")
-    if evidence_points:
-        cluster_lines.extend(f"- {point}" for point in evidence_points[:2])
-    return cluster_lines[:5] or ["- The main abnormalities are summarized above, but stronger conclusions require more complete evidence."]
+    return direct_lines[:5] or ["- The main abnormalities require cautious follow-up and clinical review even though the retrieved guidance is incomplete."]
 
 
-def build_rationale_lines(*, clusters: dict[str, list[ClinicalFinding]], specialty: SpecialtyFocus) -> list[str]:
+def build_rationale_lines(
+    *,
+    clusters: dict[str, list[ClinicalFinding]],
+    specialty: SpecialtyFocus,
+    synthesis: ClinicalSynthesis | None = None,
+) -> list[str]:
     rationale_lines: list[str] = []
+
+    if synthesis is not None:
+        headline = synthesis.interpretation_points[:1]
+        supporting = synthesis.interpretation_points[1:2]
+        for point in headline + supporting:
+            rationale_lines.append(f"- {point}")
+
     preferred_order = [
         "HF severity and congestion",
         "Cardio-renal and electrolyte safety",
@@ -317,13 +463,24 @@ def build_rationale_lines(*, clusters: dict[str, list[ClinicalFinding]], special
         "Lipids",
     ]
     seen = set()
+    biomarker_lines: list[str] = []
     for cluster_name in preferred_order + list(clusters.keys()):
         if cluster_name in seen or cluster_name not in clusters:
             continue
         seen.add(cluster_name)
         findings = clusters[cluster_name]
-        rationale_lines.append(f"- {cluster_name}: " + "; ".join(finding.summary for finding in findings[:2]))
-    return rationale_lines[:4] or [f"- {specialty.summary}"]
+        if not findings:
+            continue
+        detailed_findings = "; ".join(finding.summary for finding in findings[:2])
+        biomarker_lines.append(f"- {cluster_name}: {detailed_findings}")
+        if len(biomarker_lines) >= 3:
+            break
+
+    if biomarker_lines:
+        remaining = max(0, 5 - len(rationale_lines))
+        rationale_lines.extend(biomarker_lines[:remaining])
+
+    return rationale_lines[:5] or [f"- {specialty.summary}"]
 
 
 def build_caution_lines(

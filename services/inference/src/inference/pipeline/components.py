@@ -16,6 +16,7 @@ from inference.pipeline.answer_support import (
     should_force_deterministic_answer,
     build_deterministic_answer,
     infer_specialty_focus,
+    synthesize_clinical_state,
 )
 from inference.pipeline.prompts.multistep import (
     build_generation_prompt,
