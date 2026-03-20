@@ -1,281 +1,492 @@
 {
-  "hct": {
-    "label": "Hematocrit",
-    "low": 35.0,
-    "high": 49.0,
-    "unit": "%"
-  },
-  "weight": {
-    "label": "Weight",
-    "low": null,
-    "high": null,
-    "unit": "kg",
-    "direction": "context"
-  },
-  "ferritin": {
-    "label": "Ferritin",
-    "low": 11.0,
-    "high": 336.0,
-    "unit": "µg/L",
-    "direction": "outside_range"
-  },
-  "crea": {
-    "label": "Creatinine",
-    "low": 0.59,
-    "high": 1.35,
-    "unit": "mg/dL",
-    "direction": "outside_range"
-  },
-  "creatinine": {
-    "label": "Creatinine",
-    "low": 0.59,
-    "high": 1.35,
-    "unit": "mg/dL",
-    "direction": "outside_range"
-  },
-  "heartrate": {
-    "label": "Heart rate",
-    "low": 50.0,
-    "high": 100.0,
-    "unit": "bpm",
-    "direction": "outside_range"
-  },
-  "heart_rate": {
-    "label": "Heart rate",
-    "low": 50.0,
-    "high": 100.0,
-    "unit": "bpm",
-    "direction": "outside_range"
-  },
-  "qrsduur": {
-    "label": "QRS duration",
-    "low": null,
-    "high": 120.0,
-    "unit": "ms",
-    "direction": "high_is_bad"
-  },
-  "hb": {
-    "label": "Hemoglobin",
-    "low": 11.6,
-    "high": 16.6,
-    "unit": "g/dL",
-    "direction": "outside_range"
-  },
-  "hemoglobin": {
-    "label": "Hemoglobin",
-    "low": 11.6,
-    "high": 16.6,
-    "unit": "g/dL",
-    "direction": "outside_range"
-  },
-  "bpdiast": {
-    "label": "Diastolic blood pressure",
-    "low": 60.0,
-    "high": 90.0,
-    "unit": "mmHg",
-    "direction": "outside_range"
-  },
-  "dbp": {
-    "label": "Diastolic blood pressure",
-    "low": 60.0,
-    "high": 90.0,
-    "unit": "mmHg",
-    "direction": "outside_range"
-  },
-  "urea": {
-    "label": "Urea",
-    "low": 6.0,
-    "high": 24.0,
-    "unit": "mg/dL",
-    "direction": "outside_range"
-  },
-  "transferrin": {
-    "label": "Transferrin",
-    "low": 204.0,
-    "high": 360.0,
-    "unit": "mg/dL",
-    "direction": "outside_range"
+  "gender": {
+    "label": "Gender",
+    "kind": "context"
   },
   "age": {
     "label": "Age",
-    "low": null,
-    "high": null,
-    "unit": "years",
-    "direction": "context"
+    "kind": "context",
+    "unit": "years"
   },
-  "ef": {
-    "label": "Ejection fraction",
-    "low": 50.0,
-    "high": 70.0,
-    "unit": "%",
-    "direction": "low_is_bad"
-  },
-  "bpsyst": {
-    "label": "Systolic blood pressure",
-    "low": 90.0,
-    "high": 140.0,
-    "unit": "mmHg",
-    "direction": "outside_range"
-  },
-  "sbp": {
-    "label": "Systolic blood pressure",
-    "low": 90.0,
-    "high": 140.0,
-    "unit": "mmHg",
-    "direction": "outside_range"
-  },
-  "il6": {
-    "label": "Interleukin-6",
-    "low": 0.0,
-    "high": 17.4,
-    "unit": "pg/mL",
-    "direction": "high_is_bad"
-  },
-  "potassium": {
-    "label": "Potassium",
-    "low": 3.5,
-    "high": 5.0,
-    "unit": "mmol/L",
-    "direction": "outside_range"
-  },
-  "sodium": {
-    "label": "Sodium",
-    "low": 135.0,
-    "high": 145.0,
-    "unit": "mmol/L",
-    "direction": "outside_range"
+  "weight": {
+    "label": "Weight",
+    "kind": "context",
+    "unit": "kg"
   },
   "bmi": {
     "label": "Body mass index",
-    "low": 18.5,
-    "high": 24.9,
     "unit": "kg/m²",
-    "direction": "outside_range"
+    "bands": [
+      {
+        "low": 18.5,
+        "high": 24.9,
+        "note": "typical adult reference"
+      }
+    ]
   },
-  "hstnt": {
-    "label": "High-sensitivity troponin T",
-    "low": 0.0,
-    "high": 14.0,
-    "unit": "ng/L",
-    "direction": "high_is_bad"
+  "hb": {
+    "label": "Hemoglobin",
+    "unit": "g/dL",
+    "aliases": [
+      "hemoglobin"
+    ],
+    "bands": [
+      {
+        "gender": "male",
+        "low": 13.2,
+        "high": 16.6
+      },
+      {
+        "gender": "female",
+        "low": 11.6,
+        "high": 15.0
+      },
+      {
+        "low": 12.0,
+        "high": 16.0,
+        "note": "fallback adult reference"
+      }
+    ]
   },
-  "hscrp": {
-    "label": "High-sensitivity C-reactive protein",
-    "low": 0.0,
-    "high": 3.0,
-    "unit": "mg/L",
-    "direction": "high_is_bad"
-  },
-  "crp": {
-    "label": "C-reactive protein",
-    "low": 0.0,
-    "high": 5.0,
-    "unit": "mg/L",
-    "direction": "high_is_bad"
-  },
-  "hba1c": {
-    "label": "HbA1c",
-    "low": 4.0,
-    "high": 5.6,
+  "hct": {
+    "label": "Hematocrit",
     "unit": "%",
-    "direction": "high_is_bad"
+    "bands": [
+      {
+        "gender": "male",
+        "low": 38.0,
+        "high": 49.0
+      },
+      {
+        "gender": "female",
+        "low": 35.0,
+        "high": 45.0
+      },
+      {
+        "low": 35.0,
+        "high": 49.0,
+        "note": "fallback adult reference"
+      }
+    ]
   },
-  "bnp": {
-    "label": "BNP",
-    "low": 0.0,
-    "high": 100.0,
-    "unit": "pg/mL",
-    "direction": "high_is_bad"
+  "ferritin": {
+    "label": "Ferritin",
+    "unit": "µg/L",
+    "bands": [
+      {
+        "gender": "male",
+        "low": 24.0,
+        "high": 336.0
+      },
+      {
+        "gender": "female",
+        "low": 11.0,
+        "high": 307.0
+      },
+      {
+        "low": 11.0,
+        "high": 336.0,
+        "note": "fallback adult reference"
+      }
+    ]
+  },
+  "transferrin": {
+    "label": "Transferrin",
+    "unit": "mg/dL",
+    "bands": [
+      {
+        "low": 204.0,
+        "high": 360.0
+      }
+    ]
+  },
+  "crea": {
+    "label": "Creatinine",
+    "unit": "mg/dL",
+    "aliases": [
+      "creatinine"
+    ],
+    "bands": [
+      {
+        "gender": "male",
+        "low": 0.74,
+        "high": 1.35
+      },
+      {
+        "gender": "female",
+        "low": 0.59,
+        "high": 1.04
+      },
+      {
+        "low": 0.59,
+        "high": 1.35,
+        "note": "fallback adult reference"
+      }
+    ]
+  },
+  "urea": {
+    "label": "Urea",
+    "unit": "mg/dL",
+    "bands": [
+      {
+        "low": 6.0,
+        "high": 24.0
+      }
+    ]
   },
   "cysc": {
     "label": "Cystatin C",
-    "low": 0.63,
-    "high": 1.21,
     "unit": "mg/L",
-    "direction": "high_is_bad"
+    "direction": "high_is_bad",
+    "bands": [
+      {
+        "age_min": 18,
+        "age_max": 49,
+        "low": 0.63,
+        "high": 1.03
+      },
+      {
+        "age_min": 50,
+        "low": 0.67,
+        "high": 1.21
+      },
+      {
+        "low": 0.63,
+        "high": 1.21,
+        "note": "fallback adult reference"
+      }
+    ]
+  },
+  "sodium": {
+    "label": "Sodium",
+    "unit": "mmol/L",
+    "bands": [
+      {
+        "low": 135.0,
+        "high": 145.0
+      }
+    ]
+  },
+  "potassium": {
+    "label": "Potassium",
+    "unit": "mmol/L",
+    "bands": [
+      {
+        "low": 3.5,
+        "high": 5.0
+      }
+    ]
+  },
+  "bnp": {
+    "label": "BNP",
+    "unit": "pg/mL",
+    "direction": "high_is_bad",
+    "bands": [
+      {
+        "low": 0.0,
+        "high": 100.0,
+        "note": "higher values may also reflect age, renal dysfunction, or AF"
+      }
+    ]
+  },
+  "hstnt": {
+    "label": "High-sensitivity troponin T",
+    "aliases": [
+      "hs_tnt",
+      "hs_troponin_t"
+    ],
+    "unit": "ng/L",
+    "direction": "high_is_bad",
+    "bands": [
+      {
+        "low": 0.0,
+        "high": 14.0,
+        "note": "assay-specific upper reference"
+      }
+    ]
+  },
+  "hscrp": {
+    "label": "High-sensitivity C-reactive protein",
+    "aliases": [
+      "hs_crp"
+    ],
+    "unit": "mg/L",
+    "direction": "high_is_bad",
+    "bands": [
+      {
+        "low": 0.0,
+        "high": 3.0
+      }
+    ]
+  },
+  "crp": {
+    "label": "C-reactive protein",
+    "unit": "mg/L",
+    "direction": "high_is_bad",
+    "bands": [
+      {
+        "low": 0.0,
+        "high": 5.0,
+        "note": "general CRP fallback reference"
+      }
+    ]
+  },
+  "il6": {
+    "label": "Interleukin-6",
+    "unit": "pg/mL",
+    "direction": "high_is_bad",
+    "bands": [
+      {
+        "low": 0.0,
+        "high": 17.4,
+        "note": "assay-dependent reference"
+      }
+    ]
+  },
+  "hba1c": {
+    "label": "HbA1c",
+    "unit": "%",
+    "direction": "high_is_bad",
+    "bands": [
+      {
+        "low": 4.0,
+        "high": 5.6,
+        "note": "normal; prediabetes begins around 5.7"
+      }
+    ]
   },
   "chol": {
     "label": "Total cholesterol",
-    "low": 0.0,
-    "high": 200.0,
     "unit": "mg/dL",
-    "direction": "high_is_bad"
+    "direction": "high_is_bad",
+    "bands": [
+      {
+        "low": 0.0,
+        "high": 200.0
+      }
+    ]
   },
-  "glucose": {
-    "label": "Glucose",
-    "low": 70.0,
-    "high": 99.0,
-    "unit": "mg/dL",
-    "direction": "outside_range"
+  "ef": {
+    "label": "Ejection fraction",
+    "unit": "%",
+    "direction": "low_is_bad",
+    "bands": [
+      {
+        "low": 50.0,
+        "high": 70.0,
+        "note": "context-dependent echo measure"
+      }
+    ]
   },
-  "fasting_glucose": {
-    "label": "Fasting glucose",
-    "low": 70.0,
-    "high": 99.0,
-    "unit": "mg/dL",
-    "direction": "outside_range"
+  "heartrate": {
+    "label": "Heart rate",
+    "aliases": [
+      "heart_rate",
+      "pulse"
+    ],
+    "unit": "bpm",
+    "bands": [
+      {
+        "low": 50.0,
+        "high": 100.0,
+        "note": "context-dependent; rhythm and medication matter"
+      }
+    ]
   },
-  "egfr": {
-    "label": "eGFR",
-    "low": 60.0,
-    "high": 120.0,
-    "unit": "mL/min/1.73m²",
-    "direction": "low_is_bad"
+  "bpsyst": {
+    "label": "Systolic blood pressure",
+    "aliases": [
+      "sbp"
+    ],
+    "unit": "mmHg",
+    "bands": [
+      {
+        "low": 90.0,
+        "high": 140.0,
+        "note": "context-dependent vital sign"
+      }
+    ]
+  },
+  "bpdiast": {
+    "label": "Diastolic blood pressure",
+    "aliases": [
+      "dbp"
+    ],
+    "unit": "mmHg",
+    "bands": [
+      {
+        "low": 60.0,
+        "high": 90.0,
+        "note": "context-dependent vital sign"
+      }
+    ]
+  },
+  "qrsduur": {
+    "label": "QRS duration",
+    "unit": "ms",
+    "direction": "high_is_bad",
+    "bands": [
+      {
+        "low": 0.0,
+        "high": 120.0,
+        "note": "wide QRS clinically relevant"
+      }
+    ]
   },
   "nt_pro_bnp": {
     "label": "NT-proBNP",
-    "low": 0.0,
-    "high": 125.0,
     "unit": "pg/mL",
-    "direction": "high_is_bad"
+    "direction": "high_is_bad",
+    "bands": [
+      {
+        "low": 0.0,
+        "high": 125.0,
+        "note": "age- and setting-dependent fallback reference"
+      }
+    ]
   },
-  "lvef": {
-    "label": "Left ventricular ejection fraction",
-    "low": 50.0,
-    "high": 70.0,
-    "unit": "%",
-    "direction": "low_is_bad"
+  "egfr": {
+    "label": "Estimated GFR",
+    "unit": "mL/min/1.73m²",
+    "direction": "low_is_bad",
+    "bands": [
+      {
+        "low": 60.0,
+        "high": 120.0
+      }
+    ]
   },
-  "pulse": {
-    "label": "Pulse",
-    "low": 50.0,
-    "high": 100.0,
-    "unit": "bpm",
-    "direction": "outside_range"
+  "glucose": {
+    "label": "Glucose",
+    "unit": "mg/dL",
+    "bands": [
+      {
+        "low": 70.0,
+        "high": 99.0,
+        "note": "fasting-style adult reference"
+      }
+    ]
   },
-  "blood_pressure_systolic": {
-    "label": "Systolic blood pressure",
-    "low": 90.0,
-    "high": 140.0,
-    "unit": "mmHg",
-    "direction": "outside_range"
+  "fasting_glucose": {
+    "label": "Fasting glucose",
+    "unit": "mg/dL",
+    "bands": [
+      {
+        "low": 70.0,
+        "high": 99.0
+      }
+    ]
   },
-  "blood_pressure_diastolic": {
-    "label": "Diastolic blood pressure",
-    "low": 60.0,
-    "high": 90.0,
-    "unit": "mmHg",
-    "direction": "outside_range"
+  "diabetes": {
+    "label": "Diabetes",
+    "kind": "context"
   },
-  "spo2": {
-    "label": "SpO2",
-    "low": 95.0,
-    "high": 100.0,
-    "unit": "%",
-    "direction": "low_is_bad"
+  "kidney_disease": {
+    "label": "Kidney disease",
+    "kind": "context"
   },
-  "oxygen_saturation": {
-    "label": "Oxygen saturation",
-    "low": 95.0,
-    "high": 100.0,
-    "unit": "%",
-    "direction": "low_is_bad"
+  "hypertension": {
+    "label": "Hypertension",
+    "kind": "context"
   },
-  "temperature": {
-    "label": "Temperature",
-    "low": 36.1,
-    "high": 37.8,
-    "unit": "°C",
-    "direction": "outside_range"
+  "copd": {
+    "label": "COPD",
+    "kind": "context"
+  },
+  "smoking": {
+    "label": "Smoking",
+    "kind": "context"
+  },
+  "nyha": {
+    "label": "NYHA class",
+    "kind": "context"
+  },
+  "afib_bl": {
+    "label": "Atrial fibrillation at baseline",
+    "kind": "context"
+  },
+  "pm_rhythm_ecg": {
+    "label": "ECG rhythm",
+    "kind": "context"
+  },
+  "valvhd": {
+    "label": "Valvular heart disease",
+    "kind": "context"
+  },
+  "hist_mi": {
+    "label": "History of myocardial infarction",
+    "kind": "context"
+  },
+  "bundeltakblok": {
+    "label": "Bundle branch block",
+    "kind": "context"
+  },
+  "pacemaker_bl": {
+    "label": "Pacemaker at baseline",
+    "kind": "context"
+  },
+  "rales": {
+    "label": "Rales",
+    "kind": "context"
+  },
+  "orthopnea": {
+    "label": "Orthopnea",
+    "kind": "context"
+  },
+  "hepatomegaly": {
+    "label": "Hepatomegaly",
+    "kind": "context"
+  },
+  "angina01": {
+    "label": "Angina",
+    "kind": "context"
+  },
+  "cabg": {
+    "label": "CABG history",
+    "kind": "context"
+  },
+  "stroke01": {
+    "label": "Stroke history",
+    "kind": "context"
+  },
+  "jugularvein_01": {
+    "label": "Jugular venous distension",
+    "kind": "context"
+  },
+  "ep_hf_encoded": {
+    "label": "Heart failure phenotype",
+    "kind": "context"
+  },
+  "ischaemic": {
+    "label": "Ischaemic etiology",
+    "kind": "context"
+  },
+  "edema": {
+    "label": "Edema",
+    "kind": "context"
+  },
+  "dosebb_prev": {
+    "label": "Previous beta-blocker dose",
+    "kind": "context"
+  },
+  "rasdose_prev": {
+    "label": "Previous RAS inhibitor dose",
+    "kind": "context"
+  },
+  "dosespiro_prev": {
+    "label": "Previous MRA dose",
+    "kind": "context"
+  },
+  "loop_dose_prev": {
+    "label": "Previous loop diuretic dose",
+    "kind": "context"
+  },
+  "sglt2dose_prev": {
+    "label": "Previous SGLT2 inhibitor dose",
+    "kind": "context"
+  },
+  "arnidose_prev": {
+    "label": "Previous ARNI dose",
+    "kind": "context"
   }
 }

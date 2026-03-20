@@ -25,7 +25,11 @@ class FakeHybridRetriever:
 
     async def retrieve(self, **kwargs):
         from inference.retrieval.hybrid import HybridRetrievalResult
-        return HybridRetrievalResult(items=self.items[: kwargs.get('limit', len(self.items))], metadata={"retrieval_mode": "hybrid"})
+
+        return HybridRetrievalResult(
+            items=self.items[: kwargs.get("limit", len(self.items))],
+            metadata={"retrieval_mode": "hybrid"},
+        )
 
 
 class FakeOllamaClient:
@@ -42,12 +46,12 @@ class FakeOllamaClient:
 
 
 @pytest.mark.asyncio
-async def test_guidance_pipeline_infers_task_from_patient_data_only():
+async def test_guidance_pipeline_infers_task_from_patient_data_only_and_normalizes_source_talk():
     retrieved = [
         RetrievedContext(
             source_id="doc-1",
             title="Heart failure guideline",
-            snippet="Reduced ejection fraction should be assessed and managed carefully.",
+            snippet="If creatinine or potassium rises excessively, review nephrotoxic drugs and consider adjusting diuretics when congestion is absent.",
             chunk_id="c1",
         )
     ]
@@ -55,8 +59,9 @@ async def test_guidance_pipeline_infers_task_from_patient_data_only():
         retriever=FakeDenseRetriever(retrieved),
         hybrid_retriever=FakeHybridRetriever(retrieved),
         ollama_client=FakeOllamaClient([
-            "1. placeholder",  # not used when query rewriting disabled? safe extra
-            "Evidence-based recommendation\nUse the heart failure guidance in context.\n\nDocument-grounded general guidance\nMonitor symptoms based on the guideline excerpt.\n\nUncertainty and missing data\nI don't know the full treatment recommendation because the retrieved evidence is limited.",
+            "1. Main answer\nThe PDF says the best document recommends reviewing nephrotoxic drugs when creatinine and potassium are elevated.\n\n"
+            "2. General guidance\nMonitor renal function and potassium after changes.\n\n"
+            "3. Uncertainty and missing data\nI don't know the full treatment plan because symptoms, medications, and baseline values are missing.",
         ]),
     )
 
@@ -64,7 +69,7 @@ async def test_guidance_pipeline_infers_task_from_patient_data_only():
         InferenceRequest(
             request_id="req-1",
             question="",
-            patient_variables={"ef": 28, "nt_pro_bnp": 1200},
+            patient_variables={"gender": "male", "creatinine": 1.8, "potassium": 5.6},
             options=GenerationOptions(use_retrieval=True, retrieval_mode="dense", top_k=1),
         )
     )
@@ -72,3 +77,7 @@ async def test_guidance_pipeline_infers_task_from_patient_data_only():
     assert response.metadata["effective_question"]
     assert "patient-data-driven task was inferred" in " ".join(response.warnings)
     assert response.retrieved_context
+    assert "pdf" not in response.answer.lower()
+    assert "best document" not in response.answer.lower()
+    assert "Main answer" in response.answer
+    assert response.verification is not None

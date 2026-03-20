@@ -7,6 +7,7 @@ from typing import Any, Protocol
 from inference.clinical import ClinicalProfile, build_clinical_profile, build_question_from_patient_data
 from inference.http.clients.ollama_client import OllamaClient
 from inference.pipeline.prompts.multistep import (
+    DISALLOWED_SOURCE_REFERENCES,
     build_generation_prompt,
     build_query_rewrite_prompt,
     build_verification_prompt,
@@ -95,6 +96,10 @@ class QueryPlanner:
                 expanded_queries.append(
                     f"{base_query} Focus on abnormal or clinically relevant findings: {', '.join(abnormal_terms[:4])}."
                 )
+                for finding in profile.abnormal_variables[:3]:
+                    expanded_queries.append(
+                        f"Clinical management or follow-up guidance for {finding.label} with patient value {finding.value}."
+                    )
 
         deduped: list[str] = []
         for candidate in [base_query, *expanded_queries]:
@@ -372,7 +377,11 @@ class AnswerGenerator:
             temperature=request.options.temperature,
             max_tokens=request.options.max_tokens,
         )
-        return llm_response.response.strip(), len(prompt)
+        normalized_answer = _normalize_generated_answer(
+            llm_response.response,
+            retrieved_context=retrieved_context,
+        )
+        return normalized_answer, len(prompt)
 
 
 class ResponseVerifier:
@@ -386,15 +395,17 @@ class ResponseVerifier:
         issues: list[str] = []
         normalized = answer.strip()
         lowered = normalized.lower()
-        required_sections = ["evidence-based recommendation", "document-grounded general guidance", "uncertainty and missing data"]
+        required_sections = ["main answer", "general guidance", "uncertainty and missing data"]
         if not normalized:
             issues.append("Answer is empty.")
         for section in required_sections:
             if section not in lowered:
                 issues.append(f"Answer is missing the '{section}' section.")
-        if len(normalized.split()) < 40:
+        if len(normalized.split()) < 30:
             issues.append("Answer is too short to be useful.")
-        if "insufficient" not in lowered and "uncertain" not in lowered and "missing" not in lowered:
+        if any(term in lowered for term in DISALLOWED_SOURCE_REFERENCES):
+            issues.append("Answer mentions sources or document-selection language instead of giving direct guidance.")
+        if "insufficient" not in lowered and "uncertain" not in lowered and "missing" not in lowered and "i don't know" not in lowered:
             issues.append("Answer may not clearly communicate uncertainty.")
         return VerificationResult(
             verdict="fail" if issues else "pass",
@@ -465,3 +476,38 @@ _STOPWORDS = {
     "what", "with", "would", "patient", "variables", "management", "follow", "relevant", "document",
     "grounded", "available", "data", "should", "could", "regarding", "focus",
 }
+
+
+def _normalize_generated_answer(answer: str, *, retrieved_context: list[RetrievedContext]) -> str:
+    normalized = answer.strip()
+    if not normalized:
+        return normalized
+
+    replacements = {
+        "Evidence-based recommendation": "Main answer",
+        "Document-grounded general guidance": "General guidance",
+    }
+    for old, new in replacements.items():
+        normalized = re.sub(rf"\b{re.escape(old)}\b", new, normalized, flags=re.IGNORECASE)
+
+    for item in retrieved_context:
+        for token in filter(None, {item.source_id, item.title}):
+            normalized = re.sub(re.escape(token), "the available evidence", normalized, flags=re.IGNORECASE)
+
+    cleanup_patterns = [
+        r"the most relevant (document|source|pdf)[^.\n]*[.\n]",
+        r"the pdf says[^.\n]*",
+        r"the document says[^.\n]*",
+        r"the best (document|source|pdf)[^.\n]*",
+        r"based on the retrieved context,?",
+        r"retrieved context",
+        r"this document provides",
+        r"the pdf provides",
+        r"the available evidence is the [^.\n]*",
+    ]
+    for pattern in cleanup_patterns:
+        normalized = re.sub(pattern, "", normalized, flags=re.IGNORECASE)
+
+    normalized = re.sub(r"\n{3,}", "\n\n", normalized)
+    normalized = re.sub(r"[ \t]{2,}", " ", normalized)
+    return normalized.strip()
