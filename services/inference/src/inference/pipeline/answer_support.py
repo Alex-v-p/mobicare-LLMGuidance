@@ -500,7 +500,24 @@ def collect_answer_issues(
         issues.append("Answer is too short to be useful.")
     if any(term in lowered for term in DISALLOWED_SOURCE_REFERENCES):
         issues.append("Answer mentions sources or document-selection language instead of giving direct guidance.")
-    if all(token not in lowered for token in ["i don't know", "missing", "uncertain", "limited", "cautious"]):
+    uncertainty_signals = [
+        "i don't know",
+        "missing",
+        "uncertain",
+        "limited",
+        "cautious",
+        "may miss",
+        "may be incomplete",
+        "relying only",
+        "relying on",
+        "adjacent text",
+        "exact wording matters",
+        "retrieve the adjacent excerpt",
+        "only on the supplied excerpts",
+        "only on the retrieved excerpts",
+    ]
+    caution_block = lowered.split("4. general advice")[0]
+    if all(token not in caution_block for token in uncertainty_signals):
         issues.append("Answer may not clearly communicate uncertainty.")
     direct_answer_block = normalized.lower().split("2. rationale")[0]
     literal_question_mode = is_literal_question_mode(question, patient_variables, clinical_profile)

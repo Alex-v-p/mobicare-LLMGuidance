@@ -227,6 +227,19 @@ def test_build_caution_lines_uses_proxy_fields_and_aggregates_missing_context():
     assert "key missing context" in caution_text
 
 
+
+
+def test_response_verifier_accepts_excerpt_based_uncertainty_language():
+    verifier = ResponseVerifier(ollama_client=None)
+    result = verifier.heuristic_verify(
+        "1. Direct answer\n- intra-aortic devices.\n- transvalvular aortic (Impella).\n- left atrium to systemic artery (TandemHeart).\n- right atrium to systemic artery (veno-arterial extracorporeal membrane oxygenation).\n\n"
+        "2. Rationale\n- The retrieved excerpts explicitly enumerate four items relevant to the question.\n\n"
+        "3. Caution\n- I am relying only on the supplied excerpts and may miss detail that appears in adjacent text.\n\n"
+        "4. General advice\n- If exact wording matters, retrieve the adjacent excerpt or the full table entry before making the answer more specific."
+    )
+
+    assert all("uncertainty" not in issue.lower() for issue in result.issues)
+
 def test_response_verifier_flags_literal_question_answers_that_fall_back_to_generic_clinical_summary():
     verifier = ResponseVerifier(ollama_client=None)
     question = "What are the four circuit configurations for percutaneous mechanical circulatory support as described in Supplementary Table 22?"
