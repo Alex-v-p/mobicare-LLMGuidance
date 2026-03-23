@@ -46,6 +46,36 @@ class InferenceConfig:
 
 
 @dataclass(slots=True)
+class DeterministicRubricConfig:
+    enabled: bool = True
+    required_fact_weight: float = 0.35
+    reference_alignment_weight: float = 0.15
+    gold_alignment_weight: float = 0.10
+    context_alignment_weight: float = 0.15
+    groundedness_weight: float = 0.15
+    verification_weight: float = 0.10
+
+
+@dataclass(slots=True)
+class LLMJudgeConfig:
+    enabled: bool = False
+    provider: str = "ollama"
+    base_url: str = "http://localhost:11434"
+    model: str | None = None
+    temperature: float = 0.0
+    max_tokens: int = 384
+    timeout_seconds: int = 120
+    fail_open: bool = True
+    include_retrieved_context: bool = True
+
+
+@dataclass(slots=True)
+class EvaluationConfig:
+    deterministic_rubric: DeterministicRubricConfig = field(default_factory=DeterministicRubricConfig)
+    llm_judge: LLMJudgeConfig = field(default_factory=LLMJudgeConfig)
+
+
+@dataclass(slots=True)
 class APITestConfig:
     enabled: bool = False
     include_guidance_endpoint: bool = True
@@ -100,6 +130,7 @@ class BenchmarkRunConfig:
     ingestion: IngestionConfig = field(default_factory=IngestionConfig)
     source_mapping: SourceMappingConfig = field(default_factory=SourceMappingConfig)
     inference: InferenceConfig = field(default_factory=InferenceConfig)
+    evaluation: EvaluationConfig = field(default_factory=EvaluationConfig)
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
 
     def to_dict(self) -> dict[str, Any]:

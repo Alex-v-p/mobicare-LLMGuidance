@@ -88,7 +88,7 @@ def _build_success_case_result(
 ) -> dict[str, Any]:
     normalized_record = normalize_guidance_record(guidance_record)
     retrieval_result = run_retrieval_stage(source_mapping, normalized_record)
-    generation_result = run_generation_stage(case, normalized_record, retrieval_result.retrieved_chunks)
+    generation_result = run_generation_stage(case, normalized_record, retrieval_result.retrieved_chunks, evaluation_config=config.evaluation)
     telemetry = extract_guidance_telemetry(normalized_record)
     derived = telemetry.get("derived") or {}
     return {
@@ -132,7 +132,7 @@ def _build_failed_case_result(
     total_latency: float,
 ) -> dict[str, Any]:
     retrieval_result = run_retrieval_stage(source_mapping, {})
-    generation_result = run_generation_stage(case, {}, retrieval_result.retrieved_chunks)
+    generation_result = run_generation_stage(case, {}, retrieval_result.retrieved_chunks, evaluation_config=config.evaluation)
     failed_record = {"status": "failed", "error": str(error)}
     return {
         "status": "failed",

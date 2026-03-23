@@ -66,6 +66,32 @@ def validate_run_config(config: BenchmarkRunConfig) -> None:
     if not config.execution.output_dir:
         errors.append("execution.output_dir is required.")
 
+    rubric = config.evaluation.deterministic_rubric
+    rubric_weights = [
+        rubric.required_fact_weight,
+        rubric.reference_alignment_weight,
+        rubric.gold_alignment_weight,
+        rubric.context_alignment_weight,
+        rubric.groundedness_weight,
+        rubric.verification_weight,
+    ]
+    if any(weight < 0 for weight in rubric_weights):
+        errors.append("evaluation.deterministic_rubric weights cannot be negative.")
+    if sum(rubric_weights) <= 0:
+        errors.append("evaluation.deterministic_rubric weights must sum to more than 0.")
+
+    llm_judge = config.evaluation.llm_judge
+    if llm_judge.provider not in {"ollama"}:
+        errors.append("evaluation.llm_judge.provider must currently be 'ollama'.")
+    if llm_judge.enabled and not str(llm_judge.base_url).strip():
+        errors.append("evaluation.llm_judge.base_url is required when llm_judge is enabled.")
+    if llm_judge.max_tokens <= 0:
+        errors.append("evaluation.llm_judge.max_tokens must be positive.")
+    if llm_judge.timeout_seconds <= 0:
+        errors.append("evaluation.llm_judge.timeout_seconds must be positive.")
+    if not 0.0 <= llm_judge.temperature <= 2.0:
+        errors.append("evaluation.llm_judge.temperature must be between 0.0 and 2.0.")
+
     environment = config.execution.environment
     if not isinstance(environment.capture_enabled, bool):
         errors.append("execution.environment.capture_enabled must be a boolean.")

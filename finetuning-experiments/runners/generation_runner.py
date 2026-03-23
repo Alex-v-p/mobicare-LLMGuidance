@@ -30,7 +30,7 @@ def run_generation_stage(case: BenchmarkCase, guidance_record: dict[str, Any], r
         metadata.setdefault("diagnostics", diagnostics)
     return GenerationStageResult(
         generated_answer=generated_answer,
-        generation_scores=score_generation(case.to_dict(), generated_answer, retrieved_chunks),
+        generation_scores=score_generation(case.to_dict(), generated_answer, retrieved_chunks, normalized.get("verification")),
         verification=normalized.get("verification"),
         warnings=list(normalized.get("warnings") or []),
         metadata=metadata,
