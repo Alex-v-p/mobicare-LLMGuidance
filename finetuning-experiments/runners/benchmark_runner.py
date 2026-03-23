@@ -35,8 +35,11 @@ def _build_cases(raw_dataset: dict[str, Any]) -> list[BenchmarkCase]:
 
 
 def _build_guidance_payload(case: BenchmarkCase, config: BenchmarkRunConfig) -> dict[str, Any]:
+    generation_metadata = case.generation_metadata or {}
+    omit_question = bool(generation_metadata.get("omit_question_from_request"))
+    request_question = "" if omit_question else case.question
     return {
-        "question": case.question,
+        "question": request_question,
         "patient": {"values": case.patient_variables or {}},
         "options": {
             "use_retrieval": True,
@@ -88,7 +91,7 @@ def _build_success_case_result(
 ) -> dict[str, Any]:
     normalized_record = normalize_guidance_record(guidance_record)
     retrieval_result = run_retrieval_stage(source_mapping, normalized_record)
-    generation_result = run_generation_stage(case, normalized_record, retrieval_result.retrieved_chunks, evaluation_config=config.evaluation)
+    generation_result = run_generation_stage(case, normalized_record, retrieval_result.retrieved_chunks, config.evaluation)
     telemetry = extract_guidance_telemetry(normalized_record)
     derived = telemetry.get("derived") or {}
     return {
@@ -132,7 +135,7 @@ def _build_failed_case_result(
     total_latency: float,
 ) -> dict[str, Any]:
     retrieval_result = run_retrieval_stage(source_mapping, {})
-    generation_result = run_generation_stage(case, {}, retrieval_result.retrieved_chunks, evaluation_config=config.evaluation)
+    generation_result = run_generation_stage(case, {}, retrieval_result.retrieved_chunks, config.evaluation)
     failed_record = {"status": "failed", "error": str(error)}
     return {
         "status": "failed",

@@ -64,6 +64,18 @@ def _grade_from_score(score: float) -> str:
     return "poor"
 
 
+def _is_observation_only(case: dict[str, Any]) -> bool:
+    generation_metadata = case.get("generation_metadata") or {}
+    tags = {str(tag).strip().lower() for tag in (case.get("tags") or [])}
+    return bool(
+        generation_metadata.get("evaluation_profile") == "observation_only"
+        or generation_metadata.get("request_mode") == "biomarker_only"
+        or generation_metadata.get("omit_question_from_request")
+        or "observation-case" in tags
+        or "biomarker-only" in tags
+    )
+
+
 def score_generation(
     case: dict[str, Any],
     answer: str,
@@ -73,6 +85,7 @@ def score_generation(
 ) -> dict[str, Any]:
     answer_norm = _norm(answer)
     context_norm = _norm(" ".join((item.get("snippet") or "") for item in retrieved_context))
+    observation_only = _is_observation_only(case)
 
     required = case.get("required_facts", []) or []
     forbidden = case.get("forbidden_facts", []) or []
@@ -117,22 +130,29 @@ def score_generation(
         }
     weight_total = sum(weights.values()) or 1.0
 
-    deterministic_rubric_score = (
-        weights["required_fact"] * required_fact_recall
-        + weights["reference_alignment"] * reference_token_f1
-        + weights["gold_alignment"] * gold_token_f1
-        + weights["context_alignment"] * max(faith_context, context_token_f1)
-        + weights["groundedness"] * groundedness
-        + weights["verification"] * verification_score
-    ) / weight_total
-    if forbidden_hits:
-        deterministic_rubric_score = max(0.0, deterministic_rubric_score - min(0.4, 0.2 * forbidden_hits))
-    deterministic_rubric_score = max(0.0, min(1.0, deterministic_rubric_score))
+    deterministic_applicable = bool(not observation_only and getattr(rubric_config, "enabled", True))
+    deterministic_rubric_score: float | None = None
+    deterministic_grade: str | None = None
+    if deterministic_applicable:
+        deterministic_rubric_score = (
+            weights["required_fact"] * required_fact_recall
+            + weights["reference_alignment"] * reference_token_f1
+            + weights["gold_alignment"] * gold_token_f1
+            + weights["context_alignment"] * max(faith_context, context_token_f1)
+            + weights["groundedness"] * groundedness
+            + weights["verification"] * verification_score
+        ) / weight_total
+        if forbidden_hits:
+            deterministic_rubric_score = max(0.0, deterministic_rubric_score - min(0.4, 0.2 * forbidden_hits))
+        deterministic_rubric_score = max(0.0, min(1.0, deterministic_rubric_score))
+        deterministic_grade = _grade_from_score(deterministic_rubric_score)
 
     deterministic = {
-        "enabled": True,
+        "enabled": deterministic_applicable,
+        "applicable": deterministic_applicable,
+        "skipped_reason": None if deterministic_applicable else "observation_only_case",
         "score": deterministic_rubric_score,
-        "grade": _grade_from_score(deterministic_rubric_score),
+        "grade": deterministic_grade,
         "weights": weights,
         "subscores": {
             "required_fact_recall": required_fact_recall,
@@ -150,6 +170,8 @@ def score_generation(
     }
 
     return {
+        "evaluation_profile": "observation_only" if observation_only else "standard",
+        "deterministic_rubric_applicable": deterministic_applicable,
         "answer_similarity": reference_token_f1,
         "answer_similarity_legacy_note": "Token-F1 against the reference answer. Prefer deterministic_rubric.score and llm_judge.score.",
         "reference_token_f1": reference_token_f1,
@@ -157,9 +179,9 @@ def score_generation(
         "context_token_f1": context_token_f1,
         "deterministic_rubric": deterministic,
         "answer_quality_score": deterministic_rubric_score,
-        "answer_quality_grade": _grade_from_score(deterministic_rubric_score),
+        "answer_quality_grade": deterministic_grade,
         "judge_score": deterministic_rubric_score,
-        "judge_grade": _grade_from_score(deterministic_rubric_score),
+        "judge_grade": deterministic_grade,
         "verification_score": verification_score,
         "required_fact_recall": required_fact_recall,
         "required_fact_hits": required_hits,
@@ -174,5 +196,5 @@ def score_generation(
         "hallucination_rate": unsupported_rate,
         "unsupported_tokens": unsupported_tokens[:25],
         "retrieved_context_chunk_count": len(retrieved_context),
-        "exact_pass": bool(required_fact_recall >= 0.999 and forbidden_hits == 0 and unsupported == 0),
+        "exact_pass": bool(deterministic_applicable and required_fact_recall >= 0.999 and forbidden_hits == 0 and unsupported == 0),
     }
