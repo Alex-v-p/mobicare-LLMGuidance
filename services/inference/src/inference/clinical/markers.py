@@ -351,7 +351,7 @@ def build_question_from_patient_data(patient_variables: dict[str, Any], profile:
     if relevant_terms:
         focus = ", ".join(relevant_terms[:3])
         return (
-            "Based on the available patient variables, what treatment, management, or follow-up guidance "
-            f"is most relevant, especially regarding {focus}?"
+            "What are the most relevant next-step priorities, safety checks, and interpretation points "
+            f"for this patient, especially regarding {focus}?"
         )
-    return "Based on the available patient variables, what treatment, management, or follow-up guidance is most relevant?"
+    return "What are the most relevant next-step priorities and safety checks for this patient based on the available variables?"

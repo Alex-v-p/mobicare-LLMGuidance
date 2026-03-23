@@ -207,6 +207,7 @@ class GuidancePipeline:
                 )
                 fallback_verification = self._response_verifier.heuristic_verify(
                     fallback_answer,
+                    question=query_plan.effective_question,
                     patient_variables=request.patient_variables,
                     clinical_profile=query_plan.clinical_profile,
                     retrieved_context=retrieved_context,
