@@ -127,6 +127,20 @@ def is_literal_question_mode(
     return any(term in normalized for term in _QUESTION_LITERAL_TERMS) and not patient_language
 
 
+def is_explicit_question_only_mode(
+    question: str,
+    patient_variables: dict[str, Any],
+    clinical_profile: ClinicalProfile | None = None,
+) -> bool:
+    normalized = question.strip()
+    if not normalized:
+        return False
+
+    profile = clinical_profile
+    has_patient_context = bool(patient_variables) or bool(profile and (profile.recognized_variables or profile.abnormal_variables))
+    return not has_patient_context
+
+
 def _question_focus_terms(question: str, retrieved_context: list[RetrievedContext]) -> set[str]:
     terms = extract_terms(question)
     combined = " ".join(f"{item.title} {item.snippet}" for item in retrieved_context).lower()
@@ -221,6 +235,31 @@ def answer_addresses_literal_question(answer: str, question: str, retrieved_cont
 
     sentence_matches = select_relevant_context_sentences(question, retrieved_context, limit=2)
     return any(len(extract_terms(sentence) & extract_terms(direct_block)) >= 3 for sentence in sentence_matches)
+
+
+def answer_addresses_explicit_question(answer: str, question: str, retrieved_context: list[RetrievedContext]) -> bool:
+    direct_block = answer.lower().split("2. rationale", 1)[0]
+    if any(phrase in direct_block for phrase in _GENERIC_NON_ANSWER_PHRASES):
+        return False
+
+    focus_terms = _question_focus_terms(question, retrieved_context) or extract_terms(question)
+    focus_terms = {term for term in focus_terms if len(term) > 3}
+    if sum(1 for term in focus_terms if term in direct_block) >= min(2, max(1, len(focus_terms))):
+        return True
+
+    sentence_matches = select_relevant_context_sentences(question, retrieved_context, limit=3)
+    if any(len(extract_terms(sentence) & extract_terms(direct_block)) >= 3 for sentence in sentence_matches):
+        return True
+
+    enumerated_items = extract_numbered_items(" ".join(item.snippet for item in retrieved_context))
+    if enumerated_items:
+        anchor_terms: set[str] = set()
+        for item in enumerated_items[:4]:
+            anchor_terms.update(term for term in extract_terms(item) if len(term) > 4)
+        if anchor_terms and any(term in direct_block for term in list(anchor_terms)[:6]):
+            return True
+
+    return False
 
 
 def infer_specialty_focus(
@@ -452,6 +491,7 @@ def should_force_deterministic_answer(
     context_assessment: Any,
 ) -> bool:
     literal_question_mode = is_literal_question_mode(question, patient_variables, clinical_profile)
+    explicit_question_only_mode = is_explicit_question_only_mode(question, patient_variables, clinical_profile)
     issues = collect_answer_issues(
         answer=answer,
         question=question,
@@ -472,6 +512,8 @@ def should_force_deterministic_answer(
         return True
     if literal_question_mode:
         return not answer_addresses_literal_question(answer, question, retrieved_context)
+    if explicit_question_only_mode and not answer_addresses_explicit_question(answer, question, retrieved_context):
+        return True
     if not has_actionable_guidance(answer):
         return True
     if not context_assessment.sufficient and len(issues) >= 2:
@@ -521,9 +563,13 @@ def collect_answer_issues(
         issues.append("Answer may not clearly communicate uncertainty.")
     direct_answer_block = normalized.lower().split("2. rationale")[0]
     literal_question_mode = is_literal_question_mode(question, patient_variables, clinical_profile)
+    explicit_question_only_mode = is_explicit_question_only_mode(question, patient_variables, clinical_profile)
     if literal_question_mode:
         if not answer_addresses_literal_question(answer, question, retrieved_context):
             issues.append("Answer does not directly answer the literal question.")
+    elif explicit_question_only_mode:
+        if not answer_addresses_explicit_question(answer, question, retrieved_context):
+            issues.append("Answer does not directly address the explicit question.")
     elif not has_actionable_guidance(direct_answer_block):
         issues.append("Direct answer summarizes findings but does not provide actionable guidance.")
 
@@ -571,6 +617,12 @@ def build_deterministic_answer(
 ) -> str:
     if is_literal_question_mode(question, patient_variables, clinical_profile):
         return build_literal_question_answer(
+            question=question,
+            retrieved_context=retrieved_context,
+            context_assessment=context_assessment,
+        )
+    if is_explicit_question_only_mode(question, patient_variables, clinical_profile):
+        return build_context_question_answer(
             question=question,
             retrieved_context=retrieved_context,
             context_assessment=context_assessment,
@@ -666,6 +718,55 @@ def build_literal_question_answer(
     ]
     return "\n".join(lines).strip()
 
+
+
+def build_context_question_answer(
+    *,
+    question: str,
+    retrieved_context: list[RetrievedContext],
+    context_assessment: Any,
+) -> str:
+    sentence_matches = select_relevant_context_sentences(question, retrieved_context, limit=3)
+    combined = " ".join(item.snippet for item in retrieved_context)
+    enumerated_items = extract_numbered_items(combined)
+
+    direct_lines: list[str] = []
+    if enumerated_items:
+        direct_lines = [f"- {item}." for item in enumerated_items[:4]]
+    elif sentence_matches:
+        direct_lines = [f"- {sentence.rstrip('.')} .".replace('  ', ' ') for sentence in sentence_matches]
+    else:
+        direct_lines = ["- Unavailable from the retrieved evidence."]
+
+    rationale_lines = []
+    for sentence in sentence_matches[:2]:
+        rationale_lines.append(f"- {sentence}")
+    if not rationale_lines:
+        rationale_lines.append("- The available excerpts do not provide enough detail for a stronger grounded answer.")
+
+    caution_lines = []
+    if not getattr(context_assessment, "sufficient", False):
+        caution_lines.append("- I cannot give a fuller answer with confidence because the retrieved excerpts appear partial or incomplete.")
+    if not caution_lines:
+        caution_lines.append("- I am relying only on the supplied excerpts and may miss detail that appears in adjacent text.")
+
+    general_advice = [
+        "- Retrieve adjacent text or the full table entry before making the answer more specific or treatment-prescriptive.",
+    ]
+    lines = [
+        "1. Direct answer",
+        *direct_lines[:4],
+        "",
+        "2. Rationale",
+        *rationale_lines[:3],
+        "",
+        "3. Caution",
+        *caution_lines[:2],
+        "",
+        "4. General advice",
+        *general_advice,
+    ]
+    return "\n".join(lines).strip()
 
 def build_direct_answer_lines(
     *,

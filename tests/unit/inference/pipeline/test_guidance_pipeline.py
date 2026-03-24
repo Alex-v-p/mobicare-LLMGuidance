@@ -222,3 +222,35 @@ async def test_guidance_pipeline_replaces_generic_non_answer_for_literal_context
     assert "intra-aortic devices" in lowered
     assert "transvalvular aortic" in lowered
     assert "tandemheart" in lowered
+
+
+@pytest.mark.asyncio
+async def test_guidance_pipeline_replaces_generic_non_answer_for_explicit_question_only_prompt():
+    retrieved = [
+        RetrievedContext(
+            source_id="doc-1",
+            title="Heart failure escalation",
+            snippet="For symptomatic HFrEF, additional options may include sacubitril/valsartan, dapagliflozin, ivabradine, and CRT in eligible patients.",
+            chunk_id="c1",
+        )
+    ]
+    pipeline = GuidancePipeline(
+        retriever=FakeDenseRetriever(retrieved),
+        hybrid_retriever=FakeHybridRetriever(retrieved),
+        ollama_client=FakeOllamaClient([
+            "1. Direct answer\n- The main value abnormalities point to a clinically relevant pattern that should be interpreted as a whole rather than marker by marker.\n- Use the retrieved guidance to prioritize the most abnormal findings first, while keeping uncertainty explicit where evidence is thin.\n\n2. Rationale\n- The main value abnormalities point to a clinically relevant pattern that should be interpreted as a whole rather than marker by marker.\n\n3. Caution\n- Key missing context that could change the recommendation: current symptoms, medication history, prior laboratory trends.\n\n4. General advice\n- Review these results together with symptoms, medication history, and prior laboratory trends."
+        ]),
+    )
+
+    response = await pipeline.run(
+        InferenceRequest(
+            request_id="req-explicit-question",
+            question="What escalation of therapy should be considered for symptomatic HFrEF despite ACE inhibitor and beta blocker therapy?",
+            patient_variables={},
+            options=GenerationOptions(use_retrieval=True, retrieval_mode="dense", top_k=1),
+        )
+    )
+
+    lowered = response.answer.lower()
+    assert "clinically relevant pattern" not in lowered
+    assert "hfref" in lowered or "sacubitril" in lowered or "dapagliflozin" in lowered or "crt" in lowered

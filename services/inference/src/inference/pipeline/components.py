@@ -94,6 +94,40 @@ class ExampleResponseBuilder:
 
 
 class QueryPlanner:
+    def _expand_question_only_queries(self, question: str) -> list[str]:
+        lowered = question.lower()
+        ignored_terms = {
+            "what", "which", "when", "where", "does", "stand", "mean", "means", "described",
+            "describe", "context", "supplementary", "table", "tables", "figure", "figures",
+        }
+        topic_terms = [term for term in extract_terms(question) if term not in ignored_terms]
+        acronym_tokens = re.findall(r"\b[A-Z][A-Z0-9/+.-]{1,8}\b", question)
+        topic_text = " ".join(topic_terms[:6])
+
+        candidate_queries: list[str] = []
+        if topic_text:
+            candidate_queries.append(f"{topic_text} guidance")
+            candidate_queries.append(f"{topic_text} definition glossary abbreviation")
+        for token in acronym_tokens[:2]:
+            if topic_text:
+                candidate_queries.append(f"{token} abbreviation meaning definition in {topic_text}")
+                candidate_queries.append(f"{topic_text} glossary {token}")
+            else:
+                candidate_queries.append(f"{token} abbreviation meaning definition")
+        if any(marker in lowered for marker in {"table", "supplementary table", "figure", "supplementary figure"}):
+            focus = acronym_tokens[0] if acronym_tokens else topic_text
+            if focus:
+                candidate_queries.append(f"{focus} exact wording glossary table definition")
+        if any(marker in lowered for marker in {"what are", "which are", "list", "enumerate", "configurations", "types", "categories"}) and topic_text:
+            candidate_queries.append(f"{topic_text} categories list configurations")
+
+        deduped: list[str] = []
+        for candidate in candidate_queries:
+            normalized = candidate.strip()
+            if normalized and normalized not in deduped and normalized != question.strip():
+                deduped.append(normalized)
+        return deduped
+
     def _build_effective_question(
         self,
         request: InferenceRequest,
@@ -174,6 +208,10 @@ class QueryPlanner:
 
         expanded_queries: list[str] = []
         if request.options.adaptive_retrieval_enabled:
+            explicit_question = request.question.strip()
+            if explicit_question and not request.patient_variables:
+                expanded_queries.extend(self._expand_question_only_queries(explicit_question))
+
             variable_names = [key.replace("_", " ") for key in sorted(request.patient_variables.keys())]
             abnormal_terms = [finding.label for finding in profile.abnormal_variables]
             if variable_names:
@@ -350,12 +388,16 @@ class ChunkRelevanceRanker:
             if len(selected) >= limit:
                 break
         for entry in ranked:
-            _, item, _ = entry
+            score, item, _ = entry
             if context_key(item) in seen_ids:
+                continue
+            if score <= 0.0 and selected:
                 continue
             selected.append(entry)
             if len(selected) >= limit:
                 break
+        if not selected and ranked:
+            selected.append(ranked[0])
         return [item for _, item, _ in selected[:limit]], [details for _, _, details in selected[:limit]]
 
 
@@ -442,11 +484,16 @@ class RetrievalOrchestrator:
             if assessment.sufficient or not request.options.adaptive_retrieval_enabled:
                 break
 
+        output_limit = max(
+            request.options.top_k,
+            request.options.retrieval_low_context_min_results,
+            len(retrieval_plan.clusters),
+        )
         ranked_contexts, ranking_details = self._chunk_ranker.rank(
             contexts=combined,
             retrieval_query=retrieval_plan.base_query,
             clinical_profile=retrieval_plan.clinical_profile,
-            limit=max(request.options.top_k, request.options.retrieval_low_context_min_results),
+            limit=output_limit,
         )
         final_assessment = self._context_judge.assess(
             retrieved_context=ranked_contexts,
@@ -454,8 +501,9 @@ class RetrievalOrchestrator:
             clinical_profile=retrieval_plan.clinical_profile,
             minimum_results=request.options.retrieval_low_context_min_results,
         )
-        return ranked_contexts[: request.options.top_k], {
+        return ranked_contexts[:output_limit], {
             **retrieval_metadata,
+            "rag_output_count": min(len(ranked_contexts), output_limit),
             "retrieval_attempts": len(per_query_metadata),
             "retrieval_attempt_details": per_query_metadata,
             "retrieval_ranking": ranking_details,
@@ -516,17 +564,27 @@ class AnswerGenerator:
         attempt_number: int,
         context_assessment: ContextAssessment,
     ) -> tuple[str, int]:
+        specialty_focus = infer_specialty_focus(request.patient_variables, clinical_profile, retrieved_context)
+        clinical_synthesis = synthesize_clinical_state(
+            patient_variables=request.patient_variables,
+            clinical_profile=clinical_profile,
+            retrieved_context=retrieved_context,
+            context_assessment=context_assessment,
+            specialty=specialty_focus,
+        )
         prompt = build_generation_prompt(
             question=effective_question,
             patient_variables=request.patient_variables,
             clinical_profile=clinical_profile,
             retrieved_context=retrieved_context,
+            clinical_synthesis=clinical_synthesis,
+            actionable_reasoning=list(clinical_synthesis.action_points),
             rewritten_query=rewritten_query,
             verification_feedback=verification_feedback,
             attempt_number=attempt_number,
             allow_general_guidance=request.options.enable_general_guidance_section,
             context_assessment=context_assessment,
-            specialty_focus=infer_specialty_focus(request.patient_variables, clinical_profile, retrieved_context),
+            specialty_focus=specialty_focus,
             literal_question_mode=is_literal_question_mode(effective_question, request.patient_variables, clinical_profile),
         )
         llm_response = await self._get_llm_client(request).generate(
