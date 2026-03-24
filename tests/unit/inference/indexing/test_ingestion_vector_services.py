@@ -3,6 +3,7 @@ from __future__ import annotations
 from inference.indexing.ingestion_service import IngestionService
 from inference.indexing.models import TextChunk
 from inference.indexing.vector_indexer import VectorIndexingService
+from shared.config import Settings
 from shared.contracts.ingestion import IngestDocumentsRequest
 
 
@@ -10,12 +11,14 @@ class FakeEmbeddingClient:
     def __init__(self) -> None:
         self.model = "embed-default"
         self.selected_model = None
+        self.embed_many_calls = []
 
     def with_model(self, model):
         self.selected_model = model
         return self
 
     async def embed_many(self, texts):
+        self.embed_many_calls.append(list(texts))
         return [[float(len(text))] for text in texts]
 
 
@@ -78,7 +81,8 @@ class FakeIndexer:
 async def test_vector_indexer_indexes_only_non_empty_chunks():
     embedding_client = FakeEmbeddingClient()
     vector_store = FakeVectorStore()
-    service = VectorIndexingService(embedding_client=embedding_client, vector_store=vector_store)
+    settings = Settings(ollama_embedding_batch_size=1)
+    service = VectorIndexingService(embedding_client=embedding_client, vector_store=vector_store, settings=settings)
     chunks = [
         TextChunk(chunk_id="1", source_id="a", title="A", text="hello", metadata={}),
         TextChunk(chunk_id="2", source_id="a", title="A", text="   ", metadata={}),
@@ -90,6 +94,7 @@ async def test_vector_indexer_indexes_only_non_empty_chunks():
     assert embedding_client.selected_model == "embed-x"
     assert vector_store.ensure_calls == [1]
     assert len(vector_store.upsert_calls[0][0]) == 1
+    assert embedding_client.embed_many_calls == [["hello"]]
 
 
 async def test_ingestion_service_orchestrates_loader_preparer_and_indexer():
@@ -124,3 +129,24 @@ async def test_ingestion_service_orchestrates_loader_preparer_and_indexer():
     assert response.chunks_created == 1
     assert response.vectors_upserted == 1
     assert response.embedding_model == "embed-default"
+
+
+async def test_vector_indexer_respects_embedding_batch_size_setting():
+    embedding_client = FakeEmbeddingClient()
+    vector_store = FakeVectorStore()
+    settings = Settings(ollama_embedding_batch_size=2)
+    service = VectorIndexingService(
+        embedding_client=embedding_client,
+        vector_store=vector_store,
+        settings=settings,
+    )
+    chunks = [
+        TextChunk(chunk_id="1", source_id="a", title="A", text="one", metadata={}),
+        TextChunk(chunk_id="2", source_id="a", title="A", text="two", metadata={}),
+        TextChunk(chunk_id="3", source_id="a", title="A", text="three", metadata={}),
+    ]
+
+    indexed = await service.index_chunks(chunks, embedding_model="embed-x")
+
+    assert indexed == 3
+    assert embedding_client.embed_many_calls == [["one", "two"], ["three"]]

@@ -1,0 +1,2036 @@
+{
+  "schema_version": "1.0",
+  "dataset_type": "benchmark_dataset",
+  "dataset_size": 100,
+  "question_mix": {
+    "factual": 0.4,
+    "clinical_scenario": 0.3,
+    "paraphrased_factual": 0.2,
+    "slightly_indirect": 0.1
+  },
+  "cases": [
+    {
+      "id": "case-001",
+      "question": "What effect did the use of Ivabradine have on the hospitalization rates for heart failure (HF) in patients with a left ventricular ejection fraction (LVEF) less than 35%?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p007_001",
+      "gold_passage_text": "CV causes or a ﬁrst HF hos- pitalization reduced by 20% (22% vs. 27%, P <0.001) Reduction in all-cause mor- tality by 16% (P <0.001) and CV mortality by 20% (P <0.001). Reduction in HF hospitaliza- tion rate by 21% (P <0.001) f channel blocker SHIFT9 Ivabradine (n = 3268) vs. placebo (n = 3290) LVEF <_ 35%, NYHA II- IV, HF hospi- talization in recent",
+      "page": 7,
+      "reference_answer": "Reduction in HF hospitalization rate by 21%.",
+      "required_facts": [
+        "Ivabradine reduced HF hospitalization rate",
+        "patients had LVEF < 35%"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "clinical-scenario",
+        "heart-failure",
+        "hospitalization",
+        "ivabradine"
+      ]
+    },
+    {
+      "id": "case-002",
+      "question": "What was the reduction in the co-primary combined endpoint between the two groups?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p008_001",
+      "gold_passage_text": "ilar in both groups (19.7% vs. 19.4%, P = 0.80). Reduction in a co-primary combined endpoint of all- cause death, cardiac arrest with resuscitation, HF hos- pitalization or i.v. adminis- tration of inotropic or vasodilator drugs for >_4 h without hospitalization by 13% (29% vs. 32%, P = 0.009) Soluble guanylate cyclase stimulator",
+      "page": 8,
+      "reference_answer": "13%",
+      "required_facts": [
+        "reduction in a co-primary combined endpoint",
+        "13%",
+        "29% vs. 32%"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "clinical",
+        "factual",
+        "medical",
+        "statistics"
+      ]
+    },
+    {
+      "id": "case-003",
+      "question": "What is the starting dose of captopril?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p009_002",
+      "gold_passage_text": "3. Symptomatic or severe asymptomatic hypotension (SBP <90 mmHg). 4. Drug interactions to look out for: • K+ supplements K+-sparing diuretics, e.g. amiloride and triamterene (beware combination preparations with furosemide). • MRAs. • Renin inhibitorsc. • NSAIDsd. • Trimethoprim/trimethoprim-sulfamethoxazole. • ‘Low-salt’ substitutes with a high K+ content. WHICH ACE-I AND WHAT DOSE?- see also Guidelines, T able 8 Captopril: starting dose 6.25 mg t.i.d., target dose 50 mg t.i.d. Enalapril: starting dose 2.5 mg b.i.d., target dose 10- 20 mg b.i.d. Lisinopril: starting dose 2.5- 5m g o.d., target dose 20- 35 mg o.d.",
+      "page": 9,
+      "reference_answer": "6.25 mg t.i.d.",
+      "required_facts": [
+        "starting dose of captopril"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "factual",
+        "hypotension",
+        "medication"
+      ]
+    },
+    {
+      "id": "case-004",
+      "question": "What class of medication is recommended for a patient with heart failure and reduced ejection fraction?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p010_006",
+      "gold_passage_text": "ACE-I = angiotensin-converting enzyme inhibitor; ARB = angiotensin-receptor blocker; b.i.d. = twice daily; BUN = blood urea nitrogen; eGFR = estimated glomerular ﬁltration rate; HF = heart failure; HFrEF = heart failure with reduced ejection fraction; K + = potassium; MRA = mineralocorticoid receptor antagonist; NSAID = non-steroidal anti- inﬂammatory drug; NYHA = New York Heart Association; o.d. = once daily; SBP = systolic blood pressure; t.i.d. = three times a day; WRF = worsening renal function. aThe recommendations in this table represent expert opinion based upon relevant clinical trials (drugs, titration schedules, target doses, patient monitoring, treatment beneﬁts,",
+      "page": 10,
+      "reference_answer": "ACE-I or ARB",
+      "required_facts": [
+        "heart failure with reduced ejection fraction",
+        "recommended medication class"
+      ],
+      "forbidden_facts": [
+        "specific drug names",
+        "MRA is the only recommended class"
+      ],
+      "tags": [
+        "clinical-scenario",
+        "heart-failure",
+        "medication"
+      ]
+    },
+    {
+      "id": "case-005",
+      "question": "A 58-year-old patient with heart failure with reduced ejection fraction (HFrEF) is being evaluated for beta-blocker therapy. What condition would absolutely contraindicate the use of this medication?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p011_001",
+      "gold_passage_text": "Indications: 1. Patients with stable HFrEF. Contraindications: 1. Second- or third-degree AV block (in the absence of a permanent pacemaker). 2. Critical limb ischaemia. 3. Asthma (relative contraindication): if cardio-selective beta-blockers are indicated, asthma is not necessarily an absolute contraindication, but these medi- cations should only be used under close medical supervision by a specialist, with consideration of the risks for and against their use; COPD is not a contraindication.",
+      "page": 11,
+      "reference_answer": "Second- or third-degree AV block (in the absence of a permanent pacemaker).",
+      "required_facts": [
+        "Second- or third-degree AV block is a contraindication",
+        "Permanent pacemaker presence is not mentioned"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "beta-blockers",
+        "clinical-scenario",
+        "contraindications",
+        "heart-failure"
+      ]
+    },
+    {
+      "id": "case-006",
+      "question": "Which electrolyte level is a contraindication for the use of this medication in patients with heart failure?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p012_005",
+      "gold_passage_text": "Indications: 1. Patients with HFrEF. Contraindications: 1. Known allergic reaction/other adverse reaction (drug-speciﬁc). Cautions/seek specialist advice: 1. Signiﬁcant hyperkalaemia (K + >5.0 mmol/L)b. 2. Signiﬁcant renal dysfunction [creatinine >221 lmol/L (>2.5 mg/dL) or eGFR <30 mL/min/1.73 m2]b. 3. Drug interactions to look out for: • K+ supplements/K+-sparing diuretics (e.g. amiloride and triamterene; beware combination preparations with furosemide). • ACE-Is/ARBs/renin inhibitorsc. • NSAIDsd. • Trimethoprim/trimethoprim-sulfamethoxazole. • ‘Low-salt’ substitutes with a high K+ content. • Strong CYP3A4 inhibitors, e.g. ketoconazole, itraconazole, nefazodone, telithromycin, clarithromycin, ritonavir, and nelﬁnavir (when eplerenone used).",
+      "page": 12,
+      "reference_answer": "Potassium >5.0 mmol/L",
+      "required_facts": [
+        "hyperkalaemia is a contraindication"
+      ],
+      "forbidden_facts": [
+        "hyperkalaemia is not a caution"
+      ],
+      "tags": [
+        "electrolytes",
+        "heart-failure",
+        "medication",
+        "paraphrased-factual"
+      ]
+    },
+    {
+      "id": "case-007",
+      "question": "What is the main concern when using MRAs in patients with heart failure?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p013_002",
+      "gold_passage_text": "WRF/hyperkalaemia • See HOW TO USE? • The main concern is hyperkalaemia (>6.0 mmol/L); although this was uncommon in RALES and EMPHASIS-HF, it has been seen more commonly in clini- cal practice. • Conversely, a high-normal K+ level may be desirable in patients with HF, especially if they are taking digoxin. • It is important to avoid other K+-retaining drugs (e.g. K+-sparing diuretics such as amiloride and triamterene) and nephrotoxic agents (e.g. NSAIDsd). • The risk of hyperkalaemia and renal dysfunction when an MRA is given to patients already taking both an ACE-I and an ARB is higher than when an MRA",
+      "page": 13,
+      "reference_answer": "Hyperkalaemia",
+      "required_facts": [
+        "main concern is hyperkalaemia",
+        "hyperkalaemia (>6.0 mmol/L)"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "clinical-scenario",
+        "heart-failure",
+        "hyperkalaemia",
+        "mras"
+      ]
+    },
+    {
+      "id": "case-008",
+      "question": "What should be done if a patient's potassium level rises significantly after starting an ARNI?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p014_007",
+      "gold_passage_text": "WRF and hyperkalaemia: • Some rise in urea (BUN), creatinine, and K+ is to be expected after an ARNI; if an increase is small and asymptomatic, no action is necessary. • A reduction in eGFR up to <_ 30 mL/min/1.73 m2 is acceptable. • An increase in K+ up to <_ 5.5 mmol/L is acceptable. • If urea, creatinine, or K+ does rise excessively, consider stopping concomitant nephrotoxic drugs (e.g. NSAIDsd) and other K+ supplements or retain- ing agents (triamterene, amiloride) and, if no signs of congestion, reducing the dose of diuretic. This is particularly true in those patients on an SGLT2",
+      "page": 14,
+      "reference_answer": "Consider stopping concomitant nephrotoxic drugs and other K+ supplements or retain- ing agents, and reducing the dose of diuretic.",
+      "required_facts": [
+        "ARNI can cause an increase in K+",
+        "Consider stopping concomitant nephrotoxic drugs and other K+ supplements or retain- ing agents",
+        "Reduce diuretic dose if no signs of congestion"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "arni",
+        "diuretics",
+        "hyperkalaemia",
+        "paraphrased-factual"
+      ]
+    },
+    {
+      "id": "case-009",
+      "question": "What are the expected benefits of the treatment for heart failure as described in the passage?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p015_001",
+      "gold_passage_text": "• Explain expected beneﬁts: • Improved symptoms. • Prevention of worsening of HF leading to hospital admission. • Increased survival (reduction in both CV and all-cause mortality). • Symptoms improve within a few weeks to a few months after starting treatment. • Advise patients to report principal adverse effects (i.e. dizziness/symptomatic hypotension, cough)—see PROBLEM SOLVING. • Advise patients to avoid NSAIDsd not prescribed by a physician (i.e. purchased over-the-counter) and salt substitutes high in K+—see PROBLEM",
+      "page": 15,
+      "reference_answer": "Improved symptoms, prevention of worsening of heart failure leading to hospital admission, and increased survival.",
+      "required_facts": [
+        "expected benefits of treatment",
+        "improved symptoms",
+        "prevention of worsening of heart failure"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "clinical-scenario",
+        "heart-failure",
+        "treatment-benefits"
+      ]
+    },
+    {
+      "id": "case-010",
+      "question": "Which type of diuretic is more commonly needed for patients with severe heart failure symptoms and worsening kidney function?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p016_005",
+      "gold_passage_text": "3. Thiazide diuretics can be used in patients with preserved renal function and mild symptoms of congestion. However, the majority of patients require loop diuretics (or combined with a thiazide diuretic and an MRA) due to the severity of HF symptoms and steadily deteriorating kidney function.",
+      "page": 16,
+      "reference_answer": "loop diuretics",
+      "required_facts": [
+        "loop diuretics are needed for severe HF symptoms",
+        "worsening kidney function requires loop diuretics"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "diuretics",
+        "heart-failure",
+        "kidney-function",
+        "paraphrased-factual"
+      ]
+    },
+    {
+      "id": "case-011",
+      "question": "What should be done if a patient with gout is not responding to colchicine?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p017_005",
+      "gold_passage_text": "Hyperuricaemia/gout: • Consider allopurinol prophylaxis (not initiated during acute exacerbation). • For symptomatic gout use colchicine for pain relief. • Avoid NSAIDs. Hypovolaemia/dehydration: • Assess volume status; consider a diuretic dosage reduction. Insufficient diuretic response/diuretic resistance: • Check adherence and ﬂuid/salt intake. • Increase a dose of diuretic. • Consider switching from furosemide to bumetanide or torasemide. • Add an MRA/increase dose of an MRA. • Combine loop diuretic and thiazide/metolazoneb. • Administer loop diuretic twice (or more times) daily or on empty stomach. • Consider short-term i.v. infusion of loop diuretic.",
+      "page": 17,
+      "reference_answer": "Avoid NSAIDs and consider an alternative treatment.",
+      "required_facts": [
+        "gout treatment",
+        "colchicine pain relief",
+        "NSAIDs avoidance"
+      ],
+      "forbidden_facts": [
+        "allopurinol prophylaxis"
+      ],
+      "tags": [
+        "gout",
+        "slightly-indirect",
+        "treatment"
+      ]
+    },
+    {
+      "id": "case-012",
+      "question": "Which drugs should be discontinued or avoided due to a potential risk of bradycardia and induction of long QT in this patient?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p018_005",
+      "gold_passage_text": "3. Resting heart rate <50 b.p.m. during treatment. 4. Moderate liver dysfunction. 5. Chronic retinal diseases, including retinitis pigmentosa. 6. Drug interactions: • To look out for (due to a potential risk of bradycardia and an induction of long QT as a result of bradycardia): • Verapamil, diltiazem (both should be discontinued/not used in HFrEF). • Digoxin. • Amiodarone. • To look out for drugs being strong inhibitors of isoenzyme CYP3A4: • Antifungal azoles (such as ketoconazole, itraconazole). • Macrolide antibiotics (such as clarithromycin, erythromycin).",
+      "page": 18,
+      "reference_answer": "Verapamil, diltiazem, digoxin, amiodarone",
+      "required_facts": [
+        "risk of bradycardia",
+        "induction of long QT"
+      ],
+      "forbidden_facts": [
+        "discontinuation of other drugs not mentioned"
+      ],
+      "tags": [
+        "cardiac-effects",
+        "drug-interactions",
+        "factual",
+        "medication"
+      ]
+    },
+    {
+      "id": "case-013",
+      "question": "What is the recommended starting dose for a patient over 75 years old?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p019_001",
+      "gold_passage_text": "• Start with a low dose (5 mgb.i.d.) (see Guidelines, T able 8). In patients over 75 years old, a lower starting dose of 2.5 mgb.i.d. can be used. • Daily dose may be increased to 7.5 mgb.i.d., decreased to 2.5 mg b.i.d. or stopped depending on the patient’s resting heart rate. Double the dose not more frequently than at 2-week intervals (slower uptitration may be needed in some patients). Aim for the target dose (see above) or, failing that, the highest tolerated dose based on resting heart rate. If the resting heart rate is between 50 and 60 b.p.m., the current dose should be maintained.",
+      "page": 19,
+      "reference_answer": "2.5 mg b.i.d.",
+      "required_facts": [
+        "lower starting dose for patients over 75 years old"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "aging",
+        "dosage",
+        "factual"
+      ]
+    },
+    {
+      "id": "case-014",
+      "question": "What other interventions might be considered for a patient with advanced heart failure besides mechanical circulatory support?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p020_001",
+      "gold_passage_text": "Intervention Additional criteria beyond the presence of symptomatic HFrEF (if any) DEVICES AND INVASIVE PROCEDURES (continued) MCS48,49 Advanced HF Heart transplantation50- 52 Advanced HF OTHER INTERVENTIONS Exercise training53- 56 Multidisciplinary care management programme57,58 Palliative care59,60 Advanced HF AF = atrial ﬁbrillation; b.p.m. = beats per minute; CRT = cardiac resynchronization therapy; HF = heart failure; HFrEF = heart failure with reduced ejection fraction; i.v. = intra- venous; LVEF = left ventricular ejection fraction; MCS = mechanical circulatory support; QRS = Q, R, and S waves on ECG; SR = sinus rhythm.",
+      "page": 20,
+      "reference_answer": "Exercise training, multidisciplinary care management programme, and palliative care.",
+      "required_facts": [
+        "interventions for advanced heart failure",
+        "mechanical circulatory support is an option"
+      ],
+      "forbidden_facts": [
+        "heart transplantation is the only option",
+        "cardiac resynchronization therapy is the primary treatment"
+      ],
+      "tags": [
+        "advanced-hf",
+        "heart-failure",
+        "interventions",
+        "slightly-indirect"
+      ]
+    },
+    {
+      "id": "case-015",
+      "question": "What was the hazard ratio for the treatment effect on the primary outcomes in the TOPCAT trial for patients enrolled based on NP criteria?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p021_004",
+      "gold_passage_text": "Aldosterone Antagonist (trial). aTime to ﬁrst event analyses. bPatients with prior history of myocardial infarction—outcome was all-cause mortality or hospitalization for HF. cThese trials were overall neutral for their primary outcome; in TOPCAT, for the randomization stratum of patients enrolled on the basis of NP criteria (n = 981), hazard ratio for treatment effect on primary outcomes was 0.65 (95% CI, 0.49- 0.87), P = 0.003) (Supplementary Table 12). dFor recurrent hospitalizations, incidence rate ratio: 0.48 (0.33- 0.70). Notes: (Improved) = improved in patients with LVEF >40% but not speciﬁcally shown for HFmrEF.",
+      "page": 21,
+      "reference_answer": "0.65",
+      "required_facts": [
+        "hazard ratio for treatment effect on primary outcomes",
+        "TOPCAT trial",
+        "patients enrolled on the basis of NP criteria"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "factual",
+        "hazard-ratio",
+        "topcat",
+        "trial"
+      ]
+    },
+    {
+      "id": "case-016",
+      "question": "What is the name of the trial comparing LCZ696 to Valsartan in patients with chronic heart failure and preserved left-ventricular ejection fraction?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p022_003",
+      "gold_passage_text": "PARAMOUNT = LCZ696 Compared to Valsartan in Patients with Chronic Heart Failure and Preserved Left-ventricular Ejection Fraction (trial); Peak VO2 = peak exercise oxy- gen consumption; PEP-CHF = Perindopril in Elderly People with Chronic Heart Failure (trial); QOL = quality of life; RELAX = Phosphodiesterase-5 Inhi bition to Improve Clinical Status and Exercise Capacity in Diastolic Heart Failure (trial); Sac/Val = sacubitril/valsartan; SR = sinus rhythm; TOPCAT = Treatment of P reserved Cardiac Function Heart Failure with an Aldosterone Antagonist; vs. = versus; y = year.",
+      "page": 22,
+      "reference_answer": "PARAMOUNT",
+      "required_facts": [
+        "PARAMOUNT is a trial comparing LCZ696 to Valsartan"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "factual",
+        "heart-failure",
+        "medication",
+        "trial"
+      ]
+    },
+    {
+      "id": "case-017",
+      "question": "Which group of patients is characterized by severe symptoms of heart failure at rest, despite treatment with guideline-directed medical therapy?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p023_001",
+      "gold_passage_text": "of chronic heart failure At risk for heart failure Pre-heart failure Heart failure Advanced heart failure Patients at risk for HF but without current or prior symptoms or signs of HF and without structural biomarker or genetic markers of heart disease Patients without current or prior symptoms or signs of HF but evidence of one of the following Patients with current or prior symptoms and/or signs of HF caused by Severe symptoms and/or signs of HF at rest, recurrent hospitalization, despite GDMT, refractory or intolerant to GDMT",
+      "page": 23,
+      "reference_answer": "Advanced heart failure",
+      "required_facts": [
+        "symptoms and/or signs of HF at rest",
+        "despite GDMT",
+        "advanced heart failure"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "heart-failure",
+        "paraphrased-factual",
+        "symptoms",
+        "treatment"
+      ]
+    },
+    {
+      "id": "case-018",
+      "question": "What test measures the distance a patient can walk in 6 minutes?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p024_003",
+      "gold_passage_text": "<_ 80% at 1 year 6MWT = 6-minute walk test; BNP = B-type natriuretic peptide; CPET = cardiopulmonary exercise test; CRT = cardiac resynchronization therapy; eGFR = estimated glomeru- lar ﬁltration rate; GDMT = guideline-directed medical therapy; Hb = haemoglobin; HF = heart failure; IVC = inferior vena cava; K + = potassium; KCCQ = Kansas City Cardiomyopathy Questionnaire; LVAD = left ventricular assist device; LVEF = left ventricular ejection fraction; MAGGIC = Meta-Analysis Global Gro up in Chronic Heart Failure; MECKI = Metabolic Exercise test data combined with Cardiac and Kidney Indexes; NT-proBNP = N-terminal pro-B-type natriuretic peptide; NYHA = New York Heart",
+      "page": 24,
+      "reference_answer": "6-minute walk test",
+      "required_facts": [
+        "6-minute walk test"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "heart-failure",
+        "paraphrased-factual",
+        "test"
+      ]
+    },
+    {
+      "id": "case-019",
+      "question": "What is the survival rate at 6 months for patients with a HeartMate II LVAD according to the BTT strategy study?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p025_001",
+      "gold_passage_text": "Device Device characteristics Evidence from major clinical studies Major risks HeartMate II (Thoratec, St. Jude, Abbott)80- 90 Axial ﬂow pump Implanted in pre-peritoneal pocket, connected via inﬂow cannula to LV apex, and via outﬂow cannula to ascending aorta BTT strategy (prospective, single-arm, n = 133): 75% survival 6 months, 68% survival 12 months. HeartMate II LVAD (randomized con- tinuous ﬂow vs. pulsatile): improved 2-year survival free of stroke or device failure for continuous ﬂow vs. pulsatile ROADMAP (observational, n =9 7 LVAD, n = 103 OMM): LVAD associ-",
+      "page": 25,
+      "reference_answer": "75%",
+      "required_facts": [
+        "survival rate",
+        "BTT strategy",
+        "6 months"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "clinical-study",
+        "factual",
+        "heartmate-ii",
+        "survival"
+      ]
+    },
+    {
+      "id": "case-020",
+      "question": "A 58-year-old male patient with a history of atrial fibrillation presents with palpitations and shortness of breath. What could be a potential cause of his symptoms?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p026_003",
+      "gold_passage_text": "Tachyarrhythmia (e.g. AF, ventricular tachycardia). Excessive rise in blood pressure. Infection (e.g. pneumonia, infective endocarditis, sepsis). Non-adherence with salt/ﬂuid intake or medications. Bradyarrhythmia. Toxic substances (alcohol, recreational drugs). Drugs (e.g. NSAIDs, corticosteroids, negative inotropic substances, cardiotoxic chemotherapeutics). Exacerbation of COPD. Pulmonary embolism. Surgery and perioperative complications. Increased sympathetic drive, stress-related cardiomyopathy. Metabolic/hormonal derangements (e.g. thyroid dysfunction, diabetic ketosis, adrenal dysfunction). Severe anaemia. Pregnancy and peripartum related abnormalities. Cerebrovascular insult. Acute mechanical cause: myocardial rupture complicating ACS (free wall rupture, ventricular septal defect, acute mitral regurgitation), chest trauma or cardiac",
+      "page": 26,
+      "reference_answer": "Tachyarrhythmia (e.g., atrial fibrillation)",
+      "required_facts": [
+        "tachyarrhythmia can cause palpitations and shortness of breath"
+      ],
+      "forbidden_facts": [
+        "specific medication causing palpitations and shortness of breath"
+      ],
+      "tags": [
+        "clinical-scenario",
+        "palpitations",
+        "shortness-of-breath",
+        "tachyarrhythmia"
+      ]
+    },
+    {
+      "id": "case-021",
+      "question": "What proportion of patients with cardiogenic shock may be managed with non-invasive ventilation?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p027_002",
+      "gold_passage_text": "cardiogenic shock have respiratory failure needing oxygen, and nearly 2/3 of them require invasive mechanical ventilation. A small propor- tion <20% may be managed with non-invasive ventilation. Five evolutive stages of cardiogenic shock have been identified (Supplementary Figure 2). Depending on the local service provision, patients with cardio- genic shock may be rapidly transferred to a tertiary care centre (Shock Centre) that has a 24/7 cardiac catheterization availability, a multidisciplinary shock team, and a dedicated intensive care unit (ICU) providing short-term mechanical circulatory support (MCS).107,111 In patients with cardiogenic shock complicating",
+      "page": 27,
+      "reference_answer": "20%",
+      "required_facts": [
+        "proportion managed with non-invasive ventilation"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "cardiogenic-shock",
+        "factual",
+        "ventilation"
+      ]
+    },
+    {
+      "id": "case-022",
+      "question": "What stage of cardiogenic shock might a patient be in if they show signs of hypoperfusion requiring mechanical support?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p028_006",
+      "gold_passage_text": "infarction, acute and/or chronic heart failure symptoms A patient who has clinical evidence of relative hypotension or tachycardia without hypoperfusion A patient that manifests with hypoperfusion that requires intervention (inotrope, pressor or mechanical support, ECMO) beyond volume resuscitation to restore perfusion.These patients typically present with relative hypotension A patient with ci ato cula y co STAGE E “Extremis” STAGE D “Deteriorating or Doom” STAGE C “Classic” Cardiogenic Shock STAGE B “Beginning” Cardiogenic Shock patient who is not cu A p STAGE A “At risk”",
+      "page": 28,
+      "reference_answer": "STAGE D ‘Deteriorating or Doom’",
+      "required_facts": [
+        "hypoperfusion requiring mechanical support",
+        "cardiogenic shock stages",
+        "STAGE D description"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "cardiogenic-shock",
+        "factual",
+        "hypoperfusion",
+        "stages"
+      ]
+    },
+    {
+      "id": "case-023",
+      "question": "When might acid-base status assessment be recommended in a patient?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p029_006",
+      "gold_passage_text": "cal interventions remain refractory (in particular with hypotension and hypoperfusion—features of cardiogenic shock, biventricular dys- function, and/or where the echocardiographic features are discord- ant with the clinical picture) as the severity of illness can be underestimated when relying on clinical features alone. 134,135 Assessment of the acid-base status is recommended in patients with respiratory failure or haemodynamic instability. Venous samples may be acceptable, providing a faster and less invasive approach than arterial ones.",
+      "page": 29,
+      "reference_answer": "In patients with respiratory failure or hemodynamic instability.",
+      "required_facts": [
+        "assessment of acid-base status is recommended",
+        "in patients with respiratory failure or hemodynamic instability"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "acid-base-status",
+        "hemodynamic-instability",
+        "respiratory-failure",
+        "slightly-indirect"
+      ]
+    },
+    {
+      "id": "case-024",
+      "question": "What monitoring is typically performed in Level 1 care for a patient?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p030_002",
+      "gold_passage_text": "Level 1 care • Cardiac rhythm monitoring. • Non-invasive haemodynamic and respiratory (SpO2) monitoring. • Speciﬁc treatments (initial administration of vasoactive drugs, non-invasive bi-level positive air-way pressure or continuous positive airway pressure, chest tube insertion and monitoring). Level 2 care • Central venous access. • Arterial line. • Continuous infusion of multiple drugs (because of low CV output or compromised organ perfusion). • Invasive haemodynamic monitoring. • Temporary trans-venous pacing. • Percutaneous cardiac assist device (IABP, percutaneous axial pumps). • Pericardiocentesis. Level 3 care (critical care)",
+      "page": 30,
+      "reference_answer": "Cardiac rhythm monitoring, non-invasive haemodynamic and respiratory monitoring.",
+      "required_facts": [
+        "Level 1 care includes cardiac rhythm monitoring",
+        "Level 1 care includes non-invasive haemodynamic and respiratory monitoring"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "cardiac",
+        "clinical-scenario",
+        "monitoring",
+        "respiratory"
+      ]
+    },
+    {
+      "id": "case-025",
+      "question": "What device can be used to unload the left ventricle in VA-ECMO patients experiencing increased left ventricular end-diastolic pressure and pulmonary congestion?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p031_003",
+      "gold_passage_text": "VA-ECMO may increase left ventricular (LV) afterload with an increase in LV end-diastolic pressure and pulmonary congestion. In these cases, LV unloading is mandatory and can be achieved by means of transeptal/ventricular apex vent or adding an unloading device such as the Impella device. 156,157 Complications of percutaneous ECMO are mostly related to vascular events, bleeding, thrombosis, and infection. Randomized controlled trials comparing ECMO with IABP or medical therapy are lacking. A meta-analysis including only observational studies showed favourable outcomes in patients with cardiogenic shock or cardiac arrest treated with VA-ECMO com-",
+      "page": 31,
+      "reference_answer": "transeptal/ventricular apex vent or Impella device",
+      "required_facts": [
+        "VA-ECMO may increase left ventricular afterload",
+        "LV unloading is mandatory",
+        "Unloading can be achieved by transeptal/ventricular apex vent or adding an unloading device such as the Impella device"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "clinical-scenario",
+        "left-ventricle",
+        "unloading-device",
+        "va-ecmo"
+      ]
+    },
+    {
+      "id": "case-026",
+      "question": "What type of support does the cath lab requirement provide during resuscitation situations?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p032_005",
+      "gold_passage_text": "cath lab requirement, rapid insertion, full circulatory support even in resuscita- tion situations or during malignant arrhythmia, pro- viding combined support of the right and left ventricle, rapid improvement in oxy- genation and the possibility of rapid application, com- plete cardiopulmonary bypass Disadvantages/complications - ECG/pulse dependent (mostly inefﬁcient in tachycardia and irregular rhythms) - Limb ischaemia - Haemolysis - Thrombocytopenia - Limb ischaemia - Haemolysis - Bleeding - Infection - Limb ischaemia - Bleeding - Complex implantation requiring transseptal puncture - Infection - Haemolysis, thromboem-",
+      "page": 32,
+      "reference_answer": "full circulatory support",
+      "required_facts": [
+        "full circulatory support during resuscitation"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "cath-lab",
+        "factual",
+        "resuscitation",
+        "support"
+      ]
+    },
+    {
+      "id": "case-027",
+      "question": "What device is mentioned for LV decompression in the passage?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p033_002",
+      "gold_passage_text": "IABP Impella (2.5, CP , 5.0 a) T andemHeart VA-ECMO - Bleeding - Infection - LV overloading - periph- eral cannulation is associ- ated with an increase in LV afterload, which pro- duces LV distension and pulmonary congestion and may impair myocar- dial recovery. LV decom- pression strategies include additional proce- dures, such as septos- tomy, IABP, Impella, and hybrid circuit conﬁguration - Harlequin syndrome (upper body hypoxia from incomplete retro- grade ﬁlling and oxygena- tion), in which deoxygenated cerebral blood ﬂow occurs during retrograde perfusion",
+      "page": 33,
+      "reference_answer": "IABP",
+      "required_facts": [
+        "LV decompression strategies include IABP"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "factual",
+        "lv-decompression",
+        "medical-devices"
+      ]
+    },
+    {
+      "id": "case-028",
+      "question": "What is the mortality rate for patients aged 60-75 in the MERIT-HF study?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p034_001",
+      "gold_passage_text": "mortality 0.66 (0.54- 0.81) <45 ( n = 450) 0.71 (0.48 - 1.05) 0.81 >_45- <60 (n = 669) 0.69 (0.46 - 1.04) >_60- <75 (n = 640) 0.53 (0.34 - 0.82) >75 (n = 863) 0.64 (0.42 - 0.99) MERIT-HF179,180 Metoprolol vs. pla- cebo (n = 3991) LVEF <_ 40%; NYHA II- IV; ‘signiﬁcant’ kidney disease",
+      "page": 34,
+      "reference_answer": "0.53",
+      "required_facts": [
+        "mortality rate for >_60- <75 years",
+        "specific age group in the study",
+        "study name is MERIT-HF"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "age-group",
+        "clinical-scenario",
+        "mortality",
+        "study"
+      ]
+    },
+    {
+      "id": "case-029",
+      "question": "What did the EVEREST trial show regarding tolvaptan compared to placebo?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p035_003",
+      "gold_passage_text": "tion of a RAAS inhibitor. 191,192 The Efficacy of Vasopressin Antagonism in Heart Failure Outcome Study with Tolvaptan (EVEREST) trial showed significant decrease in dyspnoea and body weight at day 1 and oedema at day 7 with tolvap- tan vs. placebo, though with no difference in the primary endpoints of all-cause mortality or cardiovascular death or HF hospitalization. In patients with hyponatraemia, serum sodium levels increased significantly.",
+      "page": 35,
+      "reference_answer": "Tolvaptan showed significant decreases in dyspnoea and body weight at day 1 and oedema at day 7, and increased serum sodium levels in patients with hyponatraemia, but no difference in primary endpoints.",
+      "required_facts": [
+        "EVEREST trial",
+        "tolvaptan vs. placebo",
+        "dyspnoea and body weight reduction",
+        "oedema reduction",
+        "serum sodium increase in hyponatraemia"
+      ],
+      "forbidden_facts": [
+        "primary endpoints unchanged",
+        "cardiovascular death",
+        "HF hospitalization"
+      ],
+      "tags": [
+        "hyponatraemia",
+        "paraphrased-factual",
+        "tolvaptan",
+        "trial"
+      ]
+    },
+    {
+      "id": "case-030",
+      "question": "Which trial compared the effects of vericiguat against a comparator in heart failure patients?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p008_005",
+      "gold_passage_text": "treatment with the If inhibitor ivabradine Trial; SOLVD-Treatment = Studies of Left Ventricular Dysfunction Treatment (trial); SR = sinus rhythm; Val-HeFT = Valsartan H eart Failure Trial; VICTORIA = Vericiguat Global Study in Patients with Heart Failure with Reduced Ejection Fraction; vs. = versus; XL = extended release.",
+      "page": 8,
+      "reference_answer": "VICTORIA",
+      "required_facts": [
+        "VICTORIA is a trial",
+        "compared vericiguat"
+      ],
+      "forbidden_facts": [
+        "VICTORIA compared ivabradine"
+      ],
+      "tags": [
+        "heart-failure",
+        "slightly-indirect",
+        "trial",
+        "vericiguat"
+      ]
+    },
+    {
+      "id": "case-031",
+      "question": "What is the recommended frequency for monitoring blood chemistry after initiating treatment?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p009_005",
+      "gold_passage_text": "• Monitor blood chemistry 4-monthly thereafter. • When to stop uptitration, reduce dose, stop treatment—see PROBLEM SOLVING. • It is very rarely necessary to stop an ACE-I (or ARB), and clinical deterioration is likely if treatment is withdrawn. Ideally, specialist advice should be sought before treatment discontinuation. • A specialist HF nurse may assist with education of the patient, follow-up (in person or by telephone), biochemical monitoring, and dose uptitration. Continued ESC Guidelines 9",
+      "page": 9,
+      "reference_answer": "4-monthly",
+      "required_facts": [
+        "monitor blood chemistry 4-monthly thereafter"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "clinical-scenario",
+        "frequency",
+        "monitoring",
+        "treatment"
+      ]
+    },
+    {
+      "id": "case-032",
+      "question": "Which class of medication is potentially harmful in HFrEF according to the passage?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p010_007",
+      "gold_passage_text": "and reported adverse effects) and clinical experience. bThe safety of an ARB in patients developing angioedema with an ACE-I is uncertain. cRenin inhibitors are not recommended in HF. dAvoid NSAIDs unless essential. eCalcium-channel blockers should be discontinued unless absolutely necessary, and diltiazem and verapamil are potentially harmful in HFrEF because of their negative inotropic action.",
+      "page": 10,
+      "reference_answer": "diltiazem and verapamil",
+      "required_facts": [
+        "diltiazem and verapamil are potentially harmful in HFrEF"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "factual",
+        "hf",
+        "hfref",
+        "medication"
+      ]
+    },
+    {
+      "id": "case-033",
+      "question": "What action should be taken if a patient's heart rate is less than 50 beats per minute and symptoms are worsening?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p011_007",
+      "gold_passage_text": "Low heart rate: • If <50 b.p.m. and worsening symptoms, halve the dose of beta-blocker, or, if severe deterioration, stop beta-blocker (rarely necessary). • Review need for other heart rate-slowing drugs (e.g. digoxin, ivabradine, amiodarone, diltiazem, or verapamilb). • Arrange ECG to exclude heart block. • Seek specialist advice. Continued ESC Guidelines 11",
+      "page": 11,
+      "reference_answer": "Halve the dose of beta-blocker, or stop beta-blocker if severe deterioration.",
+      "required_facts": [
+        "heart rate <50 b.p.m.",
+        "worsening symptoms",
+        "action to take"
+      ],
+      "forbidden_facts": [
+        "common to increase beta-blocker dose"
+      ],
+      "tags": [
+        "factual",
+        "heart-rate",
+        "symptoms",
+        "treatment"
+      ]
+    },
+    {
+      "id": "case-034",
+      "question": "What are the potential short-term effects of beta-blocker therapy in heart failure patients?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p012_002",
+      "gold_passage_text": "• Explain expected beneﬁts (see WHY?) and mention possibility of temporary adverse effects: • Treatment is given to improve symptoms, to prevent worsening of HF leading to hospital admission, and to increase survival. • Symptomatic improvement may develop slowly after starting treatment, sometimes taking 3- 6 months or longer. • Temporary symptomatic deterioration may occur during initiation or uptitration phase; in the long term beta-blockers improve well-being. • Advise patient to report deterioration (see PROBLEM SOLVING) and that deterioration (tiredness, fatigue, breathlessness) can usually be easily managed",
+      "page": 12,
+      "reference_answer": "Temporary symptomatic deterioration may occur during initiation or uptitration phase.",
+      "required_facts": [
+        "temporary symptomatic deterioration",
+        "initiation or uptitration phase"
+      ],
+      "forbidden_facts": [
+        "immediate improvement",
+        "permanent adverse effects"
+      ],
+      "tags": [
+        "beta-blockers",
+        "heart-failure",
+        "paraphrased-factual",
+        "symptoms"
+      ]
+    },
+    {
+      "id": "case-035",
+      "question": "What are the expected benefits of the treatment for heart failure (HF) as described in the passage?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p013_004",
+      "gold_passage_text": "• Explain expected beneﬁts (see WHY?) • Treatment is given to improve symptoms, to prevent worsening of HF leading to hospital admission, and to increase survival. • Symptomatic improvement occurs within a few weeks to a few months of starting treatment. • Avoid NSAIDsd not prescribed by a physician (i.e. purchased over-the-counter) and salt substitutes high in K+. • If diarrhoea/vomiting occurs, or there is infection with fever leading to intense sweating, patients should be made aware of the risk of dehydration and electrolyte imbalance, and they should contact the physician/nurse.",
+      "page": 13,
+      "reference_answer": "To improve symptoms, prevent worsening of HF leading to hospital admission, and increase survival.",
+      "required_facts": [
+        "treatment benefits",
+        "improve symptoms",
+        "prevent hospital admission"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "clinical-scenario",
+        "heart-failure",
+        "treatment-benefits"
+      ]
+    },
+    {
+      "id": "case-036",
+      "question": "What should be monitored 1-2 weeks after the final dose titration?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p014_003",
+      "gold_passage_text": "• Check renal function and electrolytes. • Start with a low dose (seeGuidelines, T able 8). • In some patients, one may consider a reduced starting dose (24/26 mgb.i.d.), namely in those with SBP 100- 110 mmHg, ACE-I/ARB naı¨ve patients, eGFR 30- 60 mL/min/1.73 m2. • Double the dose at not less than 2-week intervals in the community, monitoring tolerability. • Aim for the target dose (see above) or, failing that, the highest tolerated dose. • Re-check blood chemistry (urea/BUN, creatinine, K+)1 - 2 weeks after initiation and 1- 2 weeks after ﬁnal dose titration.",
+      "page": 14,
+      "reference_answer": "blood chemistry (urea/BUN, creatinine, K+)",
+      "required_facts": [
+        "monitoring blood chemistry after dose changes"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "dose-titration",
+        "factual",
+        "monitoring",
+        "renal-function"
+      ]
+    },
+    {
+      "id": "case-037",
+      "question": "For which patient condition is dapagliﬂozin indicated according to the passage?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p015_004",
+      "gold_passage_text": "Indications: 1. Patients with HFrEF (regardless of concomitant diabetes mellitus). Contraindications: 1. Known allergic reaction/other adverse reaction (drug-speciﬁc). 2. Pregnancy/risk of pregnancy and breastfeeding period. 3. eGFR <20 mL/min/1.73 m 2.* 4. Symptoms of hypotension or a SBP <95 mmHg. *DAPA-CKD (dapagliﬂozin) enrolled patients with an eGFR>25 mL/min/1.73 m2",
+      "page": 15,
+      "reference_answer": "HFrEF (heart failure with reduced ejection fraction)",
+      "required_facts": [
+        "Indications for dapagliﬂozin include HFrEF"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "clinical-scenario",
+        "heart-failure",
+        "indications",
+        "medication"
+      ]
+    },
+    {
+      "id": "case-038",
+      "question": "What condition can be exacerbated by the use of diuretics according to the passage?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p016_007",
+      "gold_passage_text": "3. Symptomatic or severe asymptomatic hypotension (SBP <90 mmHg)—may be made worse by diuretic-induced hypovolaemia. 4. Drug interactions to look out for: /C15 Combination with an ACE-I, an ARB, or a renin inhibitora—risk of hypotension (usually not a problem). /C15 Combination with other diuretics (e.g. loop plus thiazide)—risk of hypovolaemia, hypotension, hypokalaemia, and renal impairmentb. /C15 NSAIDsc—may attenuate effect of diuretic.",
+      "page": 16,
+      "reference_answer": "Hypotension",
+      "required_facts": [
+        "hypotension risk with diuretics"
+      ],
+      "forbidden_facts": [
+        "renal failure",
+        "severe hypertension"
+      ],
+      "tags": [
+        "diuretics",
+        "hypotension",
+        "hypovolemia",
+        "paraphrased-factual"
+      ]
+    },
+    {
+      "id": "case-039",
+      "question": "What should be done if a patient with symptomatic hypotension does not improve with dose reduction?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p017_003",
+      "gold_passage_text": "Asymptomatic low blood pressure: • Dose may be reduced if no symptoms or signs of congestion. Symptomatic hypotension: • Causing dizziness/light-headedness—reduce dose if no symptoms or signs of congestion. • Reconsider need for nitrates, calcium-channel blockersd and other vasodilators. • If these measures do not solve problem, seek specialist advice.",
+      "page": 17,
+      "reference_answer": "Seek specialist advice.",
+      "required_facts": [
+        "reduction in dose does not solve problem",
+        "need for specialist advice"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "factual",
+        "hypotension",
+        "specialist",
+        "treatment"
+      ]
+    },
+    {
+      "id": "case-040",
+      "question": "What is essential when using medications for a short period in heart failure patients?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p018_002",
+      "gold_passage_text": "ACE-I = angiotensin-converting enzyme inhibitor; ARB = angiotensin-receptor blocker; AVP = arginine vasopressin; BUN = blood urea nitrogen; LVEF =left ventricular ejection fraction; eGFR = estimated glomerular ﬁltration rate; HF = heart failure; HFrEF = heart failure with reduced ejection fraction; i.v. = intravenous; K+ = potassium; MRA = miner- alocorticoid receptor antagonist; NSAID = non-steroidal anti-inﬂammatory drug; prn = as needed; SBP = systolic blood pressure. aRenin inhibitors are not recommended in HF. bUsually only needed for a short period—careful monitoring of blood chemistry is essential.",
+      "page": 18,
+      "reference_answer": "careful monitoring of blood chemistry",
+      "required_facts": [
+        "careful monitoring of blood chemistry is essential"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "heart-failure",
+        "medications",
+        "monitoring",
+        "paraphrased-factual"
+      ]
+    },
+    {
+      "id": "case-041",
+      "question": "What should healthcare providers monitor during the treatment of heart failure?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p019_002",
+      "gold_passage_text": "• Monitor heart rate, blood pressure, and clinical status. • When to stop uptitration, reduce dose, stop treatment—see PROBLEM SOLVING. • A specialist HF nurse may assist with education of the patient, monitoring resting heart rate, follow-up (in person or by telephone), and dose uptitration.",
+      "page": 19,
+      "reference_answer": "Heart rate, blood pressure, and clinical status.",
+      "required_facts": [
+        "monitor heart rate",
+        "monitor blood pressure",
+        "monitor clinical status"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "heart-failure",
+        "monitoring",
+        "paraphrased-factual",
+        "treatment"
+      ]
+    },
+    {
+      "id": "case-042",
+      "question": "What percentage of patients had atrial fibrillation in the CHART-2 trial?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p020_002",
+      "gold_passage_text": "Hypertension, % 78 74 64 60 82 90 Diabetes, % 42 44 27 31 -- CAD, % 57 - 53 42 80 80 AF, % 40 33 58 22 40 44 Hyperlipidaemia, % 48 35 -- 48 80 AF = atrial ﬁbrillation; BMI = body mass index; CAD = coronary artery disease; CHART-2 = Congestive Heart Failure Cardiopoietic Regenerative Therapy(trial); ESC-HF-LT = European Society of Cardiology Heart Failure Long-Term (registry); GWTG-HF = Get With the Guidelines - Heart Failure (registry); n = number of patients; OPTIMIZE-HF",
+      "page": 20,
+      "reference_answer": "40%",
+      "required_facts": [
+        "percentage of patients with atrial fibrillation",
+        "CHART-2 trial"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "atrial-fibrillation",
+        "factual",
+        "hypertension",
+        "trial"
+      ]
+    },
+    {
+      "id": "case-043",
+      "question": "What was the improvement rate for beta-blocker in AF patients according to the IPD Meta-analysis?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p021_002",
+      "gold_passage_text": "Beta-blocker (AF) Improved 1.15 (0.57 - 2.32) 1.06 (0.58 - 1.94) 0.86 (0.36 - 2.03) 1.30 (0.63 - 2.67) IPD Meta-analysis Digoxin 0.80 (0.63 - 1.03) 0.96 (0.79 - 1.17) 1.24 (0.94 - 1.64) 1.08 (0.85 - 1.37) DIG 67 ACE-I = angiotensin-converting enzyme inhibitor; AF = atrial ﬁbrillation; ARB = angiotensin-receptor blocker; ARNI = angiotensin receptor-nepri lysin inhibitor; CHARM- Preserved = Candesartan Cilexetil in Heart Failure - Assessment of Reduction in Mortality and Morbidity (trial); CI = conﬁdence interval; CV = cardiovascular; DIG = Digitalis",
+      "page": 21,
+      "reference_answer": "1.15 (0.57 - 2.32)",
+      "required_facts": [
+        "beta-blocker (AF) improvement rate",
+        "IPD Meta-analysis"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "af",
+        "beta-blocker",
+        "factual",
+        "improvement",
+        "meta-analysis"
+      ]
+    },
+    {
+      "id": "case-044",
+      "question": "What does LVEF stand for in the context of heart failure?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p022_002",
+      "gold_passage_text": "and mortality in diastolic heart failure); E/e 0 ratio = early ﬁlling velocity on transmitral Doppler/early relaxation velocity on tissue Doppler; HF = heart failure, I-PRESERVE = Irbesartan in Patients with Heart Failure and PRESERVEd Ejection Fraction (trial); KCCQ = Kansas City Cardiomyopathy Questionnaire; LV = left ventr icular; LVEF = left ven- tricular ejection fraction; LVH = left ventricular hypertrophy; MLHFQ = Minnesota Living with Heart Failure Questionnaire; NT-proBNP = N-terminal pro-B-type natriuretic peptide; NYHA = New York Heart Association; PARAGON-HF = Prospective Comparison of ARNI with ARB Global Outcomes in HF with preserved Ejection Fraction (trial);",
+      "page": 22,
+      "reference_answer": "Left ventricular ejection fraction",
+      "required_facts": [
+        "LVEF = left ventricular ejection fraction"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "factual",
+        "heart-failure",
+        "terminology"
+      ]
+    },
+    {
+      "id": "case-045",
+      "question": "What condition might a patient with elevated cardiac troponin levels and a family history of cardiomyopathy be at risk for?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p023_002",
+      "gold_passage_text": "Patients with HTN, CVD, DM, obesity, known exposure to cardiotoxins, family history of cardiomyopathy Structural heart disease, e.g. : LVH, chamber enlargement, wall motion abnormality, myocardial tissue abnormality, valvular heart disease Abnormal cardiac function, e.g.: reduced LV or RV systolic function, evidence of increased filling pressures or abnormal diastolic dysfunction Elevated natriuretic peptide levels or elevated cardiac troponin levels in the setting of exposure to cardiotoxins Structural and/or functional cardiac abnormality Heart failure in remission Persistent heart failure Requiring advanced therapies such as consideration for",
+      "page": 23,
+      "reference_answer": "Heart failure",
+      "required_facts": [
+        "elevated cardiac troponin levels",
+        "family history of cardiomyopathy"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "cardiomyopathy",
+        "factual",
+        "heart-failure",
+        "risk-factors"
+      ]
+    },
+    {
+      "id": "case-046",
+      "question": "What might be a reason to decrease or stop ACE-Is, beta-blockers, ARNIs, or MRAs in a patient with heart failure?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p024_006",
+      "gold_passage_text": "PP rognostic medication Inability to uptitrate (or need to decrease/cease) ACE-Is, beta-blockers, ARNIs, or MRAs ACE-I = angiotensin-converting enzyme inhibitor; ARNI = angiotensin receptor-neprilysin inhibitor; BNP = B-type natriuretic peptide; EF = ejection fraction; HF = heart failure; MRA = mineralocorticoid receptor antagonist; NP = natriuretic peptide; NT-proBNP = N-terminal pro-B-type natriuretic peptide; NYHA = New York Hear t Association; SBP = systolic blood pressure. Reprinted from78,79",
+      "page": 24,
+      "reference_answer": "Inability to uptitrate",
+      "required_facts": [
+        "Inability to uptitrate (or need to decrease/cease) ACE-Is, beta-blockers, ARNIs, or MRAs"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "clinical-scenario",
+        "heart-failure",
+        "medication"
+      ]
+    },
+    {
+      "id": "case-047",
+      "question": "What is the survival rate at 1 year for patients in the ENDURANCE study?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p025_003",
+      "gold_passage_text": "continued access protocol 84% 1- year survival96 ENDURANCE (randomized, open- label, n = 446 advanced HF patients ineligible for transplant, HeartWare vs. HeartMate II): non-inferiority of HeartWare vs. other devices for sur- vival at 2 years free from disabling stroke or device removal; higher rate of stroke, RV failure, sepsis • Ischaemic stroke • Haemorrhagic stroke • RV failure • Infection • Device failure92,93 • Pump thrombosis • Driveline infection HeartMate 3 (St. Jude, Abbott)99-103 Continuous ﬂow, centrifugal-pump, bearing-less magnetically levitated rotor, artiﬁcial pulse Single arm (n = 50, BTT and DT): 98%",
+      "page": 25,
+      "reference_answer": "96%",
+      "required_facts": [
+        "1-year survival rate",
+        "ENDURANCE study"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "paraphrased-factual",
+        "study",
+        "survival"
+      ]
+    },
+    {
+      "id": "case-048",
+      "question": "What was the 2-year survival rate free of disabling stroke for patients using the HeartMate 3 device according to the CE Mark Study?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p026_001",
+      "gold_passage_text": "Device Device characteristics Evidence from major clinical studies Major risks HeartMate 3 CE Mark Study, 2-year results (n = 50): survival free of dis- abling stroke 84.9±5% 1-year and 77.3±6% 2-year; 2-year Kaplan-Meier overall survival 74±6% ADVANCE = Evaluation of the HeartWare Left Ventricular Assist Device for the Treatment of Advanced Heart Failure (trial); BTT = bridge to transplant; CE = Conformite´ Europe´enne; CI = conﬁdence interval; DT = destination therapy; ENDURANCE = HeartWare Ventricular Assist System as Destination Therapy of Advanced Heart F ailure",
+      "page": 26,
+      "reference_answer": "84.9±5%",
+      "required_facts": [
+        "2-year survival rate free of disabling stroke",
+        "HeartMate 3 device",
+        "CE Mark Study"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "device",
+        "factual",
+        "stroke",
+        "survival"
+      ]
+    },
+    {
+      "id": "case-049",
+      "question": "Which inotrope is generally recommended to be used with a vasopressor in this scenario?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p027_004",
+      "gold_passage_text": "agents is largely empirical. Norepinephrine is the pressor of choice, whilst dobutamine is the most commonly used adrenergic inotrope. Levosimendan may also be used (avoiding bolus) in combination with a vasopressor such as norepinephrine. 118,119 General recommenda- tion on inotrope use is to limit the dose and the duration to the low- est possible, due to increasing myocardial oxygen consumption and arrhythmogenic burden.105- 107,111",
+      "page": 27,
+      "reference_answer": "Levosimendan",
+      "required_facts": [
+        "levosimendan may be used in combination with a vasopressor",
+        "norepinephrine is a vasopressor"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "inotrope",
+        "levosimendan",
+        "slightly-indirect",
+        "vasopressor"
+      ]
+    },
+    {
+      "id": "case-050",
+      "question": "What is the outcome for patients in the low-risk category according to the validated risk scores?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p028_003",
+      "gold_passage_text": "natriuretic peptide (NP) levels, can be discharged directly home from the emergency department after a small dose of diuretics and some adjustments of oral therapy and advice to be clinically followed as outpatients. 122,123 In the last decade, several risk scores have been developed for use in emergency departments with the aim of objectively supporting dis- position decision-making process.122,124,125 However, their imple- mentation is not widespread, to date. 126 Two of these risk scores have been prospectively and externally validated for prediction of 30-day mortality, with 0% mortality in low-risk categories and they",
+      "page": 28,
+      "reference_answer": "0% mortality",
+      "required_facts": [
+        "validated risk scores",
+        "low-risk category",
+        "30-day mortality"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "clinical-scenario",
+        "mortality",
+        "risk-scores",
+        "validation"
+      ]
+    },
+    {
+      "id": "case-051",
+      "question": "What should be monitored in patients with AHF after initial stabilization?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p029_007",
+      "gold_passage_text": "haemodynamically unstable or hypoxaemic patients with AHF, and repeated at short intervals (initially e.g. every 1- 2 h) during the acute phase. 134,137 Monitoring post-stabilization After initial stabilization, routine monitoring of pulse, respiratory rate, blood pressure, and diuresis should continue, and in patients requir- ing oxygen therapy/non-invasive ventilatory support, monitoring of transcutaneous arterial oxygen saturation (SpO",
+      "page": 29,
+      "reference_answer": "Pulse, respiratory rate, blood pressure, and diuresis should continue to be monitored.",
+      "required_facts": [
+        "monitoring pulse",
+        "monitoring respiratory rate",
+        "monitoring blood pressure",
+        "monitoring diuresis"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "ahf",
+        "factual",
+        "monitoring",
+        "stabilization"
+      ]
+    },
+    {
+      "id": "case-052",
+      "question": "What sign of hypoperfusion is mentioned in the passage?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p030_003",
+      "gold_passage_text": "• Need for intubation (or already intubated). • Poor response to high FiO2 or to NIV. • Signs/symptoms/markers of hypoperfusion: cold extremities, altered mentation, confusion, oliguria, lactate >2 mmol/L. • Persistent hypotension (SBP <90 mmHg). • Requirement for two or more vasoactive agents to maintain blood pressure. • Requirement for invasive cardiac output monitoring. • Requirement for MCS. • Heart rate <40 b.p.m. or persistent life-threatening arrhythmia. • Any associated non-cardiac condition requiring critical care admission (e.g. continuous venovenous hemodiaﬁltration and ultraﬁltration). b.p.m. = beats per minute; FiO2 = fraction of inspired oxygen; MCS = mechanical circulatory support; NIV = non-invasive ventilation; SBP = systolic blood pressure.",
+      "page": 30,
+      "reference_answer": "cold extremities",
+      "required_facts": [
+        "signs/symptoms/markers of hypoperfusion"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "clinical-signs",
+        "factual",
+        "hypoperfusion"
+      ]
+    },
+    {
+      "id": "case-053",
+      "question": "What is the initial dose range for nitroglycerine in micrograms per minute (mcg/min)?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p031_008",
+      "gold_passage_text": "Vasodilator Dosing Main side effects Other Nitroglycerine Start with 10 - 20 lg/min, increase up to 200 lg/min Hypotension, headache Tolerance in continuous use Isosorbide dinitrate Start with 1 mg/h, increase up to 10 mg/h Hypotension, headache Tolerance in continuous use Nitroprusside Start with 0.3 lg/kg/min and increase up to 5lg/kg/min Hypotension, isocyanate toxicity Light sensitivity ESC Guidelines 31",
+      "page": 31,
+      "reference_answer": "10 - 20",
+      "required_facts": [
+        "initial dose range for nitroglycerine",
+        "nitroglycerine dosing"
+      ],
+      "forbidden_facts": [
+        "tolerance in continuous use for nitroglycerine"
+      ],
+      "tags": [
+        "clinical-scenario",
+        "dosing",
+        "vasodilators"
+      ]
+    },
+    {
+      "id": "case-054",
+      "question": "What are the advantages of using an Impella device in patients with aortic stenosis or prosthetic aortic valve?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p032_004",
+      "gold_passage_text": "Duration Days to weeks 10 days for Impella 2.5 and CP and 3 weeks for Impella 2- 3 weeks 3 - 4 weeks and occasionally longer Advantages Easy insertion, easy to adjust, cath lab not manda- tory, no extracorporeal blood; increase coronary and cerebral ﬂow ECG and pulse independent relatively easy insertion in cath lab, no extracorporeal blood Rhythm independent, less artiﬁcial surface than ECMO Can be used in patients with aortic stenosis/prosthetic aortic valve; can be used even in LV thrombus Rhythm independent, no",
+      "page": 32,
+      "reference_answer": "Can be used in patients with aortic stenosis/prosthetic aortic valve.",
+      "required_facts": [
+        "Impella can be used in patients with aortic stenosis/prosthetic aortic valve"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "aortic-stenosis",
+        "clinical-scenario",
+        "impella",
+        "prosthetic-valve"
+      ]
+    },
+    {
+      "id": "case-055",
+      "question": "What condition is a contraindication for veno-arterio-venous conﬁguration with triple cannulation?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p033_003",
+      "gold_passage_text": "with peripheral cannula- tion. The veno-arterio- venous conﬁguration with triple cannulation avoids upper body hypoxia Contraindications - Moderate to severe aortic regurgitation - Severe aortic disease - Severe aortic stenosis - Prosthetic aortic valve - LV thrombus - VSD - Peripheral vascular disease - Severe aortic insufﬁciency - Aortic dissection - Peripheral vascular disease - RV failure - VSD - Inability to tolerate sys- temic anticoagulation - Severe aortic insufﬁciency - Aortic dissection - Inability to tolerate sys- temic anticoagulation AO = aorta; ECG = electrocardiogram; ECMO = extracorporeal membrane oxygenation; IABP = intra-aortic balloon pump; LA = left atrial; LV = left ventric ular; RA = right",
+      "page": 33,
+      "reference_answer": "Severe aortic insufﬁciency",
+      "required_facts": [
+        "Severe aortic insufﬁciency is a contraindication"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "cardiology",
+        "convention",
+        "factual"
+      ]
+    },
+    {
+      "id": "case-056",
+      "question": "What is the full name of the trial comparing sacubitril/valsartan to ACE-I in heart failure patients?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p034_005",
+      "gold_passage_text": "PARADIGM-HF = Prospective Comparison of ARNI with ACE-I to Determine Impact on Global Mortality and Morbidity in Heart Failure (trial); PARAGON-HF = Prospective Comparison of ARNI with ARB Global Outcomes in HF with preserved Ejection Fraction (trial); RALES = Randomized Aldactone Evaluation Study; Sac/Val = sacubitril/valsartan; SENIORS = Study of the Effects of Nebivolol Intervention on Outcomes and Rehospitalisations in Seniors with Heart Failure (trial); SGLT2 = sodium-glucose co-transporte r 2; SOLVD-Treatment = Studies of Left Ventricular Dysfunction Treatment (trial); TOPCAT = Treatment of Preserved Cardiac Function Heart Failure with an Aldosterone Antagonist (trial) ; VICTORIA = Vericiguat Global Study",
+      "page": 34,
+      "reference_answer": "PARADIGM-HF",
+      "required_facts": [
+        "PARADIGM-HF is a trial comparing sacubitril/valsartan to ACE-I"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "factual",
+        "heart-failure",
+        "sacubitril-valsartan",
+        "trials"
+      ]
+    },
+    {
+      "id": "case-057",
+      "question": "What echocardiographic findings are necessary for diagnosing amyloidosis in the absence of characteristic findings?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p035_007",
+      "gold_passage_text": "cardiac magnetic resonance for the diagnosis of amyloidosis Echocardiography Unexplained LV thickness (>_12 mm) plus 1 or 2: 1. Characteristic echocardiography ﬁndings (>_2 of a, b, and c have to be present) a. Grade 2 or worse diastolic dysfunction b. Reduced tissue Doppler s’, e’, and a’ waves velocities (<5 cm/s) c. Decreased global longitudinal LV strain (absolute value < - 15%).",
+      "page": 35,
+      "reference_answer": "Grade 2 or worse diastolic dysfunction, reduced tissue Doppler s', e', and a' waves velocities (<5 cm/s), and decreased global longitudinal LV strain (absolute value < -15%).",
+      "required_facts": [
+        "characteristic echocardiography findings",
+        "diagnosing amyloidosis",
+        "echocardiographic findings"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "amyloidosis",
+        "diagnosis",
+        "echocardiography",
+        "paraphrased-factual"
+      ]
+    },
+    {
+      "id": "case-058",
+      "question": "Which trial involved the use of dapagliﬂozin?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p008_003",
+      "gold_passage_text": "(trial); CR = controlled release; CV = cardiovascular; DAPA-HF = Dapagliﬂozin And Prevention of Adverse outcomes in Heart Failure (trial); EMPEROR- Reduced = Empagliﬂozin Outcome Trial in Patients with Chronic Heart Failure and a Reduced Ejection Fraction (trial); EMPHASIS-HF = Eplerenone in Mild Patient s Hospitalization and SurvIval Study in Heart Failure (trial); GALACTIC-HF = Global Approach to Lowering Adverse Cardiac Outcomes through Improving Contractility in Hea rt Failure (trial); h = hours; HF = heart failure; i.v. = intravenous; LVEF = left ventricular ejection fraction; LVIDD = left ventricular internal diastolic dimension; MER IT-HF = Metoprolol CR/XL",
+      "page": 8,
+      "reference_answer": "DAPA-HF",
+      "required_facts": [
+        "DAPA-HF involved dapagliﬂozin"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "factual",
+        "heart-failure",
+        "medication",
+        "trials"
+      ]
+    },
+    {
+      "id": "case-059",
+      "question": "Which condition is a contraindication for this treatment?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p009_001",
+      "gold_passage_text": "Indications: 1. Patients with HFrEF. Contraindications: 1. History of angioedema 2. Known bilateral renal artery stenosis. 3. Pregnancy/risk of pregnancy. 4. Known allergic reaction/other adverse reaction (drug-speciﬁc). Cautions/seek specialist advice: 1. Signiﬁcant hyperkalaemia (K + >5.0 mmol/L). 2. Signiﬁcant renal dysfunction [creatinine >221 lmol/L (>2.5 mg/dL) or eGFR <30 mL/min/1.73 m2].",
+      "page": 9,
+      "reference_answer": "History of angioedema",
+      "required_facts": [
+        "contraindications include history of angioedema"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "contraindications",
+        "factual",
+        "medical",
+        "treatment"
+      ]
+    },
+    {
+      "id": "case-060",
+      "question": "What are the expected benefits of the treatment for heart failure mentioned in the passage?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p010_005",
+      "gold_passage_text": "• Explain expected beneﬁts: • Improved symptoms and exercise capacity. • Prevention of worsening of HF leading to hospital admission. • Increased survival. • Symptoms improve within a few weeks to a few months after starting treatment. • Advise patients to report principal adverse effects (i.e. dizziness/symptomatic hypotension, cough)—see PROBLEM SOLVING. • Advise patients to avoid NSAIDsd not prescribed by a physician (i.e. purchased over-the-counter) and salt substitutes high in K+—see PROBLEM",
+      "page": 10,
+      "reference_answer": "Improved symptoms and exercise capacity, prevention of worsening of heart failure leading to hospital admission, increased survival",
+      "required_facts": [
+        "improved symptoms and exercise capacity",
+        "prevention of worsening of heart failure",
+        "increased survival"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "heart-failure",
+        "paraphrased-factual",
+        "treatment-benefits"
+      ]
+    },
+    {
+      "id": "case-061",
+      "question": "A patient with heart failure is experiencing increasing fatigue. What is the recommended initial action?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p011_006",
+      "gold_passage_text": "Worsening symptoms or signs (e.g. increasing dyspnoea, fatigue, oedema, weight gain): • If increasing congestion, increase a dose of diuretic or halve a dose of beta-blocker (if increasing diuretic dose does not work). • If marked fatigue (or bradycardia—see below), halve a dose of beta-blocker (rarely necessary); review patient in 1 - 2 weeks; if not improved, seek spe- cialist advice. • If serious deterioration, halve the dose of beta-blocker or stop this treatment (rarely necessary); seek specialist advice.",
+      "page": 11,
+      "reference_answer": "Halve the dose of beta-blocker.",
+      "required_facts": [
+        "Marked fatigue is a worsening symptom.",
+        "Halving the dose of beta-blocker is a recommended action.",
+        "Specialist advice is sought if the condition does not improve."
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "clinical-scenario",
+        "heart-failure",
+        "symptom-management",
+        "treatment-adjustment"
+      ]
+    },
+    {
+      "id": "case-062",
+      "question": "What should patients do during the initiation or uptitration phase of beta-blocker therapy to detect potential deterioration early?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p012_003",
+      "gold_passage_text": "by an adjustment of other medication; patients should be advised not to stop beta-blocker therapy without consulting the physician. • During initiation or uptitration phase to detect and to treat potential deterioration early, patients should be encouraged to weigh themselves daily (after waking, before dressing, after voiding, before eating), and to increase their diuretic dose should their weight increase, persistently (>2 days) by>1.5- 2.0 kg/day. AV = atrio-ventricular; b.i.d. = twice daily; b.p.m. = beats per minute; COPD = chronic obstructive pulmonary disease; CR = controlled release; ECG = electrocardiogram; HF",
+      "page": 12,
+      "reference_answer": "Encourage patients to weigh themselves daily and increase diuretic dose if weight increases persistently by >1.5-2.0 kg/day.",
+      "required_facts": [
+        "patients should weigh themselves daily",
+        "increase diuretic dose if weight increases persistently",
+        "detection of potential deterioration early"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "beta-blockers",
+        "clinical-scenario",
+        "patient-monitoring",
+        "therapy-management"
+      ]
+    },
+    {
+      "id": "case-063",
+      "question": "What side effect might male patients experience when treated with spironolactone?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p013_003",
+      "gold_passage_text": "is added to just an ACE-I or an ARB given singly; this triple combination of an ACE-I, ARB, and MRA is NOT recommended (see recommendations below). • Some ‘low-salt’ substitutes have a high K+ content. • Male patients treated with spironolactone may uncommonly develop breast discomfort or gynaecomastia (switching to eplerenone should be considered).",
+      "page": 13,
+      "reference_answer": "breast discomfort or gynaecomastia",
+      "required_facts": [
+        "spironolactone can cause side effects in male patients",
+        "the side effect is breast discomfort or gynaecomastia"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "clinical-scenario",
+        "male-patients",
+        "side-effects",
+        "spironolactone"
+      ]
+    },
+    {
+      "id": "case-064",
+      "question": "A patient on ARNI therapy shows a creatinine increase. What should be done if the creatinine continues to rise despite adjusting concomitant medications?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p014_008",
+      "gold_passage_text": "inhibitor. • If greater rises in creatinine or K+ than those outlined above persist despite adjustment of concomitant medications, the dose of the ARNI should be halved and blood chemistry re-checked within 1- 2 weeks; if there is still an unsatisfactory response, specialist advice should be sought. • If K+ rises to >5.5 mmol/L or eGFR lowers to <30 mL/min/1.73 m2, the ARNI should be stopped and specialist advice sought. • Blood chemistry should be monitored frequently and serially until K+ and creatinine have plateaued.",
+      "page": 14,
+      "reference_answer": "The dose of the ARNI should be halved and blood chemistry re-checked within 1-2 weeks. If there is still an unsatisfactory response, specialist advice should be sought.",
+      "required_facts": [
+        "greater rises in creatinine",
+        "adjustment of concomitant medications",
+        "dose of the ARNI should be halved"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "arni",
+        "clinical-scenario",
+        "creatinine",
+        "dose-adjustment"
+      ]
+    },
+    {
+      "id": "case-065",
+      "question": "What should be monitored in a diabetic patient starting SGLT2 inhibitors?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p015_006",
+      "gold_passage_text": "• Check renal function when starting the therapy and monitor regularly. eGFR is known to dip slightly after initiation but the SGLT2 inhibitors appear tob e reno-protective. • Monitor glycaemia regularly, particularly when a patient is diabetic. Consider modiﬁcation of other diabetic drugs. • Identify the risk factors predisposing to ketoacidosis and eliminate them if possible. • Monitor ﬂuid balance regularly, particularly when a patient is taking diuretics, is old and/or frail. Consider an adjustment of diuretic therapy andﬂuid intake. • A specialist HF nurse may assist with education of the patient, follow-up (in person or by telephone), and biochemical monitoring.",
+      "page": 15,
+      "reference_answer": "Glycaemia",
+      "required_facts": [
+        "monitor glycaemia regularly",
+        "patient is diabetic"
+      ],
+      "forbidden_facts": [
+        "renal function not monitored after starting therapy"
+      ],
+      "tags": [
+        "diabetes",
+        "monitoring",
+        "sglt2-inhibitors",
+        "slightly-indirect"
+      ]
+    },
+    {
+      "id": "case-066",
+      "question": "Which patient group is particularly at risk for developing complications such as dehydration, symptomatic hypotension, and prerenal renal failure?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p016_001",
+      "gold_passage_text": "Hypoglycaemia • Other diabetic drugs (particularly, insulin and/or sulfonylurea derivates) may predispose to hypoglycaemia; in this case, the diabetic treatmentstrategy needs to be modiﬁed. Dehydration, hypotension, and prerenal renal failure • SGLT2 inhibitors may intensify the diuresis, particularly when accompanied by Sac/Val and diuretic therapy. • Fluid balance needs to be monitored. Diuretic doses along with ﬂuid intake should be balanced in order to avoid dehydration, symptomatic hypotension, and prerenal renal failure. • Elderly and frail patients are at particular risk of developing these complications.",
+      "page": 16,
+      "reference_answer": "elderly and frail patients",
+      "required_facts": [
+        "elderly and frail patients are at particular risk"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "complications",
+        "elderly",
+        "factual",
+        "frailty"
+      ]
+    },
+    {
+      "id": "case-067",
+      "question": "A patient with hypokalaemia is on an ACE-I. What is the recommended initial step?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p017_004",
+      "gold_passage_text": "Hypokalaemia/hypomagnesaemia: • Increase an ACE-I/ARB dose. • Add an MRA, K+ supplements; magnesium supplements. Hyponatraemia (<135 mmol/L): • Volume depleted: • Stop thiazide or switch to loop diuretic, if possible. • Reduce dose/stop loop diuretics if possible. • Volume overloaded: • Fluid restriction. • Consider increasing dose of loop diuretic. • Consider AVP antagonist (e.g. tolvaptan if available). • i.v. inotropic support. • Consider ultraﬁltration.",
+      "page": 17,
+      "reference_answer": "Increase the ACE-I dose.",
+      "required_facts": [
+        "Increase an ACE-I/ARB dose for hypokalaemia"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "ace-i",
+        "clinical-scenario",
+        "hypokalaemia"
+      ]
+    },
+    {
+      "id": "case-068",
+      "question": "A 58-year-old male with heart failure (NYHA class III) and an ejection fraction of 30% is on a beta-blocker but still has a resting heart rate of 80 bpm. Can this patient be considered for a specific treatment based on the given criteria?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p018_003",
+      "gold_passage_text": "Indications: 1. Patients with stable symptomatic HF (NYHA class II - IV) and an EF <_ 35% SR and resting heart rate >_70 b.p.m. despite guideline-recommended treat- ment (in particular, an evidence-based dose of beta-blocker). Contraindications: 1. Unstable CV conditions (ACS, stroke/TIA, severe hypotension). 2. AF.",
+      "page": 18,
+      "reference_answer": "Yes, the patient can be considered for the specific treatment as he meets the criteria of stable symptomatic HF (NYHA class II - IV) and an EF < 35% with a resting heart rate > 70 bpm despite guideline-recommended treatment.",
+      "required_facts": [
+        "NYHA class II - IV",
+        "EF < 35%",
+        "resting heart rate > 70 bpm"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "clinical-scenario",
+        "criteria",
+        "heart-failure",
+        "treatment"
+      ]
+    },
+    {
+      "id": "case-069",
+      "question": "What should be done if a patient's heart rate drops below 50 beats per minute while on ivabradine therapy?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p019_003",
+      "gold_passage_text": "• Treatment must be reduced or stopped if resting heart rate decreases persistently below 50 b.p.m. or if symptoms of bradycardia occur: • Review need for other heart rate-slowing drugs or drugs interfering with ivabradine liver metabolism. • Arrange ECG to exclude other than sinus bradycardia rhythm disturbances. • Consider screening for secondary causes of bradyarrhythmias (e.g. thyroid dysfunction). • If a patient develops persistent/continuous AF during therapy with ivabradine, the drug should be stopped. • Visual phenomena are usually transient and disappear during the ﬁrst few months of ivabradine treatment and are not associated with serious retinal dys-",
+      "page": 19,
+      "reference_answer": "Reduce or stop the treatment.",
+      "required_facts": [
+        "heart rate below 50 b.p.m.",
+        "symptoms of bradycardia",
+        "treatment with ivabradine"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "heart-rate",
+        "ivabradine",
+        "paraphrased-factual",
+        "treatment"
+      ]
+    },
+    {
+      "id": "case-070",
+      "question": "Which trial compared the use of sacubitril/valsartan with an ARB in patients with heart failure and preserved ejection fraction?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p021_003",
+      "gold_passage_text": "Investigation Group; HF = heart failure; HFmrEF = heart failure with mildly reduced ejection fraction; IPD = individual patient data; I-PRESERVE = Ir besartan in Patients with Heart Failure and PRESERVEd Ejection Fraction (trial); LVEF = left ventricular ejection fraction; MRA = mineralocorticoid receptor antagonist; NP = natriuretic peptide; NYR = not yet reported; PARAGON-HF = Prospective Comparison of ARNI with ARB Global Outcomes in HF with Preserved Ejection Fraction (trial); PEP-CHF = Peri ndopril in Elderly People with Chronic Heart Failure (trial); Sac/Val = sacubitril/valsartan; SR = sinus rhythm; TOPCAT = Treatment of Preserved Cardiac Funct ion Heart Failure with an",
+      "page": 21,
+      "reference_answer": "PARAGON-HF",
+      "required_facts": [
+        "Sac/Val",
+        "compared with ARB",
+        "heart failure with preserved ejection fraction"
+      ],
+      "forbidden_facts": [
+        "I-PRESERVE"
+      ],
+      "tags": [
+        "ejection-fraction",
+        "heart-failure",
+        "slightly-indirect",
+        "trial"
+      ]
+    },
+    {
+      "id": "case-071",
+      "question": "What was the percentage change in total heart failure hospitalizations or cardiovascular death with the Sac/Val treatment?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p022_001",
+      "gold_passage_text": "in total HF hospitalizations or CV death by 13%, 95% CI, 0.75- 1.01, P=0.056) Sac/Val - no improvement in QOL-KCCQ 6MWT = 6-minute walk test; AF = atrial ﬁbrillation; Aldo-DHF = Aldosterone Receptor Blockade in Diastolic Heart Failure (trial); ARB = angiotensin-r eceptor blocker; ARNI = angiotensin receptor-neprilysin inhibitor; BNP = B-type natriuretic peptide; CHARM-Preserved = Candesartan Cilexetil in Heart Failure - Assessment of Reduction in Mortality and Morbidity (trial); CI = conﬁdence interval; CV = cardiovascular; DIG = Digitalis Investigation Group; DIG-PEF = Ancillary DIG trial (effects of digoxin on morbidity",
+      "page": 22,
+      "reference_answer": "13%",
+      "required_facts": [
+        "percentage change in total heart failure hospitalizations or cardiovascular death",
+        "Sac/Val treatment"
+      ],
+      "forbidden_facts": [
+        "improvement in QOL-KCCQ",
+        "6-minute walk test"
+      ],
+      "tags": [
+        "cardiovascular",
+        "clinical-scenario",
+        "heart-failure",
+        "treatment"
+      ]
+    },
+    {
+      "id": "case-072",
+      "question": "What is the minimum NT-proBNP level that indicates persistently elevated levels in this patient's case?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p024_002",
+      "gold_passage_text": "• Hb <_ 120 g/L • Persistently elevated high BNP/NT-proBNP, e.g. NT- proBNP >_1000 pg/mL • Abnormal liver function test • Low albumin • LVEF <_ 30% • Large area of akinesis/dyskine- sis or aneurysm • Moderatea-severe mitral regurgitation • RV dysfunction • Systolic PA pressure >_50 mmHg • Moderate-severe tricuspid regurgitation • Difﬁcult to grade aortic stenosis • IVC dilated or without respira- tory variation • MAGGIC predicted survival <_ 80% at 1 year • SHFM predicted survival <_ 80% at 1 year • MECKI predicted survival",
+      "page": 24,
+      "reference_answer": "NT-proBNP >_1000 pg/mL",
+      "required_facts": [
+        "elevated high BNP/NT-proBNP",
+        "NT-proBNP level"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "bnp",
+        "bnp-levels",
+        "paraphrased-factual"
+      ]
+    },
+    {
+      "id": "case-073",
+      "question": "What is the 6-month survival rate for patients with the MOMENTUM 3 device compared to HeartMate II?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p025_004",
+      "gold_passage_text": "30-day survival, 92% 6-month sur- vival; 92% 6-month survival; 1-year survival similar to other devices. 102,103 MOMENTUM 3 (randomized, HeartMate 3 vs. HeartMate II, both BTT and DT, n = 294): centrifugal ﬂow pump non-inferior to axial-ﬂow pump at 6 months; superiority also established (hazard ratio 0.55; 95% CI 0.32- 0.95; P =0.04). MOMENTUM 3, 2-year outcomes (n = 366): survival free of disabling stroke or survival free of reoperation to replace/remove device [hazard ratio 0.46; 95% CI 0.31- 0.69, P <0.001, (superiority)]. • No pump thrombosis in",
+      "page": 25,
+      "reference_answer": "92%",
+      "required_facts": [
+        "6-month survival",
+        "MOMENTUM 3 vs. HeartMate II",
+        "survival rate"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "clinical-scenario",
+        "pump-devices",
+        "survival-rate"
+      ]
+    },
+    {
+      "id": "case-074",
+      "question": "What is the name of the multicenter study involving the HeartMate 3 device?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p026_002",
+      "gold_passage_text": "(trial); HF = heart failure; LV = left ventricular; LVAD = left ventricular assist device; MOMENTUM 3 = Multicenter study of MagLev Technology in Patie nts Undergoing Mechanical Circulatory Support Therapy with HeartMate 3; n = number of patients; NYHA = New York Heart Association; OMM = optimal medical management; ROADMAP = Risk Assessment and Comparative Effectiveness of Left Ventricular Assist Device and Medical Management in Ambulatory Heart Failure Patients (trial); RV = right ventricular; vs. = versus.",
+      "page": 26,
+      "reference_answer": "MOMENTUM 3",
+      "required_facts": [
+        "MOMENTUM 3 is a multicenter study",
+        "HeartMate 3 is used in the study"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "device",
+        "factual",
+        "heartmate-3",
+        "study"
+      ]
+    },
+    {
+      "id": "case-075",
+      "question": "What test is recommended for diagnosing pulmonary embolism in a patient with acute heart failure?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p027_006",
+      "gold_passage_text": "Acute HF Acute HF Pulmonary embolism or ACS or RVF PMR or endocarditis or chordae rupture Aortic dissection Tamponade/wall rupture IVS rupture (ACS) Acute HF Coronary angiography/PCI D-dimer/echocardiogram/ CT-scan/coronary angiography Laboratory test/TOE/emergent surgery Emergent surgery Pericardiocentesis/emergent surgery MCS as bridge to surgery Lung ultrasound B lines Pleural effusion Acute HF Acute HF ACS = acute coronary syndrome; AF = atrial ﬁbrillation; AMI = acute myocardial infarction; CT = computed tomography; ECG = electrocardiogram; FoCUS = Focus Cardiac Ultrasound; HF = heart failure; IVC = inferior vena cava; IVS = interventricular septum; LV = left ventricular; PCI = percutaneous coronary intervention; PMR = papillary muscle",
+      "page": 27,
+      "reference_answer": "CT-scan",
+      "required_facts": [
+        "pulmonary embolism",
+        "CT-scan",
+        "acute heart failure"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "acute-hf",
+        "diagnosis",
+        "factual",
+        "pulmonary-embolism"
+      ]
+    },
+    {
+      "id": "case-076",
+      "question": "What is the recommended timing for the use of temporary mechanical circulatory support in patients with cardiogenic shock?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p028_001",
+      "gold_passage_text": "In patients with cardiogenic shock refractory to inotropes/vaso- pressors, the early use of temporary MCS represents a therapeutic modality that is available as a bridge to recovery (BTR) or as a bridge to decision (BTD) for long-term ventricular assist device, transplantation or withdrawal of therapy(Guidelines, Figure 10). Appropriate patient selection is influenced by the balance between efficacy, institutional experience, and device-related complications. Timing of insertion is important, preferring early use, before occur- rence of extensive multiorgan failure, and avoiding futile situations. 106,107,111",
+      "page": 28,
+      "reference_answer": "Early use, before the occurrence of extensive multiorgan failure.",
+      "required_facts": [
+        "early use of temporary MCS",
+        "before extensive multiorgan failure"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "cardiogenic-shock",
+        "paraphrased-factual",
+        "temporary-mechanical-support"
+      ]
+    },
+    {
+      "id": "case-077",
+      "question": "What monitoring is recommended for patients with haemodynamic instability?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p029_005",
+      "gold_passage_text": "illness and haemodynamic instability. Patients with haemodynamic instability should be triaged to a location where high-end monitoring, including invasive venous and arterial pressure, and cardiac output monitoring (invasive and non-invasive) according to the level of sup- port required/anticipated. Immediate echocardiography is mandatory in patients with haemodynamic instability and in patients suspected of acute life-threatening structural cardiac abnormalities (mechanical complications, acute valvular regurgitation, aortic dissection). Early echocardiography should be considered in all patients with new onset AHF or haemodynamic instability. Pulmonary artery (PA) cath- eterization may be considered in patients who, despite pharmacologi-",
+      "page": 29,
+      "reference_answer": "High-end monitoring including invasive venous and arterial pressure, and cardiac output monitoring.",
+      "required_facts": [
+        "high-end monitoring",
+        "invasive venous and arterial pressure",
+        "cardiac output monitoring"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "factual",
+        "haemodynamic-instability",
+        "monitoring"
+      ]
+    },
+    {
+      "id": "case-078",
+      "question": "What condition might require airway protection in a patient with progressive respiratory failure?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p030_001",
+      "gold_passage_text": "Cardiac or respiratory arrest Progressive worsening of altered mental status Progressive worsening of respiratory failure with hypoxaemia [PaO 2 <60 mmHg (8.0 kPa)], hypercapnia [PaCO2 >50 mmHg (6.65 kPa)] and acidosis (pH <7.35), despite NIV Need of airway protection Persistent haemodynamic instability Agitation or intolerance to NIV with progressive respiratory failure NIV = non-invasive ventilation; PaCO2 = partial pressure of carbon dioxide; PaO2 = partial pressure of oxygen. From 154",
+      "page": 30,
+      "reference_answer": "Persistent haemodynamic instability",
+      "required_facts": [
+        "need of airway protection",
+        "progressive respiratory failure"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "airway-protection",
+        "factual",
+        "respiratory-failure"
+      ]
+    },
+    {
+      "id": "case-079",
+      "question": "What support method might be used if a patient with cardiogenic shock does not respond to drug therapy?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p031_002",
+      "gold_passage_text": "results, IABP is not routinely recommended in cardiogenic shock post-myocardial infarction. However, it may still be considered in car- diogenic shock refractory to drug therapy as a BTD, BTR, bridge to bridge. Extracorporeal membrane oxygenation(ECMO) is a simplified cardi- opulmonary bypass machine driven by centrifugal blood pump, which can be used in either veno-arterial (VA) or veno-venous configura- tion. Although VA-ECMO provides full circulatory support, it does not decompress the left ventricle. Depending on the severity of myo- cardial dysfunction and/or concomitant mitral or aortic regurgitation,",
+      "page": 31,
+      "reference_answer": "Intra-aortic balloon pump (IABP) or extracorporeal membrane oxygenation (ECMO) might be considered.",
+      "required_facts": [
+        "IABP may be considered in cardiogenic shock refractory to drug therapy",
+        "ECMO can be used in cardiogenic shock"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "cardiogenic-shock",
+        "paraphrased-factual",
+        "support-methods"
+      ]
+    },
+    {
+      "id": "case-080",
+      "question": "What is the primary function of the LV in the context of the passage?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p032_002",
+      "gold_passage_text": "(decrease in afterload) Expels blood from LV to Aspirates oxygenated blood from LA and returns to iliac artery Drainage of deoxygenated venous blood, via an extrac- orporeal centrifugal pump over a membrane oxygena- tor and pumped back oxy- genated blood to iliac artery LV unloading ( +) ++ ++ LV overloading in peripheral cannulation Only RV unloading Technical characteristics - Cannula size 7- 8F - Cardiac output: 0.3- 0.5 L/min - Pulsatile ﬂow - Cannula size 12- 14 F for CP and 21 F for",
+      "page": 32,
+      "reference_answer": "Expels blood from LV to Aspirates oxygenated blood from LA and returns to iliac artery",
+      "required_facts": [
+        "LV expels blood",
+        "LV aspirates oxygenated blood from LA"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "blood-flow",
+        "factual",
+        "lv-function"
+      ]
+    },
+    {
+      "id": "case-081",
+      "question": "What is a mandatory requirement for the Impella 5.0 device?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p033_004",
+      "gold_passage_text": "atrial; r.p.m. = revolutions per minute; RV = right ventricular; VA = veno-arterial; VSD = ventricular septal defect. Percutaneous mechanical circulatory supports can be characterized by one of four circuit conﬁgurations: 1. intra-aortic devices, 2. transvalvular aortic (Impella) 3. left atrium to systemic artery (TandemHeart); 4. right atrium to systemic artery (veno-arterial extracorporeal membrane oxygenation). aFor Impella 5.0 surgical cut-down for cannulation is mandatory. From 171 ESC Guidelines 33",
+      "page": 33,
+      "reference_answer": "surgical cut-down for cannulation",
+      "required_facts": [
+        "Impella 5.0 requires a surgical cut-down for cannulation",
+        "Impella 5.0 is a percutaneous mechanical circulatory support"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "cannulation",
+        "clinical-scenario",
+        "medical-device",
+        "surgical-procedure"
+      ]
+    },
+    {
+      "id": "case-082",
+      "question": "What does LVEF stand for in the context of heart failure?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p034_004",
+      "gold_passage_text": "Chronic Heart Failure with Reduced Ejection Fraction; EMPHASIS-HF = Eplerenone in Mild Patients Hospitalization and SurvIval Study in Heart Failur e (trial); GALACTIC-HF = Global Approach to Lowering Adverse Cardiac Outcomes Through Improving Contractility in Heart Failure (trial); HF = heart failure; ICD = implantable cardioverter-deﬁbrillator; LVEF = left ven- tricular ejection fraction; MADIT II = Multicenter Autonomic Deﬁbrillator Implantation Trial II; MERIT-HF = Metoprolol CR/XL Randomized Interven tion Trial in Congestive Heart Failure; min = minute; MRA = mineralocorticoid receptor antagonist; N/A = not available; NP = natriuretic peptide; NYHA = New York Heart Association, o.d. = omn e in die (once daily);",
+      "page": 34,
+      "reference_answer": "Left ventricular ejection fraction",
+      "required_facts": [
+        "LVEF stands for left ventricular ejection fraction"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "factual",
+        "heart-failure",
+        "medical-terminology"
+      ]
+    },
+    {
+      "id": "case-083",
+      "question": "What should be done if a patient's potassium level is 4.7 mEq/L and they are not on the maximal tolerated dose of RAAS inhibitor?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p035_005",
+      "gold_passage_text": "aetiology is identiﬁed. RAAS inhibitors should be optimized when K+ levels are <5.0 mEq/L. • In patients with K+ levels of 4.5- 5.0 mEq/L not on maximal tolerated, guideline-recommended target dose of RAAS inhibitor therapy, RAAS inhibitor therapy can be initiated/uptitrated with a close monitoring of K+ levels. If K+ levels rise above 5.0 mEq/L, initiate an approved K+-lowering agent. • In patients with K+ levels of >5.0- <_ 6.5 mEq/L not on maximal tolerated, guideline-recommended target dose of RAAS inhibitor therapy, an approved K+-lowering agent should be initiated. If levels <5.0 mEq/L are detected, uptitrate RAAS inhibitor; K+ level should be closely monitored and K+-lowering",
+      "page": 35,
+      "reference_answer": "Initiate or uptitrate RAAS inhibitor with close monitoring of K+ levels.",
+      "required_facts": [
+        "K+ levels of 4.5-5.0 mEq/L",
+        "not on maximal tolerated dose of RAAS inhibitor therapy"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "factual",
+        "potassium-levels",
+        "raas-inhibitors",
+        "therapeutic-monitoring"
+      ]
+    },
+    {
+      "id": "case-084",
+      "question": "What is the difference in CV death rate between the two groups in the ATLAS trial?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p008_002",
+      "gold_passage_text": "CV death by 8% (37% vs. 39.1%, P <0.001) ACE-I = angiotensin-converting enzyme inhibitor; ARB = angiotensin-receptor blocker; ARNI = angiotensin-receptor neprilysin inhibitor; ATLAS = Assessment of Treatment with Lisinopril And Survival (trial); BNP = B-type natriuretic peptide; b.p.m. = beats per minute; CIBIS-II = Cardiac Insufﬁciency Bisoprolol Study II; CHARM-Added = Candesartan Cilexitil in Heart Failure Assessment of Mortality and Morbidity (trial); CHARM-Alternative = Candesartan in Heart Failure Assessmen t of Reduction in Mortality and Morbidity (trial); CONSENSUS = Cooperative North Scandinavian Enalapril Survival Study; COPERNICUS = Carvedilol Prospective Randomized Cumu lative Survival",
+      "page": 8,
+      "reference_answer": "8%",
+      "required_facts": [
+        "difference in CV death rate",
+        "ATLAS trial"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "cardiovascular",
+        "clinical-scenario",
+        "clinical-trial",
+        "death-rate"
+      ]
+    },
+    {
+      "id": "case-085",
+      "question": "When should patients with severe heart failure be referred for specialist advice?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p009_003",
+      "gold_passage_text": "• In the community in stable patients (NYHA class IV/patients with severe HF and those with a current/recent exacerbation should be referred for special- ist advice). • In patients hospitalized with worsening HF—after stabilizing, relieving congestion, and if possible, restoring ‘euvolaemia’ (but ideally beforedischarge). • Other exceptions—see ‘ Cautions/seek specialist advice’.",
+      "page": 9,
+      "reference_answer": "In the community for stable patients (NYHA class IV) and those with a current/recent exacerbation, and in patients hospitalized with worsening HF after stabilization and relieving congestion, but ideally before discharge.",
+      "required_facts": [
+        "patients with severe heart failure should be referred for specialist advice",
+        "referral should occur in the community for stable patients (NYHA class IV) and those with a current/recent exacerbation",
+        "referral should also occur in patients hospitalized with worsening HF after stabilization and relieving congestion, but ideally before discharge"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "factual",
+        "heart-failure",
+        "referral",
+        "specialist-advice"
+      ]
+    },
+    {
+      "id": "case-086",
+      "question": "A patient reports dizziness and low blood pressure. What should be considered in their treatment?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p010_001",
+      "gold_passage_text": "Asymptomatic low blood pressure: • Does not usually require any change in therapy. Symptomatic hypotension: • Dizziness/light headedness is common and often improves with time—patients should be reassured. • Reconsider need for nitrates, calcium-channel blockerse and other vasodilators and reduce dose/stop, if possible. • If no signs or symptoms of congestion, consider reducing diuretic dose. • If these measures do not solve problem, seek specialist advice.",
+      "page": 10,
+      "reference_answer": "Reassure the patient, consider reducing the dose of nitrates, calcium-channel blockers, or other vasodilators, and seek specialist advice if symptoms persist.",
+      "required_facts": [
+        "Symptomatic hypotension can cause dizziness",
+        "Nitrates, calcium-channel blockers, and other vasodilators can be reduced in dose",
+        "Seek specialist advice if measures do not solve the problem"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "clinical-scenario",
+        "hypotension",
+        "treatment",
+        "vasodilators"
+      ]
+    },
+    {
+      "id": "case-087",
+      "question": "What condition must be managed before starting a beta-blocker according to the passage?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p011_002",
+      "gold_passage_text": "4. Known allergic reaction/other adverse reaction (drug-speciﬁc). Cautions/seek specialist advice: 1. Severe (NYHA class IV) HF. 2. Current or recent (<4 weeks) exacerbation of HF (e.g. hospital admission with worsening HF), heart block, or heart rate <50 b.p.m. 3. If persisting signs of congestion, hypotension (SBP <90 mmHg), raised jugular venous pressure, ascites, marked peripheral oedema—try to relieve con- gestion and achieve ‘euvolaemia’ before starting a beta-blocker.",
+      "page": 11,
+      "reference_answer": "Persisting signs of congestion",
+      "required_facts": [
+        "congestion",
+        "euvolaemia"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "beta-blocker",
+        "congestion",
+        "factual"
+      ]
+    },
+    {
+      "id": "case-088",
+      "question": "What should be considered before stopping beta-blockers in a patient with heart failure?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p012_004",
+      "gold_passage_text": "= heart failure; HFrEF = heart failure with reduced ejection fraction; NYHA = New York Heart Association; o.d. = once daily; SBP = systolic blood pressure; XL = extended release. Note: Beta-blockers should not be stopped suddenly unless absolutely necessary (there is a risk of a ‘rebound’ increase in myocardial ischaemia or infarction and arrhythmias). Ideally, specialist advice should be sought before treatment discontinuation. aThe recommendations in this table represent expert opinion based upon relevant clinical trials (drugs, titration schedules, target doses, patient monitoring, treatment beneﬁts,",
+      "page": 12,
+      "reference_answer": "Specialist advice should be sought.",
+      "required_facts": [
+        "beta-blockers should not be stopped suddenly",
+        "risk of rebound increase in myocardial ischaemia or infarction and arrhythmias"
+      ],
+      "forbidden_facts": [
+        "can be stopped without specialist advice"
+      ],
+      "tags": [
+        "beta-blockers",
+        "heart-failure",
+        "slightly-indirect",
+        "treatment-discontinuation"
+      ]
+    },
+    {
+      "id": "case-089",
+      "question": "A patient on MRA therapy has a creatinine level of 221 μmol/L and an eGFR of 30 mL/min/1.73 m². What should be the next step in management?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p013_001",
+      "gold_passage_text": "• Start with a low dose (see above). • Consider dose up-titration after 4- 8 weeks. • Check blood chemistry at 1 and 4 weeks after starting/increasing dose and at 8 and 12 weeks; 6, 9, and 12 months; 4-monthly thereafter. • If K+ rises above 5.5 mmol/L or creatinine rises to 221lmol/L (2.5 mg/dL)/eGFR <30 mL/min/1.73 m2, halve a dose and monitor blood chemistry closely. • If K+ rises to >6.0 mmol/L or creatinine to >310lmol/L (3.5 mg/dL) eGFR <20 mL/min/1.73 m2, stop MRA immediately and seek specialist advice.",
+      "page": 13,
+      "reference_answer": "Halve the dose and monitor blood chemistry closely.",
+      "required_facts": [
+        "Creatinine rises to 221 μmol/L (2.5 mg/dL)/eGFR <30 mL/min/1.73 m²",
+        "Halve a dose and monitor blood chemistry closely"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "clinical-scenario",
+        "dose-management",
+        "mra",
+        "renal-function"
+      ]
+    },
+    {
+      "id": "case-090",
+      "question": "When should patients with severe heart failure be referred to specialists?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p014_002",
+      "gold_passage_text": "• In the community in stable patients (NYHA class IV/patients with severe HF and those with a current/recent exacerbation should be referred for specialist advice). • In patients hospitalized with worsening HF—after stabilizing, relieving congestion, and if possible, restoring ‘euvolaemia’ (but ideally beforedischarge). • Other exceptions—see ‘Cautions/seek specialist advice’.",
+      "page": 14,
+      "reference_answer": "In the community for stable patients with severe heart failure or those with a recent exacerbation, and in patients hospitalized with worsening heart failure after stabilization and relief of congestion, but ideally before discharge.",
+      "required_facts": [
+        "patients with severe heart failure should be referred for specialist advice",
+        "referral should occur in the community for stable patients",
+        "referral should occur in hospitalized patients after stabilization"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "heart-failure",
+        "hospitalization",
+        "paraphrased-factual",
+        "specialist-referral"
+      ]
+    },
+    {
+      "id": "case-091",
+      "question": "What does ARNI stand for in the context of heart failure treatment?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p015_002",
+      "gold_passage_text": "ACE-I = angiotensin-converting enzyme inhibitor; ARB = angiotensin-receptor blocker; ARNI = angiotensin-receptor neprilysin inhibitor; b.i.d. = twice daily; BUN = blood urea nitrogen; CV = cardiovascular; eGFR = estimated glomerular ﬁltration rate; HF = heart failure; HFrEF = heart failure with reduced ejection fraction; K+ = potassium; MRA = mineralocorticoid receptor antagonist; NSAID = non-steroidal anti-inﬂammatory drug; NYHA = New York Heart Association; PARADIGM-HF = Prospectiv e Comparison of ARNI with ACE-I to Determine Impact on Global Mortality and Morbidity in Heart Failure (trial); Sac/Val = sacubitril/valsartan; SBP = systolic blood pressure; SGLT2 =",
+      "page": 15,
+      "reference_answer": "Angiotensin-receptor neprilysin inhibitor",
+      "required_facts": [
+        "ARNI definition"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "factual",
+        "heart-failure",
+        "terminology"
+      ]
+    },
+    {
+      "id": "case-092",
+      "question": "A 65-year-old male with heart failure symptoms is prescribed a medication to relieve congestion. Which class of drugs should be used in combination with this medication?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p016_004",
+      "gold_passage_text": "Indications: 1. Potentially all patients with symptoms and signs of congestion, irrespective of LVEF. 2. When used, should always be used in a combination with an ACE-I (or an ARB), a beta-blocker, and an MRA in patients with HFrEF (unless any of these drugs is not tolerated/contraindicated), until signs of congestion have been relieved.",
+      "page": 16,
+      "reference_answer": "ACE-I (or ARB), a beta-blocker, and an MRA",
+      "required_facts": [
+        "used in combination with ACE-I (or ARB), a beta-blocker, and an MRA",
+        "relieves signs of congestion"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "clinical-scenario",
+        "congestion",
+        "heart-failure",
+        "medication"
+      ]
+    },
+    {
+      "id": "case-093",
+      "question": "What should be monitored after initiating diuretic therapy and after dose increases?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p017_002",
+      "gold_passage_text": "• Dose may need to be increased or decreased according to the patient’s volume status (remember that excessive diuresis is more dangerous than oedema itself). • Re-check blood chemistry 1- 2 weeks after an initiation and after any increase in dose (urea/BUN, creatinine, K+). • When to stop uptitration, reduce dose, stop treatment—see PROBLEM SOLVING. • Patients can be educated to alter their own diuretic dose, according to need (based on symptoms, signs, and weight changes). • A specialist HF nurse may assist with education of the patient, follow-up (in person or by telephone), biochemical monitoring, and dose adjustment",
+      "page": 17,
+      "reference_answer": "Blood chemistry including urea/BUN, creatinine, and K+ should be re-checked.",
+      "required_facts": [
+        "blood chemistry monitoring",
+        "urea/BUN",
+        "creatinine",
+        "K+"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "diuretics",
+        "monitoring",
+        "slightly-indirect",
+        "therapy"
+      ]
+    },
+    {
+      "id": "case-094",
+      "question": "What are the expected benefits of the treatment according to the passage?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p018_001",
+      "gold_passage_text": "• Explain expected beneﬁts: • Relieves breathlessness and oedema. • Symptoms improve quickly—usually within days of starting treatment. • Advise patients to report principal adverse effects [e.g. thirst (avoid excessive consumption of hypotonic ﬂuids, which can cause hyponatraemia) and dizzi- ness/symptomatic hypotension]—see PROBLEM SOLVING. • Advise patients to avoid NSAIDsc not prescribed by a physician (i.e. purchased over-the-counter)—may cause diuretic resistance and renal impairment. • Patient may be educated to adjust dose based on symptoms, signs, and changes in weight (if weighing regularly). • Dose may need to be decreased if there is ﬂuid loss (e.g. due to diarrhoea/vomiting, excessive sweating).",
+      "page": 18,
+      "reference_answer": "Relieves breathlessness and oedema. Symptoms improve quickly—usually within days of starting treatment.",
+      "required_facts": [
+        "relieves breathlessness and oedema",
+        "symptoms improve quickly"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "benefits",
+        "factual",
+        "treatment"
+      ]
+    },
+    {
+      "id": "case-095",
+      "question": "Which drug is mentioned for treating heart failure with reduced ejection fraction besides diuretics?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p019_006",
+      "gold_passage_text": "with heart failure with reduced ejection fraction Intervention Additional criteria beyond the presence of symptomatic HFrEF (if any) DRUGS Sacubitril/valsartan17,18 Dapagliﬂozin19 Diuretics20 Fluid overload Ferric carboxymaltose i.v.21- 23 Iron deﬁciency Ivabradine24- 26 SR >70 b.p.m. Trimetazidine27- 29 DEVICES AND INVASIVE PROCEDURES CRT30,31 Eligibility for CRT Pulmonary vein isolation32- 34 AF Percutaneous correction of severe functional mitral regurgitation35- 38 Severe functional mitral regurgitation Cardiac contractility modulation39- 41 QRS <130 ms, LVEF 25- 45% Baroreﬂex activation therapy42- 44 Phrenic nerve stimulation45- 47 Central sleep apnoea Continued ESC Guidelines 19",
+      "page": 19,
+      "reference_answer": "Sacubitril/valsartan",
+      "required_facts": [
+        "treating heart failure with reduced ejection fraction",
+        "drugs"
+      ],
+      "forbidden_facts": [
+        "ferric carboxymaltose",
+        "iron deficiency"
+      ],
+      "tags": [
+        "drugs",
+        "heart-failure",
+        "slightly-indirect"
+      ]
+    },
+    {
+      "id": "case-096",
+      "question": "What drug showed an improvement in CV mortality according to the study?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p021_001",
+      "gold_passage_text": "Clinical characteristics LVEF Symptoms Hospitalization for HFa CV death or HF hospitalization CV mortality All-cause mortality Comment Diuretics No relevant trials ACE-I (Improved) 0.38 (0.19- 0.75)b PEP-CHFc Candesartan (Improved) 0.72 (0.55- 0.95)d 0.76 (0.61- 0.96) 0.81 (0.60- 1.11) 0.79 (0.60 - 1.04) CHARM-Preserved c Irbesartan 0.98 (0.85 - 1.12) I-PRESERVE c ARNI (Sac/Val) Improved NYR 0.78 (0.64- 0.95) NYR NYR PARAGON-HF c (compared to valsartan) MRA 0.76 (0.46 - 1.27) 0.72 (0.50 - 1.05) 0.69 (0.43 - 1.12) 0.73 (0.49 - 1.10) TOPCAT c Beta-blocker (SR) Improved 0.95 (0.68 - 1.32) 0.83 (0.60 - 1.13) 0.48 (0.24- 0.97) 0.59 (0.34- 1.03) IPD Meta-analysis",
+      "page": 21,
+      "reference_answer": "ACE-I",
+      "required_facts": [
+        "ACE-I (Improved)"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "clinical-trial",
+        "medication",
+        "mortality",
+        "paraphrased-factual"
+      ]
+    },
+    {
+      "id": "case-097",
+      "question": "What condition is indicated by persistently high BNP or NT-proBNP levels in the context of heart failure?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p024_005",
+      "gold_passage_text": "II notropes Previous or ongoing requirement for dobutamine, milrinone, dopamine, or levosimendan NN YHA class/NP Persisting NYHA class III or IV and/or persistently high BNP or NT-proBNP EE nd-Organ Dysfunction Worsening renal or liver dysfunction in the setting of HF EE jection Fraction Very low EF <20% DD eﬁbrillator shocks Recurrent appropriate deﬁbrillator shocks HH ospitalizations More than 1 hospitalization with HF in the last 12 months EE dema/Escalating diuretics Persisting ﬂuid overload and/or increasing diuretic requirement LL ow blood pressure Consistently low blood pressure with SBP <90 to 100 mmHg",
+      "page": 24,
+      "reference_answer": "Persisting NYHA class III or IV",
+      "required_facts": [
+        "persisting NYHA class III or IV",
+        "high BNP or NT-proBNP"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "bnp",
+        "factual",
+        "heart-failure",
+        "nyha-class"
+      ]
+    },
+    {
+      "id": "case-098",
+      "question": "What is the 1-year survival rate for patients with the HeartWare device according to the post-CE mark approval registry?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p025_002",
+      "gold_passage_text": "ated with better survival and func- tional capacity at 2 years80,81 • Device failure • Pump thrombosis86,88,89 • Ischaemic stroke • Driveline infection90 • Bleeding (haemorrhagic stroke) • RV failure HeartWare (HeartWare, Medtronic)91- 98 Continuous ﬂow centrifugal pump Implanted and positioned com- pletely within pericardial space, connected via driveline to controller Single-arm (transplant candidates, NYHA class IV, n = 50): 84% 1-year survival Post-CE mark approval registry (n = 254): 85% 1-year survival, 73% 3-year survival97 ADVANCE (HeartWare vs. commer- cially available LVADs): non-inferior to commercially available devices;91",
+      "page": 25,
+      "reference_answer": "85%",
+      "required_facts": [
+        "HeartWare device",
+        "post-CE mark approval registry",
+        "1-year survival rate"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "heartware",
+        "lvad",
+        "paraphrased-factual",
+        "survival"
+      ]
+    },
+    {
+      "id": "case-099",
+      "question": "What strategy was found to be superior in the CULPRIT-SHOCK trial?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p027_003",
+      "gold_passage_text": "ACS, an immediate coronary angiography is recommended with the intent to perform coronary revascularization. 105- 107,111- 113 In the CULPRIT-SHOCK (Culprit Lesion only PCI versus Multi- vessel PCI in Cardiogenic Shock) trial 114- 116 ‘culprit lesion only percutaneous coronary intervention (PCI)’ strategy with possible staged revascularization has proven superior to immediate ‘multi- vessel PCI’. After an initial fluid challenge (if appropriate), pharmacological management consists of intravenous (i.v.) vasoactive agents, aiming to improve organ perfusion by increasing cardiac output and blood pressure (Guidelines, Figure 10). Selection of pharmacological",
+      "page": 27,
+      "reference_answer": "culprit lesion only PCI with possible staged revascularization",
+      "required_facts": [
+        "culprit lesion only PCI",
+        "superior to multi-vessel PCI"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "coronary-revascularization",
+        "culprit-shock",
+        "factual",
+        "pci"
+      ]
+    },
+    {
+      "id": "case-100",
+      "question": "What factors, in addition to patient risk of adverse events, should be considered in disposition decisions?",
+      "patient_variables": {},
+      "gold_passage_id": "HF_GuidLine_Christof_ehab368_Suppl_p028_004",
+      "gold_passage_text": "may be useful for disposition decisions. 127,128 Further research, including implementation testing followed by broad use of the algo- rithms, may improve care efficiency of those at lower risk and enhance safety by decreasing inappropriate discharge of high-risk patients. 129,130 Also, disposition decisions may not be exclusively guided by the patient risk of adverse events, and many non-medical circumstances, including socio-economic status, adequacy of family support, and feasibility of follow-up in outpatient settings, have to be considered. A patient that is similar to category C but is getting worse.They have",
+      "page": 28,
+      "reference_answer": "Socio-economic status, adequacy of family support, and feasibility of follow-up in outpatient settings.",
+      "required_facts": [
+        "factors other than patient risk of adverse events should be considered",
+        "examples of these factors"
+      ],
+      "forbidden_facts": [],
+      "tags": [
+        "clinical-scenario",
+        "disposition",
+        "patient-care",
+        "risk-factors"
+      ]
+    }
+  ]
+}

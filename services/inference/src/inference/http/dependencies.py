@@ -14,7 +14,7 @@ from inference.indexing.vector_indexer import VectorIndexingService
 from inference.jobstore.base import ReadWriteJobStore
 from inference.jobstore.redis_guidance_job_store import RedisGuidanceJobStore
 from inference.jobstore.redis_ingestion_job_store import RedisIngestionJobStore
-from inference.pipeline.components import AnswerGenerator, ExampleResponseBuilder, QueryRewriter, RetrievalOrchestrator, ResponseVerifier
+from inference.pipeline.components import AnswerGenerator, ExampleResponseBuilder, QueryPlanner, QueryRewriter, RetrievalOrchestrator, ResponseVerifier
 from inference.pipeline.generate_guidance import GuidancePipeline
 from inference.retrieval.dense import DenseRetriever
 from inference.retrieval.hybrid import HybridRetriever
@@ -83,6 +83,11 @@ def get_retrieval_orchestrator() -> RetrievalOrchestrator:
 
 
 @lru_cache(maxsize=1)
+def get_query_planner() -> QueryPlanner:
+    return QueryPlanner()
+
+
+@lru_cache(maxsize=1)
 def get_query_rewriter() -> QueryRewriter:
     return QueryRewriter(get_ollama_client())
 
@@ -112,6 +117,7 @@ def get_guidance_pipeline() -> GuidancePipeline:
         retriever=get_dense_retriever(),
         hybrid_retriever=get_hybrid_retriever(),
         ollama_client=get_ollama_client(),
+        query_planner=get_query_planner(),
         query_rewriter=get_query_rewriter(),
         retrieval_orchestrator=get_retrieval_orchestrator(),
         answer_generator=get_answer_generator(),

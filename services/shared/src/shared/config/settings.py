@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     ollama_model: str = "qwen2.5:0.5b"
     ollama_embedding_model: str = "nomic-embed-text"
     ollama_timeout_s: float = 120.0
+    ollama_embedding_batch_size: int = 8
+    ollama_embedding_fallback_concurrency: int = 2
 
     callback_timeout_s: int = 10
     callback_max_attempts: int = 3

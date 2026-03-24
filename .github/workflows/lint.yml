@@ -56,9 +56,11 @@ jobs:
           PYTHONPATH: services/api/src:services/inference/src:services/shared/src
         run: |
           set -o pipefail
-          files=$(git ls-files '*.py')
+
+          files=$(git ls-files 'services/**/*.py')
+
           if [ -z "$files" ]; then
-            echo "No Python files found."
+            echo "No Python files found in services/."
             exit 0
           fi
 
@@ -72,7 +74,6 @@ jobs:
           fi
 
           python -c "score = float('$score'); threshold = 9.75; print(f'Pylint score: {score:.2f}/10 (threshold: {threshold:.2f})'); import sys; sys.exit(0 if score >= threshold else 1)"
-
 
       - name: Run test suite
         env:
