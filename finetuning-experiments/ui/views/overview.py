@@ -15,6 +15,7 @@ RUN_COLUMNS = [
     "documents_version",
     "chunking_strategy",
     "retrieval_mode",
+    "pipeline_variant",
     "llm_model",
     "prompt_label",
     "hit@1",
@@ -156,7 +157,7 @@ def _summarize_patterns(df: pd.DataFrame) -> list[str]:
             f"**Best retrieval:** `{strongest_retrieval['run_id']}` leads hit@3 at **{strongest_retrieval.get('hit@3', 0.0):.3f}**; **best generation:** `{strongest_generation['run_id']}` leads answer quality at **{strongest_generation.get('avg_answer_quality', 0.0):.3f}**."
         )
 
-    for dimension in ["chunking_strategy", "retrieval_mode", "llm_model"]:
+    for dimension in ["chunking_strategy", "retrieval_mode", "pipeline_variant", "llm_model"]:
         if dimension in df.columns and df[dimension].nunique(dropna=True) > 1:
             grouped = (
                 df.groupby(dimension, dropna=False)[["composite_score", "hit@3", "avg_answer_quality", "p95_latency"]]
@@ -245,6 +246,7 @@ def render(df: pd.DataFrame) -> None:
         "hallucination_rate",
         "chunking_strategy",
         "retrieval_mode",
+        "pipeline_variant",
         "llm_model",
     ]
     st.dataframe(

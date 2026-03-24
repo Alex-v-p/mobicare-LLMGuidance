@@ -5,6 +5,7 @@ from pathlib import Path
 from .schema import BenchmarkRunConfig
 
 _ALLOWED_RETRIEVAL_MODES = {"dense", "sparse", "hybrid"}
+_ALLOWED_PIPELINE_VARIANTS = {"standard", "drug_dosing"}
 _ALLOWED_PERCENTILE_POLICIES = {"all", "success_only"}
 _ALLOWED_OUTLIER_POLICIES = {"keep_all", "exclude_failures"}
 
@@ -35,6 +36,8 @@ def validate_run_config(config: BenchmarkRunConfig) -> None:
         errors.append("inference.temperature must be between 0.0 and 2.0.")
     if config.inference.retrieval_mode not in _ALLOWED_RETRIEVAL_MODES:
         errors.append(f"inference.retrieval_mode must be one of {sorted(_ALLOWED_RETRIEVAL_MODES)}.")
+    if config.inference.pipeline_variant not in _ALLOWED_PIPELINE_VARIANTS:
+        errors.append(f"inference.pipeline_variant must be one of {sorted(_ALLOWED_PIPELINE_VARIANTS)}.")
     if config.inference.retrieval_mode == "hybrid":
         total_weight = config.inference.hybrid_dense_weight + config.inference.hybrid_sparse_weight
         if total_weight <= 0:

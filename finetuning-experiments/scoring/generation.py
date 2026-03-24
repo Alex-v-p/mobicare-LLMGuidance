@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from datasets.observation import is_observation_only_case
+
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 _STOPWORDS = {
     "the", "a", "an", "to", "and", "or", "of", "in", "for", "on", "with", "is", "are", "was", "were", "by", "that",
@@ -64,17 +66,6 @@ def _grade_from_score(score: float) -> str:
     return "poor"
 
 
-def _is_observation_only(case: dict[str, Any]) -> bool:
-    generation_metadata = case.get("generation_metadata") or {}
-    tags = {str(tag).strip().lower() for tag in (case.get("tags") or [])}
-    return bool(
-        generation_metadata.get("evaluation_profile") == "observation_only"
-        or generation_metadata.get("request_mode") == "biomarker_only"
-        or generation_metadata.get("omit_question_from_request")
-        or "observation-case" in tags
-        or "biomarker-only" in tags
-    )
-
 
 def score_generation(
     case: dict[str, Any],
@@ -85,7 +76,7 @@ def score_generation(
 ) -> dict[str, Any]:
     answer_norm = _norm(answer)
     context_norm = _norm(" ".join((item.get("snippet") or "") for item in retrieved_context))
-    observation_only = _is_observation_only(case)
+    observation_only = is_observation_only_case(case)
 
     required = case.get("required_facts", []) or []
     forbidden = case.get("forbidden_facts", []) or []

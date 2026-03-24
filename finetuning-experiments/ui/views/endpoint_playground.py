@@ -18,10 +18,10 @@ DEFAULT_INGESTION_PAYLOAD = {
     "embedding_model": "nomic-embed-text",
 }
 
-DEFAULT_GUIDANCE_PAYLOAD = {
+DEFAULT_STANDARD_GUIDANCE_PAYLOAD = {
     "question": "What therapy should be considered for symptomatic HFrEF despite ACE inhibitor and beta blocker?",
-    "patient_variables": {"age": 72, "ef": 32},
-    "inference": {
+    "patient": {"values": {"age": 72, "ef": 32}},
+    "options": {
         "top_k": 3,
         "temperature": 0.0,
         "max_tokens": 256,
@@ -30,7 +30,44 @@ DEFAULT_GUIDANCE_PAYLOAD = {
         "enable_query_rewriting": False,
         "enable_response_verification": False,
         "enable_regeneration": False,
+        "pipeline_variant": "standard",
     },
+}
+
+DEFAULT_DRUG_DOSING_PAYLOAD = {
+    "question": "",
+    "patient": {
+        "values": {
+            "age": 74,
+            "gender": "male",
+            "creatinine": 2.0,
+            "egfr": 34,
+            "potassium": 5.3,
+            "blood_pressure_systolic": 95,
+            "heart_rate": 108,
+            "nyha": 3,
+            "ef": 28,
+            "DoseSpiro_prev": 25,
+            "DoseBB_prev": 2.5,
+            "RASDose_prev": 10,
+            "ARNIDose_prev": 0,
+            "SGLT2Dose_prev": 0,
+            "Loop_dose_prev": 40
+        }
+    },
+    "options": {
+        "pipeline_variant": "drug_dosing",
+        "llm_model": "qwen2.5:3b-instruct",
+        "embedding_model": "qwen3-embedding:4b",
+        "top_k": 3,
+        "temperature": 0.0,
+        "max_tokens": 256,
+        "retrieval_mode": "hybrid",
+        "use_graph_augmentation": False,
+        "enable_query_rewriting": False,
+        "enable_response_verification": True,
+        "enable_regeneration": False
+    }
 }
 
 
@@ -67,7 +104,9 @@ def render() -> None:
                 st.error(str(exc))
 
     with guidance_tab:
-        guidance_text = st.text_area("Guidance payload", value=json.dumps(DEFAULT_GUIDANCE_PAYLOAD, indent=2), height=280)
+        example_name = st.selectbox("Guidance example", ["Standard QA", "Drug dosing"], index=0)
+        default_payload = DEFAULT_STANDARD_GUIDANCE_PAYLOAD if example_name == "Standard QA" else DEFAULT_DRUG_DOSING_PAYLOAD
+        guidance_text = st.text_area("Guidance payload", value=json.dumps(default_payload, indent=2), height=340)
         if st.button("Run guidance job"):
             try:
                 payload = _parse_json(guidance_text)

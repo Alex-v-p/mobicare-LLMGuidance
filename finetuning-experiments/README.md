@@ -58,6 +58,39 @@ Example:
 
 ---
 
+### 3. Append drug-dosing observation cases to an existing dataset
+
+You can also extend an existing benchmark dataset with **drug-dosing-only observation cases**.
+
+These cases:
+- are added to the **same dataset** as the normal paragraph-based questions and biomarker-only observation cases
+- are sent to the guidance API with `options.pipeline_variant = "drug_dosing"`
+- omit the visible question from the actual request, just like the biomarker-only observation flow
+- keep a hidden evaluation question and reference answer in the dataset for qualitative scoring and behavior review
+- skip deterministic paragraph-grounded scoring, because they are intended for **behavior observation** rather than gold-passage matching
+
+Use this when you want to benchmark the **sole drug pipeline** on realistic medication/safety profiles without forcing them into a paragraph-grounded question format.
+
+```bash
+python -m dataset_generation.drug_dosing_generator \
+  --base-dataset ./datasets/document_sets/benchmark_v2_plus_biomarkers.json \
+  --output ./datasets/document_sets/benchmark_v2_plus_biomarkers_plus_drug_dosing.json \
+  --dataset-size 20
+```
+
+Notes:
+- the generated cases are marked as `request_mode = "drug_dosing_only"` and `evaluation_profile = "observation_only"`
+- each generated case stores `pipeline_variant = "drug_dosing"` in its metadata so mixed datasets can still route standard cases to the standard pipeline
+- a mixed dataset can therefore contain **normal QA**, **biomarker-only observation cases**, and **drug-dosing-only observation cases** at the same time
+- older run artifacts remain loadable in Streamlit; the dashboard simply surfaces the pipeline variant when it is present
+
+Example mixed-dataset benchmark config:
+```json
+"dataset_path": "./datasets/document_sets/benchmark_v2_plus_biomarkers_plus_drug_dosing.json"
+```
+
+---
+
 ## Manual Source mapping
 
 Build run-specific chunk assignments from the frozen benchmark dataset after ingestion:

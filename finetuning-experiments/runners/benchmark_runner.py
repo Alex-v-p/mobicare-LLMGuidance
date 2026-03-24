@@ -15,6 +15,7 @@ from configs.schema import BenchmarkRunConfig
 from datasets.loader import load_benchmark_dataset
 from datasets.schema import BenchmarkCase
 from runners.api_runner import run_api_stage
+from runners.request_payloads import build_guidance_payload
 from runners.generation_runner import run_generation_stage
 from runners.ingestion_runner import run_ingestion_stage
 from runners.retrieval_runner import run_retrieval_stage
@@ -32,32 +33,6 @@ def _build_cases(raw_dataset: dict[str, Any]) -> list[BenchmarkCase]:
     return [BenchmarkCase(**case) for case in raw_dataset.get("cases", [])]
 
 
-def _build_guidance_payload(case: BenchmarkCase, config: BenchmarkRunConfig) -> dict[str, Any]:
-    generation_metadata = case.generation_metadata or {}
-    omit_question = bool(generation_metadata.get("omit_question_from_request"))
-    request_question = "" if omit_question else case.question
-    return {
-        "question": request_question,
-        "patient": {"values": case.patient_variables or {}},
-        "options": {
-            "use_retrieval": True,
-            "top_k": config.inference.top_k,
-            "temperature": config.inference.temperature,
-            "max_tokens": config.inference.max_tokens,
-            "use_example_response": config.inference.use_example_response,
-            "retrieval_mode": config.inference.retrieval_mode,
-            "hybrid_dense_weight": config.inference.hybrid_dense_weight,
-            "hybrid_sparse_weight": config.inference.hybrid_sparse_weight,
-            "use_graph_augmentation": config.inference.use_graph_augmentation,
-            "graph_max_extra_nodes": config.inference.graph_max_extra_nodes,
-            "enable_query_rewriting": config.inference.enable_query_rewriting,
-            "enable_response_verification": config.inference.enable_response_verification,
-            "enable_regeneration": config.inference.enable_regeneration,
-            "max_regeneration_attempts": config.inference.max_regeneration_attempts,
-            "llm_model": config.inference.llm_model,
-            "embedding_model": config.inference.embedding_model,
-        },
-    }
 
 
 def _timing_seconds(start: float) -> float:
@@ -69,7 +44,7 @@ def _run_warmups(cases: list[BenchmarkCase], config: BenchmarkRunConfig, guidanc
         logger.info("Warm-up case=%s", case.id)
         try:
             guidance_client.run_guidance_and_wait(
-                _build_guidance_payload(case, config),
+                build_guidance_payload(case, config),
                 poll_interval_seconds=config.execution.poll_interval_seconds,
                 max_wait_seconds=config.execution.max_wait_seconds,
             )
@@ -209,7 +184,7 @@ def run_benchmark(config: BenchmarkRunConfig) -> Path:
         per_case_results: list[dict[str, Any]] = []
         for case in cases:
             source_mapping = source_mapping_by_case.get(case.id)
-            payload = _build_guidance_payload(case, config)
+            payload = build_guidance_payload(case, config)
             logger.info("Running case=%s question=%s", case.id, case.question[:100])
             start = time.monotonic()
             try:

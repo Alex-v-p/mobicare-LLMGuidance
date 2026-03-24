@@ -13,36 +13,13 @@ from adapters.guidance_payloads import extract_retrieved_context, normalize_guid
 from adapters.metrics import MetricsClient
 from configs.schema import BenchmarkRunConfig
 from datasets.schema import BenchmarkCase
+from runners.request_payloads import build_guidance_payload
 from scoring.latency import summarize_latencies, summarize_stage_latencies
 from telemetry.stage_recorder import extract_guidance_telemetry, extract_ingestion_telemetry
 
 logger = logging.getLogger(__name__)
 
 
-
-def _build_guidance_payload(case: BenchmarkCase, config: BenchmarkRunConfig) -> dict[str, Any]:
-    return {
-        "question": case.question,
-        "patient": {"values": case.patient_variables or {}},
-        "options": {
-            "use_retrieval": True,
-            "top_k": config.inference.top_k,
-            "temperature": config.inference.temperature,
-            "max_tokens": config.inference.max_tokens,
-            "use_example_response": config.inference.use_example_response,
-            "retrieval_mode": config.inference.retrieval_mode,
-            "hybrid_dense_weight": config.inference.hybrid_dense_weight,
-            "hybrid_sparse_weight": config.inference.hybrid_sparse_weight,
-            "use_graph_augmentation": config.inference.use_graph_augmentation,
-            "graph_max_extra_nodes": config.inference.graph_max_extra_nodes,
-            "enable_query_rewriting": config.inference.enable_query_rewriting,
-            "enable_response_verification": config.inference.enable_response_verification,
-            "enable_regeneration": config.inference.enable_regeneration,
-            "max_regeneration_attempts": config.inference.max_regeneration_attempts,
-            "llm_model": config.inference.llm_model,
-            "embedding_model": config.inference.embedding_model,
-        },
-    }
 
 
 
@@ -187,7 +164,7 @@ def run_api_stage(config: BenchmarkRunConfig, cases: list[BenchmarkCase]) -> dic
             case = selected_cases[warmup_index % len(selected_cases)]
             try:
                 guidance_client.run_guidance_and_wait(
-                    _build_guidance_payload(case, config),
+                    build_guidance_payload(case, config),
                     poll_interval_seconds=config.execution.poll_interval_seconds,
                     max_wait_seconds=config.execution.max_wait_seconds,
                 )
@@ -198,7 +175,7 @@ def run_api_stage(config: BenchmarkRunConfig, cases: list[BenchmarkCase]) -> dic
             case = selected_cases[index % len(selected_cases)]
             latency_seconds, result, error = _timed_call(
                 lambda case=case: guidance_client.run_guidance_and_wait(
-                    _build_guidance_payload(case, config),
+                    build_guidance_payload(case, config),
                     poll_interval_seconds=config.execution.poll_interval_seconds,
                     max_wait_seconds=config.execution.max_wait_seconds,
                 )

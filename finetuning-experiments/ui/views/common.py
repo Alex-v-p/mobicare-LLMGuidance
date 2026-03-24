@@ -154,6 +154,7 @@ def normalize_run_row(run: dict[str, Any]) -> dict[str, Any]:
         "chunking_strategy": safe_str(ingestion_config.get("chunking_strategy") or get_nested(payload, "config", "ingestion", "chunking_strategy")),
         "retrieval_mode": safe_str(inference_config.get("retrieval_mode") or get_nested(payload, "config", "inference", "retrieval_mode")),
         "llm_model": safe_str(inference_config.get("llm_model") or get_nested(payload, "config", "inference", "llm_model")),
+        "pipeline_variant": safe_str(inference_config.get("pipeline_variant") or get_nested(payload, "config", "inference", "pipeline_variant", default="standard") or "standard"),
         "prompt_label": safe_str(inference_config.get("prompt_engineering_label") or get_nested(payload, "config", "inference", "prompt_engineering_label")),
         "query_rewriting": bool(inference_config.get("enable_query_rewriting") or get_nested(payload, "config", "inference", "enable_query_rewriting", default=False)),
         "verification": bool(inference_config.get("enable_response_verification") or get_nested(payload, "config", "inference", "enable_response_verification", default=False)),
@@ -259,6 +260,8 @@ def build_case_dataframe(artifact: dict[str, Any]) -> pd.DataFrame:
                 "execution_duration_ms": safe_float(derived.get("execution_duration_ms")),
                 "api_failure_category": safe_str((case.get("raw_endpoint_result") or {}).get("error")),
                 "generated_answer": safe_str(case.get("generated_answer")),
+                "pipeline_runner": safe_str(get_nested(case, "metadata", "pipeline_runner", default=get_nested(case, "raw_endpoint_result", "metadata", "pipeline_runner", default="standard"))),
+                "evaluation_profile": safe_str(generation_scores.get("evaluation_profile")),
             }
         )
     return pd.DataFrame(rows)
