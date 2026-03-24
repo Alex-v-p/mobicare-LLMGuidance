@@ -34,6 +34,7 @@ class GenerationOptions(BaseModel):
     retrieval_low_context_min_results: int = 2
     enable_general_guidance_section: bool = True
     enable_unknown_fallback: bool = True
+    pipeline_variant: Literal["standard", "drug_dosing"] = "standard"
 
 
 class GuidanceRequest(BaseModel):

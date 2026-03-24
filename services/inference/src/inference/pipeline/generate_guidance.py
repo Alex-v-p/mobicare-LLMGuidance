@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from inference.http.clients.ollama_client import OllamaClient
 from inference.pipeline.steps import (
     AnswerGenerator,
     ExampleResponseBuilder,
@@ -9,7 +8,12 @@ from inference.pipeline.steps import (
     RetrievalOrchestrator,
     ResponseVerifier,
 )
-from inference.pipeline.runners import PipelineRunnerRegistry, StandardPipelineDependencies, StandardPipelineRunner
+from inference.pipeline.runners import (
+    DrugDosingPipelineRunner,
+    PipelineRunnerRegistry,
+    StandardPipelineDependencies,
+    StandardPipelineRunner,
+)
 from inference.retrieval.dense import DenseRetriever
 from inference.retrieval.hybrid import HybridRetriever
 from shared.contracts.inference import InferenceRequest, InferenceResponse
@@ -46,8 +50,9 @@ class GuidancePipeline:
         )
         self._runner_registry = PipelineRunnerRegistry(
             standard_runner=StandardPipelineRunner(dependencies),
+            drug_dosing_runner=DrugDosingPipelineRunner(),
         )
 
     async def run(self, request: InferenceRequest) -> InferenceResponse:
-        runner = self._runner_registry.resolve("standard")
+        runner = self._runner_registry.resolve(request.options.pipeline_variant)
         return await runner.run(request)
