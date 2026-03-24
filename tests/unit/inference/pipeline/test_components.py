@@ -1,6 +1,6 @@
 from inference.clinical import build_clinical_profile, build_question_from_patient_data
-from inference.pipeline.answer_support import build_caution_lines, build_deterministic_answer, infer_specialty_focus
-from inference.pipeline.components import ChunkRelevanceRanker, ContextJudge, QueryPlanner, ResponseVerifier
+from inference.pipeline.steps import ChunkRelevanceRanker, ContextJudge, QueryPlan, QueryPlanner, ResponseVerifier, RetrievalOrchestrator
+from inference.pipeline.support import build_caution_lines, build_deterministic_answer, infer_specialty_focus
 from shared.contracts.inference import GenerationOptions, InferenceRequest, RetrievedContext
 
 
@@ -46,6 +46,21 @@ def test_query_planner_adds_targeted_adaptive_queries_for_abnormal_variables():
     assert any("clinical management" in query.lower() for query in plan.expanded_queries)
     assert any("heart failure" in query.lower() or "hf severity and congestion" in query.lower() for query in plan.expanded_queries)
     assert "heart-failure-oriented profile" in plan.effective_question.lower()
+
+def test_query_planner_adds_question_only_expansion_queries_for_literal_prompt():
+    planner = QueryPlanner()
+    request = InferenceRequest(
+        request_id="req-qonly",
+        question="What does RV stand for in the context of heart failure studies?",
+        patient_variables={},
+        options=GenerationOptions(adaptive_retrieval_enabled=True),
+    )
+
+    plan = planner.create_plan(request)
+
+    assert len(plan.expanded_queries) > 1
+    assert any("glossary" in query.lower() or "abbreviation" in query.lower() for query in plan.expanded_queries[1:])
+
 
 
 def test_context_judge_marks_context_as_insufficient_when_overlap_is_missing():
@@ -110,7 +125,23 @@ def test_chunk_ranker_prefers_chunks_with_clinical_term_overlap():
     )
 
     assert ranked[0].chunk_id == "a"
-    assert details[0]["score"] >= details[1]["score"]
+    assert details[0]["score"] > 0
+
+def test_chunk_ranker_does_not_backfill_zero_score_context_when_relevant_chunk_exists():
+    ranker = ChunkRelevanceRanker()
+    profile = build_clinical_profile({"ef": 30})
+    ranked, _ = ranker.rank(
+        contexts=[
+            RetrievedContext(source_id="1", title="Heart failure", snippet="Reduced ejection fraction therapy", chunk_id="a"),
+            RetrievedContext(source_id="2", title="Dermatology", snippet="Skin care guidance", chunk_id="b"),
+        ],
+        retrieval_query="heart failure treatment",
+        clinical_profile=profile,
+        limit=2,
+    )
+
+    assert [item.chunk_id for item in ranked] == ["a"]
+
 
 
 def test_response_verifier_flags_document_mentions():
@@ -140,6 +171,39 @@ def test_response_verifier_flags_potassium_contradiction():
 
     assert result.verdict == "fail"
     assert any("potassium value" in issue for issue in result.issues)
+
+
+def test_response_verifier_accepts_minimal_unknown_fallback():
+    verifier = ResponseVerifier(ollama_client=None)
+    result = verifier.heuristic_verify("Based on the provided context, I don't know.")
+
+    assert result.verdict == "pass"
+    assert result.issues == ["none"]
+
+
+def test_response_verifier_flags_generic_non_answer_for_explicit_question_only_prompt():
+    verifier = ResponseVerifier(ollama_client=None)
+    retrieved = [
+        RetrievedContext(
+            source_id="doc-1",
+            title="HF therapy",
+            snippet="Symptomatic HFrEF escalation may include sacubitril/valsartan, dapagliflozin, ivabradine, or CRT in selected patients.",
+            chunk_id="c1",
+        )
+    ]
+    result = verifier.heuristic_verify(
+        "1. Direct answer\n- The main value abnormalities point to a clinically relevant pattern that should be interpreted as a whole rather than marker by marker.\n\n"
+        "2. Rationale\n- The main value abnormalities point to a clinically relevant pattern that should be interpreted as a whole rather than marker by marker.\n\n"
+        "3. Caution\n- I don't know.\n\n"
+        "4. General advice\n- Review these results together with symptoms.",
+        question="What escalation of therapy should be considered for symptomatic HFrEF despite ACE inhibitor and beta blocker therapy?",
+        patient_variables={},
+        clinical_profile=build_clinical_profile({}),
+        retrieved_context=retrieved,
+    )
+
+    assert result.verdict == "fail"
+    assert any("explicit question" in issue.lower() for issue in result.issues)
 
 
 def test_infer_specialty_focus_prefers_heart_failure_when_cardiac_variables_dominate():
@@ -288,3 +352,81 @@ def test_build_deterministic_answer_for_literal_question_extracts_enumerated_ite
     assert "transvalvular aortic" in lowered
     assert "tandemheart" in lowered
     assert "right atrium to systemic artery" in lowered
+
+
+def test_build_deterministic_answer_prefers_minimal_unknown_fallback_when_enabled_for_patient_only_cases():
+    profile = build_clinical_profile({"creatinine": 1.8, "potassium": 5.6})
+    context_assessment = type("Assessment", (), {"sufficient": True})()
+
+    answer = build_deterministic_answer(
+        question="",
+        patient_variables={"creatinine": 1.8, "potassium": 5.6},
+        clinical_profile=profile,
+        retrieved_context=[
+            RetrievedContext(
+                source_id="1",
+                title="Heart failure",
+                snippet="Review creatinine and potassium when renal safety concerns are present.",
+                chunk_id="c1",
+            )
+        ],
+        context_assessment=context_assessment,
+        prefer_unknown_fallback=True,
+    )
+
+    assert answer == "Based on the provided context, I don't know."
+
+
+class _StubDenseRetriever:
+    async def retrieve(self, **kwargs):
+        return []
+
+
+class _StubHybridRetriever:
+    def __init__(self, items):
+        self._items = items
+
+    async def retrieve(self, **kwargs):
+        return type("Result", (), {"items": list(self._items), "metadata": {"retrieval_mode": "hybrid"}})()
+
+
+async def test_retrieval_orchestrator_keeps_cluster_supporting_chunks_in_returned_rag():
+    profile = build_clinical_profile({"ef": 28, "nt_pro_bnp": 2400, "creatinine": 1.8, "potassium": 5.4})
+    contexts = [
+        RetrievedContext(
+            source_id="1",
+            title="Heart failure",
+            snippet="Heart failure follow-up should monitor congestion and worsening symptoms.",
+            chunk_id="hf",
+        ),
+        RetrievedContext(
+            source_id="2",
+            title="Cardio-renal safety",
+            snippet="Review creatinine, potassium, renal function, and RAAS-related safety.",
+            chunk_id="renal",
+        ),
+    ]
+    orchestrator = RetrievalOrchestrator(
+        retriever=_StubDenseRetriever(),
+        hybrid_retriever=_StubHybridRetriever(contexts),
+    )
+    request = InferenceRequest(
+        request_id="req-rag",
+        question="",
+        patient_variables={"ef": 28, "nt_pro_bnp": 2400, "creatinine": 1.8, "potassium": 5.4},
+        options=GenerationOptions(top_k=1, adaptive_retrieval_enabled=False),
+    )
+    plan = QueryPlan(
+        effective_question="What matters most now?",
+        base_query="heart failure congestion creatinine potassium",
+        expanded_queries=["heart failure congestion creatinine potassium"],
+        clinical_profile=profile,
+        clusters=["HF severity and congestion", "Cardio-renal and electrolyte safety"],
+        specialty_focus="heart_failure",
+    )
+
+    retrieved, metadata = await orchestrator.retrieve_context(request=request, retrieval_plan=plan)
+
+    assert len(retrieved) == 2
+    assert metadata["rag_output_count"] == 2
+    assert {item.chunk_id for item in retrieved} == {"hf", "renal"}
