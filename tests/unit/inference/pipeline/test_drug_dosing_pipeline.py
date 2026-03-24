@@ -241,6 +241,38 @@ async def test_grounded_drug_dosing_pipeline_uses_evidence_backed_default_agents
     assert payload["recommendations"]["beta_blocker"]["grounded"] is True
 
 
+
+
+@pytest.mark.asyncio
+async def test_grounded_drug_dosing_pipeline_uses_family_specific_contexts_for_evidence_mapping():
+    pipeline = GuidancePipeline(retriever=FakeDenseRetriever(), hybrid_retriever=FakeHybridRetriever(), ollama_client=FakeOllamaClient())
+
+    response = await pipeline.run(
+        InferenceRequest(
+            request_id="drug-dose-5",
+            question="",
+            patient_variables={
+                "ef": 28,
+                "potassium": 5.3,
+                "egfr": 34,
+                "creatinine": 2.0,
+                "blood_pressure_systolic": 95,
+                "heart_rate": 108,
+                "DoseSpiro_prev": 25,
+                "DoseBB_prev": 2.5,
+                "RASDose_prev": 10,
+                "SGLT2Dose_prev": 0,
+            },
+            options=GenerationOptions(pipeline_variant="drug_dosing"),
+        )
+    )
+
+    payload = response.metadata["drug_dosing_payload"]
+    assert payload["recommendations"]["mra"]["status"] == "caution"
+    assert payload["recommendations"]["ras"]["grounded"] is True
+    assert payload["evidence_rows_used"]["ras"]["source_chunk_ids"] == ["chunk-ras"]
+    assert payload["evidence_rows_used"]["loop_diuretic"]["source_chunk_ids"] == ["chunk-loop"]
+
 @pytest.mark.asyncio
 async def test_grounded_drug_dosing_pipeline_includes_evidence_and_short_answer_for_sample_case():
     pipeline = GuidancePipeline(retriever=FakeDenseRetriever(), hybrid_retriever=FakeHybridRetriever(), ollama_client=FakeOllamaClient())
@@ -281,5 +313,8 @@ async def test_grounded_drug_dosing_pipeline_includes_evidence_and_short_answer_
     assert response.retrieved_context
     payload = response.metadata["drug_dosing_payload"]
     assert payload["evidence_rows_used"]
-    assert any(line.startswith("dapagliflozin:") for line in lines)
+    assert payload["evidence_rows_used"]["ras"]["source_chunk_ids"] == ["chunk-ras"]
+    assert payload["evidence_rows_used"]["sglt2"]["source_chunk_ids"] == ["chunk-sglt2"]
     assert all(item["grounded"] for item in payload["selected_recommendations"])
+    assert all(not line.startswith("spironolactone:") for line in lines)
+    assert any(line.startswith("dapagliflozin:") for line in lines)

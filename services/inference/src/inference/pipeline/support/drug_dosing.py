@@ -128,31 +128,48 @@ def build_drug_retrieval_queries(snapshot: dict[str, Any]) -> list[dict[str, str
     mra_agent = snapshot.get("mra_agent") or DEFAULT_AGENTS["mra"]
     queries.append({
         "family": "mra",
-        "query": f"{mra_agent} MRA starting dose target dose potassium creatinine egfr heart failure HFrEF",
+        "query": (
+            f"{mra_agent} MRA starting dose target dose consider dose up-titration after 4-8 weeks "
+            "significant hyperkalaemia K >5.0 creatinine 2.5 egfr 30 stop >5.5 HFrEF"
+        ),
     })
     bb_agent = snapshot.get("beta_blocker_agent") or DEFAULT_AGENTS["beta_blocker"]
     queries.append({
         "family": "beta_blocker",
-        "query": f"{bb_agent} beta-blocker starting dose target dose heart rate <50 SBP <90 congestion euvolaemia HFrEF",
+        "query": (
+            f"{bb_agent} beta-blocker starting dose target dose double the dose at not less than 2-week intervals "
+            "heart rate <50 SBP <90 congestion euvolaemia HFrEF"
+        ),
     })
     ras_agent = snapshot.get("ras_agent") or DEFAULT_AGENTS["ras"]
     queries.append({
         "family": "ras",
-        "query": f"{ras_agent} ACE-I ARB starting dose target dose potassium 5.5 creatinine 3.5 egfr 20 HFrEF",
+        "query": (
+            f"{ras_agent} ACE-I ARB starting dose target dose double the dose at not less than 2-week intervals "
+            "significant hyperkalaemia K >5.0 creatinine 2.5 3.5 egfr 30 20 SBP <90 HFrEF"
+        ),
     })
     queries.append({
         "family": "arni",
-        "query": "sacubitril valsartan ARNI starting dose 49/51 target dose 97/103 24/26 potassium 5.5 egfr 30 SBP 90 HFrEF",
+        "query": (
+            "sacubitril valsartan ARNI starting dose 49/51 target dose 97/103 24/26 reduced starting dose "
+            "washout 36 h significant hyperkalaemia K >5.0 egfr 30 SBP 90 HFrEF"
+        ),
     })
     sglt2_agent = snapshot.get("sglt2_agent") or DEFAULT_AGENTS["sglt2"]
     queries.append({
         "family": "sglt2",
-        "query": f"{sglt2_agent} SGLT2 starting target dose 10 mg egfr 20 SBP 95 HFrEF",
+        "query": (
+            f"{sglt2_agent} SGLT2 starting and target dose 10 mg egfr 20 SBP 95 fluid balance intensify diuresis HFrEF"
+        ),
     })
     loop_agent = snapshot.get("loop_agent") or DEFAULT_AGENTS["loop_diuretic"]
     queries.append({
         "family": "loop_diuretic",
-        "query": f"{loop_agent} loop diuretic starting dose usual dose congestion volume depletion hypotension HFrEF",
+        "query": (
+            f"{loop_agent} loop diuretic starting dose usual dose not indicated without congestion hypovolaemia dehydration "
+            "consider a diuretic dosage reduction SBP <90 HFrEF"
+        ),
     })
     return queries
 
@@ -161,8 +178,9 @@ def extract_grounded_drug_evidence(
     *,
     retrieved_context: list[RetrievedContext],
     snapshot: dict[str, Any],
+    family_contexts: dict[str, list[RetrievedContext]] | None = None,
 ) -> dict[str, DrugEvidence]:
-    grouped = _group_context_by_family(retrieved_context)
+    grouped = family_contexts or _group_context_by_family(retrieved_context)
     evidence = {
         "mra": _extract_mra_evidence(grouped.get("mra", []), snapshot),
         "beta_blocker": _extract_beta_blocker_evidence(grouped.get("beta_blocker", []), snapshot),
@@ -179,9 +197,14 @@ def build_grounded_drug_dosing_payload(
     patient_variables: dict[str, Any],
     retrieved_context: list[RetrievedContext],
     retrieval_queries: list[str],
+    family_contexts: dict[str, list[RetrievedContext]] | None = None,
 ) -> dict[str, Any]:
     snapshot = build_snapshot(patient_variables)
-    evidence = extract_grounded_drug_evidence(retrieved_context=retrieved_context, snapshot=snapshot)
+    evidence = extract_grounded_drug_evidence(
+        retrieved_context=retrieved_context,
+        snapshot=snapshot,
+        family_contexts=family_contexts,
+    )
     recommendations = {
         "mra": _recommend_mra(snapshot, evidence["mra"]),
         "beta_blocker": _recommend_beta_blocker(snapshot, evidence["beta_blocker"]),
@@ -192,6 +215,7 @@ def build_grounded_drug_dosing_payload(
     }
     selected = _select_visible_recommendations(recommendations, snapshot)
     tradeoffs = _build_tradeoff_notes(recommendations)
+    safety_cautions = _build_safety_cautions(recommendations)
     evidence_rows_used = {
         family: item.to_dict()
         for family, item in evidence.items()
@@ -203,6 +227,7 @@ def build_grounded_drug_dosing_payload(
         "selected_recommendations": selected,
         "evidence_rows_used": evidence_rows_used,
         "tradeoffs": tradeoffs,
+        "safety_cautions": safety_cautions,
         "inputs_used": snapshot,
         "retrieval_queries": retrieval_queries,
     }
@@ -237,6 +262,8 @@ def summarize_drug_dosing_warnings(payload: dict[str, Any]) -> list[str]:
 def verify_grounded_payload(payload: dict[str, Any]) -> tuple[str, list[str], str]:
     selected = payload.get("selected_recommendations") or []
     if not selected:
+        if payload.get("safety_cautions"):
+            return "pass", ["grounded_safety_cautions_without_visible_uptitration"], "high"
         return "pass", ["no_grounded_recommendation"], "medium"
     ungrounded = [item["family"] for item in selected if not item.get("grounded") or not item.get("evidence_chunk_ids")]
     if ungrounded:
@@ -405,6 +432,42 @@ def _base_evidence(family: str, drug: str | None, contexts: list[RetrievedContex
 
 # ---------- recommendation engine ----------
 
+def _near_upper_threshold(value: float | None, *, caution: float | None, stop: float | None, margin: float) -> bool:
+    if value is None:
+        return False
+    if caution is not None and value >= caution - margin:
+        return True
+    if stop is not None and value >= stop - margin:
+        return True
+    return False
+
+
+def _near_lower_threshold(value: float | None, *, caution: float | None, stop: float | None, margin: float) -> bool:
+    if value is None:
+        return False
+    if caution is not None and value <= caution + margin:
+        return True
+    if stop is not None and value <= stop + margin:
+        return True
+    return False
+
+
+def _triggers_conservative_raas_hold(
+    *,
+    potassium: float | None,
+    creatinine: float | None,
+    egfr: float | None,
+    sbp: float | None,
+    evidence: DrugEvidence,
+) -> bool:
+    return (
+        _near_upper_threshold(potassium, caution=evidence.caution_potassium_gt, stop=evidence.stop_potassium_gt, margin=0.2)
+        or _near_upper_threshold(creatinine, caution=evidence.caution_creatinine_gt, stop=evidence.stop_creatinine_gt, margin=0.3)
+        or _near_lower_threshold(egfr, caution=evidence.caution_egfr_lt, stop=evidence.stop_egfr_lt, margin=5.0)
+        or _near_lower_threshold(sbp, caution=evidence.caution_sbp_lt, stop=None, margin=0.0)
+    )
+
+
 def _recommend_mra(snapshot: dict[str, Any], evidence: DrugEvidence) -> DrugRecommendation:
     agent, assumed = _agent_or_default(snapshot.get("mra_agent"), DEFAULT_AGENTS["mra"])
     if not evidence.source_chunk_ids or not evidence.starting_dose:
@@ -418,11 +481,17 @@ def _recommend_mra(snapshot: dict[str, Any], evidence: DrugEvidence) -> DrugReco
         if current:
             return _grounded_rec("mra", agent, "stop", None, "contraindicated", "Retrieved MRA safety thresholds were crossed.", assumed, evidence)
         return _grounded_rec("mra", agent, "avoid_start", None, "contraindicated", "Retrieved MRA safety thresholds were crossed.", assumed, evidence)
-    if _exceeds_caution_thresholds(potassium, creatinine, egfr, evidence):
+    if _exceeds_caution_thresholds(potassium, creatinine, egfr, evidence) or _triggers_conservative_raas_hold(
+        potassium=potassium,
+        creatinine=creatinine,
+        egfr=egfr,
+        sbp=None,
+        evidence=evidence,
+    ):
         if current:
             dose = evidence.starting_dose if evidence.starting_dose else _format_numeric_dose(current / 2.0, evidence.target_frequency)
-            return _grounded_rec("mra", agent, "reduce", dose, "caution", "Retrieved MRA guidance supports halving or holding when potassium/renal thresholds are exceeded.", assumed, evidence)
-        return _grounded_rec("mra", agent, "avoid_start", None, "caution", "Retrieved MRA starting thresholds are not met.", assumed, evidence)
+            return _grounded_rec("mra", agent, "reduce", dose, "caution", "Retrieved MRA guidance supports halving or holding when potassium/renal thresholds are exceeded or close to stopping thresholds.", assumed, evidence)
+        return _grounded_rec("mra", agent, "avoid_start", None, "caution", "Retrieved MRA starting thresholds are not met or are too close to stopping thresholds.", assumed, evidence)
     if not current:
         return _grounded_rec("mra", agent, "start", evidence.starting_dose, "eligible", None, assumed, evidence)
     if evidence.target_value and current + 0.001 < evidence.target_value:
@@ -484,9 +553,15 @@ def _recommend_ras(snapshot: dict[str, Any], evidence: DrugEvidence) -> DrugReco
         if current:
             return _grounded_rec("ras", agent, "stop", None, "contraindicated", "Retrieved ACE-I/ARB stopping thresholds were crossed.", assumed, evidence)
         return _grounded_rec("ras", agent, "avoid_start", None, "contraindicated", "Retrieved ACE-I/ARB starting thresholds were not met.", assumed, evidence)
-    if _exceeds_ras_caution_thresholds(potassium, creatinine, egfr, sbp, evidence):
+    if _exceeds_ras_caution_thresholds(potassium, creatinine, egfr, sbp, evidence) or _triggers_conservative_raas_hold(
+        potassium=potassium,
+        creatinine=creatinine,
+        egfr=egfr,
+        sbp=sbp,
+        evidence=evidence,
+    ):
         if current:
-            return _grounded_rec("ras", agent, "reduce", _format_numeric_dose(max(current / 2.0, evidence.start_low_value or current / 2.0), evidence.target_frequency), "caution", "Retrieved ACE-I/ARB guidance supports halving the dose when chemistry rises excessively.", assumed, evidence)
+            return _grounded_rec("ras", agent, "reduce", _format_numeric_dose(max(current / 2.0, evidence.start_low_value or current / 2.0), evidence.target_frequency), "caution", "Retrieved ACE-I/ARB guidance supports halving or holding when chemistry rises excessively or is close to stopping thresholds.", assumed, evidence)
         return _grounded_rec("ras", agent, "avoid_start", None, "caution", "Retrieved ACE-I/ARB guidance lists potassium/renal/blood-pressure cautions for initiation.", assumed, evidence)
     if not current:
         return _grounded_rec("ras", agent, "start", evidence.starting_dose, "eligible", None, assumed, evidence)
@@ -520,6 +595,17 @@ def _recommend_arni(snapshot: dict[str, Any], evidence: DrugEvidence) -> DrugRec
         if current is not None:
             return _grounded_rec("arni", "sacubitril/valsartan", "maintain", _combo_from_lead_value(current, evidence), "caution", "Retrieved ARNI guidance cautions against hypotension.", False, evidence)
         return _grounded_rec("arni", "sacubitril/valsartan", "avoid_start", None, "caution", "Retrieved ARNI guidance cautions against starting while hypotensive.", False, evidence)
+    if _triggers_conservative_raas_hold(
+        potassium=potassium,
+        creatinine=None,
+        egfr=egfr,
+        sbp=None,
+        evidence=evidence,
+    ):
+        if current is not None:
+            reduced = evidence.reduced_start_dose or evidence.starting_dose or _combo_from_lead_value(current, evidence)
+            return _grounded_rec("arni", "sacubitril/valsartan", "reduce", reduced, "caution", "Retrieved ARNI guidance lists potassium/renal thresholds that are too close to stopping thresholds for escalation.", False, evidence)
+        return _grounded_rec("arni", "sacubitril/valsartan", "avoid_start", None, "caution", "Retrieved ARNI guidance lists potassium/renal thresholds that are too close to stopping thresholds for initiation.", False, evidence)
     if current is not None:
         if evidence.stop_potassium_gt is not None and evidence.caution_potassium_gt is not None and _gt(potassium, evidence.caution_potassium_gt):
             reduced = evidence.reduced_start_dose or evidence.starting_dose
@@ -627,6 +713,26 @@ def _build_tradeoff_notes(recommendations: dict[str, DrugRecommendation]) -> lis
     return notes
 
 
+def _build_safety_cautions(recommendations: dict[str, DrugRecommendation]) -> list[dict[str, Any]]:
+    cautions: list[dict[str, Any]] = []
+    for item in recommendations.values():
+        if not item.grounded:
+            continue
+        if item.status not in {"caution", "contraindicated"}:
+            continue
+        cautions.append(
+            {
+                "family": item.family,
+                "drug": item.drug,
+                "action": item.action,
+                "status": item.status,
+                "note": item.note,
+                "evidence_chunk_ids": list(item.evidence_chunk_ids),
+            }
+        )
+    return cautions
+
+
 def _select_visible_recommendations(
     recommendations: dict[str, DrugRecommendation],
     snapshot: dict[str, Any],
@@ -640,9 +746,9 @@ def _select_visible_recommendations(
         if family == "arni" and not (arni_requested or recommendation.action == "start"):
             # allow ARNI only when already requested/current or when it is surfaced as a replacement strategy
             continue
-        if recommendation.action not in {"switch", "start", "increase", "maintain"}:
+        if recommendation.action not in {"switch", "start", "increase"}:
             continue
-        if recommendation.status not in {"eligible", "maintain", "at_target"}:
+        if recommendation.status != "eligible":
             continue
         if not recommendation.grounded or not recommendation.evidence_chunk_ids:
             continue
@@ -654,7 +760,7 @@ def _select_visible_recommendations(
     visible.sort(key=_recommendation_sort_key)
     if not visible:
         fallback = recommendations.get("loop_diuretic")
-        if fallback and fallback.grounded and fallback.status in {"maintain", "eligible"} and fallback.recommended_dose:
+        if fallback and fallback.grounded and fallback.status == "eligible" and fallback.recommended_dose and fallback.action in {"start", "increase"}:
             visible = [fallback]
     visible = visible[:MAX_VISIBLE_RECOMMENDATIONS]
     return [
@@ -684,6 +790,37 @@ def _render_visible_recommendation(item: dict[str, Any]) -> str:
     drug = item.get("drug") or item.get("family") or "drug"
     dose = item.get("dose")
     return f"{drug}: {dose}" if dose else drug
+
+
+def select_grounded_rag_context(
+    retrieved_context: list[RetrievedContext],
+    payload: dict[str, Any],
+    *,
+    max_items: int = 12,
+) -> list[RetrievedContext]:
+    relevant_ids: list[str] = []
+    for recommendation in (payload.get("recommendations") or {}).values():
+        if recommendation.get("grounded") and recommendation.get("evidence_chunk_ids"):
+            relevant_ids.extend(recommendation.get("evidence_chunk_ids", []))
+    seen_needed: set[str] = set()
+    ordered_ids: list[str] = []
+    for chunk_id in relevant_ids:
+        if chunk_id and chunk_id not in seen_needed:
+            seen_needed.add(chunk_id)
+            ordered_ids.append(chunk_id)
+    selected: list[RetrievedContext] = []
+    selected_ids: set[str] = set()
+    for chunk_id in ordered_ids:
+        for item in retrieved_context:
+            if item.chunk_id == chunk_id and chunk_id not in selected_ids:
+                selected.append(item)
+                selected_ids.add(chunk_id)
+                break
+        if len(selected) >= max_items:
+            break
+    if selected:
+        return selected
+    return retrieved_context[:max_items]
 
 
 # ---------- parsing helpers ----------

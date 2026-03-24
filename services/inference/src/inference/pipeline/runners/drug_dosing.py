@@ -8,6 +8,7 @@ from inference.pipeline.support.drug_dosing import (
     build_grounded_drug_dosing_payload,
     build_snapshot,
     render_drug_dosing_answer,
+    select_grounded_rag_context,
     summarize_drug_dosing_warnings,
     verify_grounded_payload,
 )
@@ -33,14 +34,18 @@ class DrugDosingPipelineRunner:
             patient_variables=request.patient_variables,
             retrieved_context=retrieval_items,
             retrieval_queries=retrieval_metadata["retrieval_queries"],
+            family_contexts=retrieval_metadata.get("family_contexts"),
         )
+        visible_rag = select_grounded_rag_context(retrieval_items, payload)
         verdict, issues, confidence = verify_grounded_payload(payload)
+        metadata = dict(retrieval_metadata)
+        metadata.pop("family_contexts", None)
         return InferenceResponse(
             request_id=request.request_id,
             status="ok",
             model="drug-dosing-grounded-v1",
             answer=render_drug_dosing_answer(payload),
-            retrieved_context=retrieval_items,
+            retrieved_context=visible_rag,
             used_variables=request.patient_variables,
             warnings=summarize_drug_dosing_warnings(payload),
             metadata={
@@ -49,7 +54,7 @@ class DrugDosingPipelineRunner:
                 "guideline_basis": "ESC 2021 supplementary tables 2-7",
                 "retrieval_mode": request.options.retrieval_mode,
                 "use_graph_augmentation": request.options.use_graph_augmentation,
-                **retrieval_metadata,
+                **metadata,
                 "drug_dosing_payload": payload,
             },
             verification=VerificationResult(
@@ -64,8 +69,9 @@ class DrugDosingPipelineRunner:
         per_query: list[dict[str, Any]] = []
         combined: list[RetrievedContext] = list(request.retrieved_context)
         seen = {(item.source_id, item.chunk_id, item.snippet) for item in combined}
+        family_contexts: dict[str, list[RetrievedContext]] = {spec["family"]: [] for spec in query_specs}
         embedding_model = request.options.embedding_model or self._deps.default_embedding_model
-        per_query_limit = 2
+        per_query_limit = 3
 
         for query_index, spec in enumerate(query_specs, start=1):
             query = spec["query"]
@@ -103,15 +109,19 @@ class DrugDosingPipelineRunner:
                 }
             per_query.append(metadata)
             for item in items:
+                if item not in family_contexts[family]:
+                    family_contexts[family].append(item)
                 identity = (item.source_id, item.chunk_id, item.snippet)
                 if identity in seen:
                     continue
                 seen.add(identity)
                 combined.append(item)
 
-        overall_limit = max(request.options.top_k, 8)
-        return combined[:overall_limit], {
+        overall_limit = max(request.options.top_k, 18)
+        combined = combined[:overall_limit]
+        return combined, {
             "retrieval_queries": [entry["query"] for entry in per_query],
             "retrieval_attempt_details": per_query,
-            "rag_output_count": min(len(combined), overall_limit),
+            "rag_output_count": len(combined),
+            "family_contexts": family_contexts,
         }
