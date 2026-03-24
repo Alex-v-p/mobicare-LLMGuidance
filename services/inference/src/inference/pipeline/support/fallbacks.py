@@ -1,425 +1,29 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
 from typing import Any
 
-from inference.clinical import ClinicalFinding, ClinicalProfile
+from inference.clinical import ClinicalProfile
 from inference.pipeline.prompts.multistep import DISALLOWED_SOURCE_REFERENCES
-from shared.contracts.inference import RetrievedContext
-
-_STOPWORDS = {
-    "about", "according", "after", "all", "and", "are", "based", "been", "for", "from",
-    "guidance", "has", "have", "into", "most", "not", "that", "the", "their", "this", "treatment",
-    "what", "with", "would", "patient", "variables", "management", "follow", "relevant", "document",
-    "grounded", "available", "data", "should", "could", "regarding", "focus", "clinical",
-}
-
-_CARDIAC_KEYS = {
-    "bnp", "nt_pro_bnp", "ef", "lvef", "nyha", "edema", "rales", "orthopnea", "jugularvein_01",
-    "hepatomegaly", "qrsduur", "heart_rate", "heartrate", "bpsyst", "bpdiast", "sbp", "dbp",
-    "afib_bl", "bundeltakblok", "pm_rhythm_ecg", "pacemaker_bl", "valvhd", "ischaemic", "hist_mi",
-    "cabg", "angina01", "dosebb_prev", "rasdose_prev", "dosespiro_prev", "loop_dose_prev",
-    "sglt2dose_prev", "arnidose_prev", "potassium", "sodium", "crea", "creatinine", "urea", "cysc",
-    "cystatin_c", "hstnt", "hscrp", "hs_crp", "crp", "il6", "il_6",
-}
-_GLYCEMIC_KEYS = {"glucose", "hba1c", "diabetes"}
-_RENAL_KEYS = {"crea", "creatinine", "urea", "cysc", "cystatin_c", "kidney_disease", "potassium", "sodium"}
-_HEART_FAILURE_KEYWORDS = {
-    "heart failure", "hfr ef", "hfref", "hfmr ef", "hfpef", "congestion", "decongestion",
-    "gdmt", "euvolaemia", "euvolemia", "hyperkalaemia", "hyperkalemia", "hyponatraemia", "hyponatremia",
-    "raas", "ace-i", "arb", "arni", "mra", "sglt2", "diuretic", "ivabradine", "nt-probnp", "bnp",
-}
-
-
-_QUESTION_LITERAL_TERMS = {"table", "figure", "supplementary", "appendix", "section", "described", "listed"}
-_GENERIC_NON_ANSWER_PHRASES = {
-    "clinically relevant pattern",
-    "interpreted as a whole rather than marker by marker",
-    "prioritize the most abnormal findings first",
-    "use the retrieved guidance to prioritize",
-}
-
-
-@dataclass(frozen=True, slots=True)
-class SpecialtyFocus:
-    name: str
-    score: int
-    summary: str
-    retrieval_hints: tuple[str, ...]
-    prompt_priorities: tuple[str, ...]
-
-    @property
-    def is_heart_failure(self) -> bool:
-        return self.name == "heart_failure"
-
-
-@dataclass(frozen=True, slots=True)
-class ClinicalSynthesis:
-    headline: str
-    interpretation_points: tuple[str, ...]
-    action_points: tuple[str, ...]
-    covered_clusters: tuple[str, ...]
-
-
-_HF_FOCUS_CLUSTER_ORDER = (
-    "HF severity and congestion",
-    "Cardio-renal and electrolyte safety",
-    "Rhythm and conduction",
-    "Anemia and iron status",
-    "Inflammation and injury",
-    "Glycemic and cardiometabolic risk",
+from inference.pipeline.support.question_analysis import (
+    _expected_item_count,
+    answer_addresses_explicit_question,
+    answer_addresses_literal_question,
+    extract_numbered_items,
+    is_explicit_question_only_mode,
+    is_literal_question_mode,
+    select_relevant_context_sentences,
 )
-
-
-def prioritized_clusters(
-    clinical_profile: ClinicalProfile,
-    specialty: SpecialtyFocus | None = None,
-    *,
-    limit: int = 2,
-) -> list[str]:
-    clusters = detected_clusters(clinical_profile)
-    if not clusters:
-        return []
-
-    specialty = specialty or infer_specialty_focus({}, clinical_profile)
-    ordered = list(_HF_FOCUS_CLUSTER_ORDER) if specialty.is_heart_failure else list(clusters.keys())
-    selected = [cluster for cluster in ordered if cluster in clusters][:limit]
-
-    if len(selected) < min(limit, len(clusters)):
-        for cluster in clusters:
-            if cluster not in selected:
-                selected.append(cluster)
-            if len(selected) >= min(limit, len(clusters)):
-                break
-    return selected
-
-
-def extract_terms(text: str) -> set[str]:
-    return {term for term in re.findall(r"[a-z0-9]{3,}", text.lower()) if term not in _STOPWORDS}
-
-
-def context_key(item: RetrievedContext) -> tuple[str, str | None, str]:
-    return (item.source_id, item.chunk_id, item.snippet)
-
-
-def is_literal_question_mode(
-    question: str,
-    patient_variables: dict[str, Any],
-    clinical_profile: ClinicalProfile | None = None,
-) -> bool:
-    normalized = question.strip().lower()
-    if not normalized:
-        return False
-
-    profile = clinical_profile
-    has_patient_context = bool(patient_variables) or bool(profile and (profile.recognized_variables or profile.abnormal_variables))
-    patient_language = any(
-        term in normalized
-        for term in {
-            "patient", "symptom", "symptoms", "result", "results", "value", "values", "profile",
-            "management", "follow-up", "follow up", "monitor", "monitoring", "safety", "treat",
-            "treatment", "prescribe", "medication", "dose", "escalation",
-        }
-    )
-    if not has_patient_context and not patient_language:
-        return True
-    return any(term in normalized for term in _QUESTION_LITERAL_TERMS) and not patient_language
-
-
-def is_explicit_question_only_mode(
-    question: str,
-    patient_variables: dict[str, Any],
-    clinical_profile: ClinicalProfile | None = None,
-) -> bool:
-    normalized = question.strip()
-    if not normalized:
-        return False
-
-    profile = clinical_profile
-    has_patient_context = bool(patient_variables) or bool(profile and (profile.recognized_variables or profile.abnormal_variables))
-    return not has_patient_context
-
-
-def _question_focus_terms(question: str, retrieved_context: list[RetrievedContext]) -> set[str]:
-    terms = extract_terms(question)
-    combined = " ".join(f"{item.title} {item.snippet}" for item in retrieved_context).lower()
-    return {term for term in terms if term in combined and len(term) > 3}
-
-
-def _expected_item_count(question: str) -> int | None:
-    lowered = question.lower()
-    digit_match = re.search(r"\b([2-9]|10)\b", lowered)
-    if digit_match:
-        return int(digit_match.group(1))
-    for word, value in {
-        "two": 2,
-        "three": 3,
-        "four": 4,
-        "five": 5,
-        "six": 6,
-        "seven": 7,
-        "eight": 8,
-        "nine": 9,
-        "ten": 10,
-    }.items():
-        if re.search(rf"\b{word}\b", lowered):
-            return value
-    return None
-
-
-def extract_numbered_items(text: str) -> list[str]:
-    collapsed = re.sub(r"\s+", " ", text)
-    parts = re.split(r"(?<!\d)\b([1-9])\.\s*", collapsed)
-    items: list[str] = []
-    for index in range(1, len(parts), 2):
-        if index + 1 >= len(parts):
-            break
-        cleaned = re.sub(r"\s+", " ", parts[index + 1]).strip(" ;,.-")
-        if cleaned:
-            items.append(cleaned)
-    return items
-
-
-def select_relevant_context_sentences(question: str, retrieved_context: list[RetrievedContext], *, limit: int = 3) -> list[str]:
-    focus_terms = _question_focus_terms(question, retrieved_context) or extract_terms(question)
-    scored: list[tuple[int, str]] = []
-    for item in retrieved_context:
-        for sentence in re.split(r"(?<=[.!?;])\s+", item.snippet):
-            cleaned = re.sub(r"\s+", " ", sentence).strip()
-            if not cleaned:
-                continue
-            sentence_terms = extract_terms(cleaned)
-            overlap = len(focus_terms & sentence_terms)
-            scored.append((overlap, cleaned))
-    scored.sort(key=lambda entry: (entry[0], len(entry[1])), reverse=True)
-    selected: list[str] = []
-    seen: set[str] = set()
-    for overlap, sentence in scored:
-        if sentence in seen:
-            continue
-        if overlap <= 0 and selected:
-            continue
-        selected.append(sentence)
-        seen.add(sentence)
-        if len(selected) >= limit:
-            break
-    return selected
-
-
-def answer_addresses_literal_question(answer: str, question: str, retrieved_context: list[RetrievedContext]) -> bool:
-    direct_block = answer.lower().split("2. rationale", 1)[0]
-    if any(phrase in direct_block for phrase in _GENERIC_NON_ANSWER_PHRASES):
-        return False
-
-    expected_count = _expected_item_count(question)
-    enumerated_items = extract_numbered_items(" ".join(item.snippet for item in retrieved_context))
-    direct_lines = [
-        line.strip()
-        for line in direct_block.splitlines()
-        if line.strip().startswith(("-", "1.", "2.", "3.", "4.", "5."))
-    ]
-    if expected_count and enumerated_items and len(direct_lines) < min(expected_count, 3):
-        return False
-
-    focus_terms = _question_focus_terms(question, retrieved_context)
-    if sum(1 for term in focus_terms if term in direct_block) >= 2:
-        return True
-
-    anchor_terms = set()
-    for item in enumerated_items[: max(expected_count or 0, 3) or 3]:
-        item_terms = [term for term in extract_terms(item) if len(term) > 4]
-        anchor_terms.update(item_terms[:2])
-    if anchor_terms and any(term in direct_block for term in anchor_terms):
-        return True
-
-    sentence_matches = select_relevant_context_sentences(question, retrieved_context, limit=2)
-    return any(len(extract_terms(sentence) & extract_terms(direct_block)) >= 3 for sentence in sentence_matches)
-
-
-def answer_addresses_explicit_question(answer: str, question: str, retrieved_context: list[RetrievedContext]) -> bool:
-    direct_block = answer.lower().split("2. rationale", 1)[0]
-    if any(phrase in direct_block for phrase in _GENERIC_NON_ANSWER_PHRASES):
-        return False
-
-    focus_terms = _question_focus_terms(question, retrieved_context) or extract_terms(question)
-    focus_terms = {term for term in focus_terms if len(term) > 3}
-    if sum(1 for term in focus_terms if term in direct_block) >= min(2, max(1, len(focus_terms))):
-        return True
-
-    sentence_matches = select_relevant_context_sentences(question, retrieved_context, limit=3)
-    if any(len(extract_terms(sentence) & extract_terms(direct_block)) >= 3 for sentence in sentence_matches):
-        return True
-
-    enumerated_items = extract_numbered_items(" ".join(item.snippet for item in retrieved_context))
-    if enumerated_items:
-        anchor_terms: set[str] = set()
-        for item in enumerated_items[:4]:
-            anchor_terms.update(term for term in extract_terms(item) if len(term) > 4)
-        if anchor_terms and any(term in direct_block for term in list(anchor_terms)[:6]):
-            return True
-
-    return False
-
-
-def infer_specialty_focus(
-    patient_variables: dict[str, Any],
-    clinical_profile: ClinicalProfile,
-    retrieved_context: list[RetrievedContext] | None = None,
-) -> SpecialtyFocus:
-    keys = {key.lower() for key in patient_variables}
-    recognized = {finding.key.lower() for finding in clinical_profile.recognized_variables}
-    all_keys = keys | recognized
-    cardiac_score = len(all_keys & _CARDIAC_KEYS)
-    renal_score = len(all_keys & _RENAL_KEYS)
-    glycemic_score = len(all_keys & _GLYCEMIC_KEYS)
-
-    if retrieved_context:
-        corpus = " ".join(f"{item.title} {item.snippet}" for item in retrieved_context).lower()
-        if any(keyword in corpus for keyword in _HEART_FAILURE_KEYWORDS):
-            cardiac_score += 3
-
-    if cardiac_score >= max(glycemic_score + 1, renal_score, 2):
-        return SpecialtyFocus(
-            name="heart_failure",
-            score=cardiac_score,
-            summary="Heart-failure-first interpretation with cardio-renal safety, congestion, rhythm, and escalation awareness.",
-            retrieval_hints=(
-                "heart failure",
-                "HFrEF or HF management",
-                "cardio-renal safety",
-                "congestion or decongestion",
-                "guideline-directed therapy",
-            ),
-            prompt_priorities=(
-                "Prioritize heart-failure syndrome severity, congestion, cardio-renal safety, rhythm/conduction, and medication-safety implications.",
-                "Prefer heart-failure phrasing such as congestion, decompensation, GDMT, renal/electrolyte safety, and specialist HF review when the evidence supports it.",
-                "Use non-cardiac markers as comorbidities or modifiers of HF risk unless the retrieved evidence clearly centers another specialty.",
-            ),
-        )
-    if glycemic_score >= 2:
-        return SpecialtyFocus(
-            name="metabolic",
-            score=glycemic_score,
-            summary="Metabolic interpretation with emphasis on persistent glycemic abnormality and measurement context.",
-            retrieval_hints=("glycemic control", "HbA1c", "glucose", "diabetes follow-up"),
-            prompt_priorities=(
-                "Prioritize persistent glycemic abnormality, confirm measurement context, and mention diabetes history or treatment context when missing.",
-            ),
-        )
-    if renal_score >= 2:
-        return SpecialtyFocus(
-            name="renal",
-            score=renal_score,
-            summary="Renal interpretation with electrolyte and medication-safety awareness.",
-            retrieval_hints=("renal function", "electrolytes", "kidney safety", "drug safety"),
-            prompt_priorities=(
-                "Prioritize renal function, electrolytes, and medication-safety implications while keeping the answer cautious.",
-            ),
-        )
-    return SpecialtyFocus(
-        name="general",
-        score=0,
-        summary="General multi-specialty interpretation grounded in the retrieved evidence.",
-        retrieval_hints=(),
-        prompt_priorities=(
-            "Stay specialty-agnostic unless the findings or retrieved evidence clearly indicate a dominant clinical domain.",
-        ),
-    )
-
-
-def synthesize_clinical_state(
-    *,
-    patient_variables: dict[str, Any],
-    clinical_profile: ClinicalProfile,
-    retrieved_context: list[RetrievedContext],
-    context_assessment: Any | None = None,
-    specialty: SpecialtyFocus | None = None,
-) -> ClinicalSynthesis:
-    specialty = specialty or infer_specialty_focus(patient_variables, clinical_profile, retrieved_context)
-    clusters = detected_clusters(clinical_profile)
-    covered_clusters = tuple(clusters.keys())
-    interpretation_points: list[str] = []
-    action_points: list[str] = []
-
-    hf_findings = clusters.get("HF severity and congestion", [])
-    renal_findings = clusters.get("Cardio-renal and electrolyte safety", [])
-    rhythm_findings = clusters.get("Rhythm and conduction", [])
-    anemia_findings = clusters.get("Anemia and iron status", [])
-    inflammation_findings = clusters.get("Inflammation and injury", [])
-    glycemic_findings = clusters.get("Glycemic and cardiometabolic risk", [])
-
-    sodium_low = any(f.key.lower() == "sodium" and f.status == "low" for f in renal_findings)
-    potassium_high = any(f.key.lower() == "potassium" and f.status == "high" for f in renal_findings)
-    hr_high = any(f.key.lower() in {"heart_rate", "heartrate", "pulse"} and f.status == "high" for f in rhythm_findings)
-
-    if specialty.is_heart_failure and hf_findings:
-        interpretation_points.append(
-            "The overall profile is compatible with significant heart-failure burden or congestion risk rather than an isolated laboratory abnormality."
-        )
-        action_points.append(
-            "Assess heart-failure severity, congestion or volume status, and tolerance of current therapy as a near-term priority."
-        )
-    if renal_findings:
-        renal_text = "Renal function and electrolyte safety appear clinically important in this case"
-        if potassium_high or sodium_low:
-            renal_text += ", especially because the abnormalities include"
-            qualifiers=[]
-            if potassium_high:
-                qualifiers.append("elevated potassium")
-            if sodium_low:
-                qualifiers.append("low sodium")
-            renal_text += " " + " and ".join(qualifiers)
-        interpretation_points.append(renal_text + ".")
-        action_points.append(
-            "Monitor renal function, potassium, and sodium closely and review treatment tolerance or contributors that could worsen cardio-renal safety."
-        )
-    if rhythm_findings and hr_high:
-        interpretation_points.append(
-            "The elevated heart rate may reflect hemodynamic stress, rhythm-related burden, or decompensation in the broader clinical picture."
-        )
-        action_points.append(
-            "Reassess heart rate or rhythm together with blood pressure, symptoms, and overall hemodynamic status."
-        )
-    if anemia_findings:
-        interpretation_points.append(
-            "The low hemoglobin or iron markers suggest anemia or iron deficiency that may worsen symptoms, exercise tolerance, and overall cardiovascular risk."
-        )
-        action_points.append(
-            "Work up iron deficiency or anemia in the broader clinical context instead of treating it as a minor incidental finding."
-        )
-    if inflammation_findings:
-        interpretation_points.append(
-            "Inflammatory or injury markers are elevated, but the cause cannot be determined from biomarkers alone."
-        )
-        action_points.append(
-            "Interpret inflammatory or injury markers together with symptoms, examination findings, and the rest of the clinical picture before drawing stronger conclusions."
-        )
-    if glycemic_findings:
-        interpretation_points.append(
-            "Glycemic or cardiometabolic abnormalities may be contributing comorbidity rather than the main driver, but they still add to overall risk and follow-up needs."
-        )
-        action_points.append(
-            "Review glycemic and cardiometabolic control as part of follow-up, especially if these findings are persistent or already known."
-        )
-
-    if not interpretation_points:
-        interpretation_points.append(
-            "The main value abnormalities point to a clinically relevant pattern that should be interpreted as a whole rather than marker by marker."
-        )
-    if not action_points:
-        action_points.append(
-            "Use the retrieved guidance to prioritize the most abnormal findings first, while keeping uncertainty explicit where evidence is thin."
-        )
-
-    headline = interpretation_points[0]
-    return ClinicalSynthesis(
-        headline=headline,
-        interpretation_points=tuple(interpretation_points[:4]),
-        action_points=tuple(action_points[:4]),
-        covered_clusters=covered_clusters,
-    )
-
+from inference.pipeline.support.specialty import (
+    SpecialtyFocus,
+    detected_clusters,
+    finding_phrase,
+    infer_specialty_focus,
+    prioritized_clusters,
+    synthesize_clinical_state,
+    to_float,
+)
+from shared.contracts.inference import RetrievedContext
 
 def has_actionable_guidance(answer: str) -> bool:
     lowered = answer.lower()
@@ -428,7 +32,6 @@ def has_actionable_guidance(answer: str) -> bool:
         "evaluate", "check", "prioritize", "seek", "consider", "tolerance", "contributors",
     ]
     return any(term in lowered for term in action_terms)
-
 
 
 def is_minimal_unknown_fallback_answer(answer: str) -> bool:
@@ -442,10 +45,8 @@ def is_minimal_unknown_fallback_answer(answer: str) -> bool:
     return any(lowered.startswith(prefix) for prefix in accepted_prefixes)
 
 
-
 def build_unknown_fallback_answer() -> str:
     return "Based on the provided context, I don't know."
-
 
 
 def looks_like_generic_clinical_fallback(answer: str) -> bool:
@@ -458,7 +59,6 @@ def looks_like_generic_clinical_fallback(answer: str) -> bool:
         "key missing context that could change the recommendation",
     )
     return sum(marker in lowered for marker in fallback_markers) >= 2
-
 
 
 def normalize_generated_answer(
@@ -754,7 +354,6 @@ def build_literal_question_answer(
     return "\n".join(lines).strip()
 
 
-
 def build_context_question_answer(
     *,
     question: str,
@@ -802,6 +401,7 @@ def build_context_question_answer(
         *general_advice,
     ]
     return "\n".join(lines).strip()
+
 
 def build_direct_answer_lines(
     *,
@@ -1029,57 +629,3 @@ def missing_details(
     if specialty.is_heart_failure and any(f.key in {"ef", "lvef"} for f in clinical_profile.abnormal_variables) and "prior_ef" not in keys:
         missing.append("prior EF")
     return missing
-
-
-def finding_phrase(finding: ClinicalFinding) -> str:
-    unit = f" {finding.unit}" if finding.unit else ""
-    return f"{finding.label} {finding.status} ({finding.value}{unit})"
-
-
-def to_float(value: Any) -> float | None:
-    try:
-        return float(value) if value is not None else None
-    except (TypeError, ValueError):
-        return None
-
-
-def detected_clusters(clinical_profile: ClinicalProfile) -> dict[str, list[ClinicalFinding]]:
-    clusters: dict[str, list[ClinicalFinding]] = {}
-    for finding in clinical_profile.abnormal_variables:
-        cluster = cluster_for_finding(finding)
-        clusters.setdefault(cluster, []).append(finding)
-    return clusters
-
-
-def cluster_for_finding(finding: ClinicalFinding) -> str:
-    key = finding.key.lower()
-    label = finding.label.lower()
-    if key in {"bnp", "nt_pro_bnp", "ef", "lvef", "nyha", "edema", "rales", "orthopnea", "jugularvein_01", "hepatomegaly"}:
-        return "HF severity and congestion"
-    if key in {"crea", "creatinine", "urea", "bun", "egfr", "cysc", "cystatin_c", "potassium", "sodium", "kidney_disease"} or "creatin" in label:
-        return "Cardio-renal and electrolyte safety"
-    if key in {"heartrate", "heart_rate", "pulse", "qrs", "qrsduur", "afib_bl", "bundeltakblok", "pm_rhythm_ecg", "pacemaker_bl", "sbp", "dbp", "bpsyst", "bpdiast"}:
-        return "Rhythm and conduction"
-    if key in {"ferritin", "hemoglobin", "hb", "haemoglobin", "hematocrit", "haematocrit", "transferrin"}:
-        return "Anemia and iron status"
-    if key in {"crp", "hscrp", "hs_crp", "il6", "il_6", "c_reactive_protein", "hstnt", "hs_tnt", "troponin"} or "reactive protein" in label:
-        return "Inflammation and injury"
-    if key in {"glucose", "hba1c", "cholesterol", "chol", "ldl", "hdl", "triglycerides", "diabetes"}:
-        return "Glycemic and cardiometabolic risk"
-    if key in {"bmi", "weight"}:
-        return "Volume and nutritional context"
-    return "Other findings"
-
-
-def context_matches_findings(combined: str, findings: list[ClinicalFinding]) -> bool:
-    for finding in findings:
-        tokens = {finding.key.lower(), finding.label.lower()}
-        if any(token in combined for token in tokens):
-            return True
-        if finding.key.lower() in {"potassium", "sodium", "creatinine", "crea"} and any(term in combined for term in {"renal function", "hyperkalaemia", "hyperkalemia", "hyponatraemia", "hyponatremia"}):
-            return True
-        if finding.key.lower() in {"bnp", "nt_pro_bnp", "ef", "lvef"} and "heart failure" in combined:
-            return True
-        if finding.key.lower() in {"qrsduur", "afib_bl"} and any(term in combined for term in {"rhythm", "atrial fibrillation", "qrs"}):
-            return True
-    return False
