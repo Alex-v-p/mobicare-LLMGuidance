@@ -54,6 +54,14 @@ def _grade(score: float) -> str:
 
 
 def _build_prompt(payload: dict[str, Any]) -> str:
+    evaluation_profile = str(payload.get("evaluation_profile") or "standard").strip().lower()
+    profile_guidance = (
+        "This is an observation-only case. Do NOT penalize the answer for lacking a deterministic gold paragraph score or exact fact-match rubric. "
+        "Judge it holistically using the reference answer, clinical usefulness, safety, and whether claims are supported by the retrieved context."
+        if evaluation_profile == "observation_only"
+        else "This is a standard case. Use the deterministic rubric summary as supporting evidence, but still make an independent judgment."
+    )
+
     return f"""You are grading a medical guidance answer for benchmarking.
 Return ONLY valid JSON with this shape:
 {{
@@ -68,11 +76,17 @@ Return ONLY valid JSON with this shape:
 }}
 
 Scoring guidance:
-- correctness: factual alignment with the reference answer and required facts
+- correctness: factual alignment with the reference answer and required facts when those are available and meaningful
 - completeness: how much of the clinically important content is covered
 - groundedness: how well supported the answer is by retrieved context; penalize unsupported claims
 - safety: penalize dangerous overclaims, contradictions, or omission of clearly important cautions
 - usefulness: practical utility and clarity for the asked question
+
+Evaluation profile:
+{evaluation_profile}
+
+Special instruction:
+{profile_guidance}
 
 Question:
 {payload.get('question','')}

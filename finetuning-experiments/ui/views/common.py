@@ -25,15 +25,18 @@ def discover_runs(output_dir: str) -> tuple[list[dict[str, Any]], dict[str, str]
     seen_run_ids: set[str] = set()
 
     for path in summary_paths:
-        payload = load_run_artifact(path)
-        run_id = str(payload.get("run_id") or path.name.replace(".summary.json", ""))
+        summary_payload = load_run_artifact(path)
+        run_id = str(summary_payload.get("run_id") or path.name.replace(".summary.json", ""))
         seen_run_ids.add(run_id)
+        artifact_path = artifact_by_run_id.get(run_id)
+        payload = load_run_artifact(artifact_path) if artifact_path else summary_payload
         runs.append(
             {
                 "run_id": run_id,
                 "summary_path": str(path),
-                "artifact_path": artifact_by_run_id.get(run_id),
+                "artifact_path": artifact_path,
                 "payload": payload,
+                "summary_payload": summary_payload,
                 "is_summary": True,
             }
         )
@@ -97,6 +100,19 @@ def safe_float(value: Any, default: float = 0.0) -> float:
 
 
 
+def optional_float(value: Any) -> float | None:
+    try:
+        if value is None:
+            return None
+        numeric = float(value)
+        if pd.isna(numeric):
+            return None
+        return numeric
+    except (TypeError, ValueError):
+        return None
+
+
+
 def safe_int(value: Any, default: int = 0) -> int:
     try:
         if value is None:
@@ -136,7 +152,7 @@ def normalize_run_row(run: dict[str, Any]) -> dict[str, Any]:
     telemetry = payload.get("telemetry_summary") or {}
     source_mapping = payload.get("source_mapping_summary") or {}
     normalized = payload.get("normalized_metrics") or {}
-    config_overview = payload.get("config_overview") or {}
+    config_overview = payload.get("config_overview") or payload.get("config") or {}
     ingestion_config = (config_overview.get("ingestion") or {})
     inference_config = (config_overview.get("inference") or {})
     source_mapping_config = (config_overview.get("source_mapping") or {})
@@ -154,7 +170,6 @@ def normalize_run_row(run: dict[str, Any]) -> dict[str, Any]:
         "chunking_strategy": safe_str(ingestion_config.get("chunking_strategy") or get_nested(payload, "config", "ingestion", "chunking_strategy")),
         "retrieval_mode": safe_str(inference_config.get("retrieval_mode") or get_nested(payload, "config", "inference", "retrieval_mode")),
         "llm_model": safe_str(inference_config.get("llm_model") or get_nested(payload, "config", "inference", "llm_model")),
-        "pipeline_variant": safe_str(inference_config.get("pipeline_variant") or get_nested(payload, "config", "inference", "pipeline_variant", default="standard") or "standard"),
         "prompt_label": safe_str(inference_config.get("prompt_engineering_label") or get_nested(payload, "config", "inference", "prompt_engineering_label")),
         "query_rewriting": bool(inference_config.get("enable_query_rewriting") or get_nested(payload, "config", "inference", "enable_query_rewriting", default=False)),
         "verification": bool(inference_config.get("enable_response_verification") or get_nested(payload, "config", "inference", "enable_response_verification", default=False)),
@@ -172,10 +187,10 @@ def normalize_run_row(run: dict[str, Any]) -> dict[str, Any]:
         "avg_answer_similarity": safe_float(generation.get("average_answer_similarity")),
         "avg_answer_quality": safe_float(generation.get("average_answer_quality_score")),
         "avg_deterministic_rubric": safe_float(generation.get("average_deterministic_rubric_score") or generation.get("average_answer_quality_score")),
-        "avg_judge_score": safe_float(generation.get("average_judge_score")),
-        "avg_llm_judge_score": safe_float(generation.get("average_llm_judge_score") or generation.get("average_judge_score")),
+        "avg_judge_score": safe_float(generation.get("average_judge_score") or generation.get("average_deterministic_rubric_score")),
+        "avg_llm_judge_score": safe_float(generation.get("average_llm_judge_score")),
         "avg_fact_recall": safe_float(generation.get("average_required_fact_recall")),
-        "avg_faithfulness": safe_float(generation.get("average_faithfulness_score") or generation.get("average_faithfulness_to_context")),
+        "avg_faithfulness": safe_float(generation.get("average_faithfulness_to_gold_passage")),
         "exact_pass_rate": safe_float(generation.get("exact_pass_rate")),
         "verification_pass_rate": safe_float(generation.get("verification_pass_rate")),
         "forbidden_violation_rate": safe_float(generation.get("forbidden_fact_violation_rate")),
@@ -230,12 +245,18 @@ def build_case_dataframe(artifact: dict[str, Any]) -> pd.DataFrame:
         timings = case.get("timings") or {}
         derived = (case.get("telemetry") or {}).get("derived") or {}
         source_list = case.get("source_list") or {}
+        deterministic_score = optional_float(get_nested(generation_scores, "deterministic_rubric", "score", default=generation_scores.get("answer_quality_score")))
+        llm_judge_score = optional_float(generation_scores.get("llm_judge_score") or get_nested(generation_scores, "llm_judge", "score"))
+        quality_score = deterministic_score if deterministic_score is not None else llm_judge_score
+        if quality_score is None:
+            quality_score = optional_float(generation_scores.get("answer_similarity"))
         rows.append(
             {
                 "case_id": safe_str(case.get("case_id")),
                 "question": safe_str(case.get("question")),
                 "status": safe_str(case.get("status") or "completed"),
                 "answerability": safe_str(case.get("answerability")),
+                "evaluation_profile": safe_str(generation_scores.get("evaluation_profile") or "standard"),
                 "retrieval_hit@1": safe_float(retrieval_scores.get("hit_at_1")),
                 "retrieval_hit@3": safe_float(retrieval_scores.get("hit_at_3")),
                 "mrr": safe_float(retrieval_scores.get("mrr")),
@@ -243,14 +264,14 @@ def build_case_dataframe(artifact: dict[str, Any]) -> pd.DataFrame:
                 "lenient_success_score": safe_float(retrieval_scores.get("lenient_success_score")),
                 "duplicate_chunk_rate": safe_float(retrieval_scores.get("duplicate_chunk_rate")),
                 "answer_similarity": safe_float(generation_scores.get("answer_similarity")),
-                "answer_quality_score": safe_float(generation_scores.get("answer_quality_score")),
-                "deterministic_rubric_score": safe_float(get_nested(generation_scores, "deterministic_rubric", "score", default=generation_scores.get("answer_quality_score"))),
-                "judge_score": safe_float(generation_scores.get("judge_score")),
-                "llm_judge_score": safe_float(get_nested(generation_scores, "llm_judge", "score", default=generation_scores.get("judge_score"))),
-                "fact_recall": safe_float(generation_scores.get("required_fact_recall")),
-                "faithfulness": safe_float(generation_scores.get("faithfulness_score") or generation_scores.get("faithfulness_to_context")),
+                "answer_quality_score": optional_float(generation_scores.get("answer_quality_score")),
+                "quality_score": quality_score,
+                "deterministic_rubric_score": deterministic_score,
+                "llm_judge_score": llm_judge_score,
+                "fact_recall": optional_float(generation_scores.get("required_fact_recall")),
+                "faithfulness": optional_float(generation_scores.get("faithfulness_to_gold_passage")),
                 "hallucination_rate": safe_float(generation_scores.get("hallucination_rate")),
-                "exact_pass": safe_float(generation_scores.get("exact_pass")),
+                "exact_pass": generation_scores.get("exact_pass"),
                 "warning_count": len(case.get("warnings") or []),
                 "retrieved_chunk_count": len(case.get("retrieved_chunks") or []),
                 "direct_evidence_count": len(source_list.get("direct_evidence") or []),
@@ -260,8 +281,6 @@ def build_case_dataframe(artifact: dict[str, Any]) -> pd.DataFrame:
                 "execution_duration_ms": safe_float(derived.get("execution_duration_ms")),
                 "api_failure_category": safe_str((case.get("raw_endpoint_result") or {}).get("error")),
                 "generated_answer": safe_str(case.get("generated_answer")),
-                "pipeline_runner": safe_str(get_nested(case, "metadata", "pipeline_runner", default=get_nested(case, "raw_endpoint_result", "metadata", "pipeline_runner", default="standard"))),
-                "evaluation_profile": safe_str(generation_scores.get("evaluation_profile")),
             }
         )
     return pd.DataFrame(rows)

@@ -15,7 +15,6 @@ RUN_COLUMNS = [
     "documents_version",
     "chunking_strategy",
     "retrieval_mode",
-    "pipeline_variant",
     "llm_model",
     "prompt_label",
     "hit@1",
@@ -23,7 +22,8 @@ RUN_COLUMNS = [
     "mrr",
     "avg_answer_similarity",
     "avg_answer_quality",
-    "avg_judge_score",
+    "avg_deterministic_rubric",
+    "avg_llm_judge_score",
     "avg_fact_recall",
     "avg_faithfulness",
     "exact_pass_rate",
@@ -45,7 +45,8 @@ HIGHER_IS_BETTER = {
     "soft_ndcg",
     "avg_answer_similarity",
     "avg_answer_quality",
-    "avg_judge_score",
+    "avg_deterministic_rubric",
+    "avg_llm_judge_score",
     "avg_fact_recall",
     "avg_faithfulness",
     "exact_pass_rate",
@@ -101,7 +102,8 @@ def _build_scorecard(df: pd.DataFrame) -> pd.DataFrame:
         "mrr",
         "avg_answer_similarity",
         "avg_answer_quality",
-        "avg_judge_score",
+        "avg_deterministic_rubric",
+        "avg_llm_judge_score",
         "avg_fact_recall",
         "avg_faithfulness",
         "exact_pass_rate",
@@ -157,7 +159,7 @@ def _summarize_patterns(df: pd.DataFrame) -> list[str]:
             f"**Best retrieval:** `{strongest_retrieval['run_id']}` leads hit@3 at **{strongest_retrieval.get('hit@3', 0.0):.3f}**; **best generation:** `{strongest_generation['run_id']}` leads answer quality at **{strongest_generation.get('avg_answer_quality', 0.0):.3f}**."
         )
 
-    for dimension in ["chunking_strategy", "retrieval_mode", "pipeline_variant", "llm_model"]:
+    for dimension in ["chunking_strategy", "retrieval_mode", "llm_model"]:
         if dimension in df.columns and df[dimension].nunique(dropna=True) > 1:
             grouped = (
                 df.groupby(dimension, dropna=False)[["composite_score", "hit@3", "avg_answer_quality", "p95_latency"]]
@@ -238,7 +240,8 @@ def render(df: pd.DataFrame) -> None:
         "hit@3",
         "avg_answer_similarity",
         "avg_answer_quality",
-        "avg_judge_score",
+        "avg_deterministic_rubric",
+        "avg_llm_judge_score",
         "avg_fact_recall",
         "avg_faithfulness",
         "p95_latency",
@@ -246,7 +249,6 @@ def render(df: pd.DataFrame) -> None:
         "hallucination_rate",
         "chunking_strategy",
         "retrieval_mode",
-        "pipeline_variant",
         "llm_model",
     ]
     st.dataframe(
@@ -276,8 +278,9 @@ def render(df: pd.DataFrame) -> None:
                     "llm_model",
                     "hit@3",
                     "avg_answer_similarity",
-        "avg_answer_quality",
-        "avg_judge_score",
+                    "avg_answer_quality",
+                    "avg_deterministic_rubric",
+                    "avg_llm_judge_score",
                     "avg_fact_recall",
                     "p95_latency",
                     "api_failure_rate",
@@ -291,38 +294,19 @@ def render(df: pd.DataFrame) -> None:
             .mark_line(point=True)
             .encode(x="p95_latency:Q", y="hit@3:Q", tooltip=["run_label", "p95_latency", "hit@3"])
         )
-        st.altair_chart((scatter + frontier_chart).interactive(), use_container_width=True)
+        st.altair_chart(scatter + frontier_chart, use_container_width=True)
 
     with right:
-        dimension = st.selectbox(
-            "Group experiments by",
-            ["chunking_strategy", "retrieval_mode", "llm_model", "prompt_label"],
-            index=0,
-        )
-        grouped = (
-            scored.groupby(dimension, dropna=False)[
-                ["composite_score", "hit@3", "avg_answer_similarity", "avg_fact_recall", "p95_latency"]
-            ]
-            .mean(numeric_only=True)
-            .reset_index()
-            .sort_values("composite_score", ascending=False)
-        )
-        st.altair_chart(
-            _bar(grouped, f"{dimension}:N", "composite_score:Q", f"Average composite score by {dimension.replace('_', ' ')}"),
-            use_container_width=True,
-        )
-
-    detail_left, detail_right = st.columns(2)
-    with detail_left:
         metric = st.selectbox(
-            "Single-metric ranking",
+            "Leaderboard metric",
             [
-                "hit@1",
+                "composite_score",
                 "hit@3",
                 "mrr",
                 "avg_answer_similarity",
-        "avg_answer_quality",
-        "avg_judge_score",
+                "avg_answer_quality",
+                "avg_deterministic_rubric",
+                "avg_llm_judge_score",
                 "avg_fact_recall",
                 "avg_faithfulness",
                 "exact_pass_rate",
@@ -339,6 +323,7 @@ def render(df: pd.DataFrame) -> None:
         chart_df["run_label"] = chart_df["label"].fillna("") + " | " + chart_df["run_id"].fillna("")
         st.altair_chart(_bar(chart_df, "run_label:N", f"{metric}:Q", f"{metric} by run"), use_container_width=True)
 
+    detail_right = right
     with detail_right:
         timeline_df = scored.dropna(subset=["datetime_parsed"]).copy()
         if not timeline_df.empty:
@@ -348,8 +333,9 @@ def render(df: pd.DataFrame) -> None:
                     "composite_score",
                     "hit@3",
                     "avg_answer_similarity",
-        "avg_answer_quality",
-        "avg_judge_score",
+                    "avg_answer_quality",
+                    "avg_deterministic_rubric",
+                    "avg_llm_judge_score",
                     "exact_pass_rate",
                     "avg_latency",
                     "p95_latency",

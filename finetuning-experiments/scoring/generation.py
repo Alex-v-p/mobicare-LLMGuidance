@@ -3,8 +3,6 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from datasets.observation import is_observation_only_case
-
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 _STOPWORDS = {
     "the", "a", "an", "to", "and", "or", "of", "in", "for", "on", "with", "is", "are", "was", "were", "by", "that",
@@ -66,6 +64,23 @@ def _grade_from_score(score: float) -> str:
     return "poor"
 
 
+def _is_observation_only(case: dict[str, Any]) -> bool:
+    generation_metadata = case.get("generation_metadata") or {}
+    tags = {str(tag).strip().lower() for tag in (case.get("tags") or [])}
+    request_mode = str(generation_metadata.get("request_mode") or "").strip().lower()
+    return bool(
+        generation_metadata.get("evaluation_profile") == "observation_only"
+        or request_mode in {"biomarker_only", "drug_dosing_only"}
+        or generation_metadata.get("omit_question_from_request")
+        or "observation-case" in tags
+        or "biomarker-only" in tags
+        or "drug-dosing-only" in tags
+    )
+
+
+def _metric_or_none(value: float | bool | None, *, applicable: bool) -> float | bool | None:
+    return value if applicable else None
+
 
 def score_generation(
     case: dict[str, Any],
@@ -76,7 +91,7 @@ def score_generation(
 ) -> dict[str, Any]:
     answer_norm = _norm(answer)
     context_norm = _norm(" ".join((item.get("snippet") or "") for item in retrieved_context))
-    observation_only = is_observation_only_case(case)
+    observation_only = _is_observation_only(case)
 
     required = case.get("required_facts", []) or []
     forbidden = case.get("forbidden_facts", []) or []
@@ -100,7 +115,7 @@ def score_generation(
     unsupported_rate = (unsupported / len(answer_token_set)) if answer_token_set else 0.0
     groundedness = max(0.0, 1.0 - unsupported_rate)
     verification_score = _verification_score(verification)
-    required_fact_recall = (required_hits / len(required)) if required else 1.0
+    required_fact_recall_raw = (required_hits / len(required)) if required else None
 
     weights = {
         "required_fact": 0.35,
@@ -125,8 +140,9 @@ def score_generation(
     deterministic_rubric_score: float | None = None
     deterministic_grade: str | None = None
     if deterministic_applicable:
+        required_fact_component = required_fact_recall_raw if required_fact_recall_raw is not None else 1.0
         deterministic_rubric_score = (
-            weights["required_fact"] * required_fact_recall
+            weights["required_fact"] * required_fact_component
             + weights["reference_alignment"] * reference_token_f1
             + weights["gold_alignment"] * gold_token_f1
             + weights["context_alignment"] * max(faith_context, context_token_f1)
@@ -138,6 +154,11 @@ def score_generation(
         deterministic_rubric_score = max(0.0, min(1.0, deterministic_rubric_score))
         deterministic_grade = _grade_from_score(deterministic_rubric_score)
 
+    required_fact_metric_applicable = deterministic_applicable and bool(required)
+    forbidden_fact_metric_applicable = deterministic_applicable and bool(forbidden)
+    gold_faithfulness_applicable = deterministic_applicable and bool(gold_token_set)
+    exact_pass_applicable = deterministic_applicable and bool(required or forbidden)
+
     deterministic = {
         "enabled": deterministic_applicable,
         "applicable": deterministic_applicable,
@@ -146,7 +167,7 @@ def score_generation(
         "grade": deterministic_grade,
         "weights": weights,
         "subscores": {
-            "required_fact_recall": required_fact_recall,
+            "required_fact_recall": _metric_or_none(required_fact_recall_raw, applicable=required_fact_metric_applicable),
             "reference_alignment": reference_token_f1,
             "gold_alignment": gold_token_f1,
             "context_alignment": max(faith_context, context_token_f1),
@@ -156,13 +177,19 @@ def score_generation(
         "required_fact_hits": required_hits,
         "required_fact_total": len(required),
         "required_fact_misses": max(0, len(required) - required_hits),
-        "forbidden_fact_violations": forbidden_hits,
+        "forbidden_fact_violations": _metric_or_none(forbidden_hits, applicable=forbidden_fact_metric_applicable),
         "forbidden_fact_total": len(forbidden),
     }
 
     return {
         "evaluation_profile": "observation_only" if observation_only else "standard",
         "deterministic_rubric_applicable": deterministic_applicable,
+        "metric_applicability": {
+            "required_fact_recall": required_fact_metric_applicable,
+            "forbidden_fact_violations": forbidden_fact_metric_applicable,
+            "faithfulness_to_gold_passage": gold_faithfulness_applicable,
+            "exact_pass": exact_pass_applicable,
+        },
         "answer_similarity": reference_token_f1,
         "answer_similarity_legacy_note": "Token-F1 against the reference answer. Prefer deterministic_rubric.score and llm_judge.score.",
         "reference_token_f1": reference_token_f1,
@@ -173,19 +200,23 @@ def score_generation(
         "answer_quality_grade": deterministic_grade,
         "judge_score": deterministic_rubric_score,
         "judge_grade": deterministic_grade,
+        "judge_score_legacy_note": "Legacy alias for deterministic_rubric.score. LLM-judge is stored separately in llm_judge.score.",
         "verification_score": verification_score,
-        "required_fact_recall": required_fact_recall,
+        "required_fact_recall": _metric_or_none(required_fact_recall_raw, applicable=required_fact_metric_applicable),
         "required_fact_hits": required_hits,
         "required_fact_total": len(required),
         "required_fact_misses": max(0, len(required) - required_hits),
-        "forbidden_fact_violations": forbidden_hits,
+        "forbidden_fact_violations": _metric_or_none(forbidden_hits, applicable=forbidden_fact_metric_applicable),
         "forbidden_fact_total": len(forbidden),
-        "faithfulness_to_gold_passage": faith_gold,
+        "faithfulness_to_gold_passage": _metric_or_none(faith_gold, applicable=gold_faithfulness_applicable),
         "faithfulness_to_retrieved_context": faith_context,
         "groundedness_score": groundedness,
         "hallucination_unsupported_token_count": unsupported,
         "hallucination_rate": unsupported_rate,
         "unsupported_tokens": unsupported_tokens[:25],
         "retrieved_context_chunk_count": len(retrieved_context),
-        "exact_pass": bool(deterministic_applicable and required_fact_recall >= 0.999 and forbidden_hits == 0 and unsupported == 0),
+        "exact_pass": _metric_or_none(
+            bool(deterministic_applicable and required_fact_recall_raw is not None and required_fact_recall_raw >= 0.999 and forbidden_hits == 0 and unsupported == 0),
+            applicable=exact_pass_applicable,
+        ),
     }

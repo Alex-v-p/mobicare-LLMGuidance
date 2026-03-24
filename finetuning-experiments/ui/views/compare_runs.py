@@ -10,7 +10,6 @@ COMPARE_COLUMNS = [
     "label",
     "chunking_strategy",
     "retrieval_mode",
-    "pipeline_variant",
     "llm_model",
     "prompt_label",
     "query_rewriting",
@@ -25,7 +24,8 @@ COMPARE_COLUMNS = [
     "context_diversity_score",
     "avg_answer_similarity",
     "avg_answer_quality",
-    "avg_judge_score",
+    "avg_deterministic_rubric",
+    "avg_llm_judge_score",
     "avg_fact_recall",
     "avg_faithfulness",
     "exact_pass_rate",
@@ -48,7 +48,8 @@ BENEFIT_DIRECTION = {
     "context_diversity_score": 1,
     "avg_answer_similarity": 1,
     "avg_answer_quality": 1,
-    "avg_judge_score": 1,
+    "avg_deterministic_rubric": 1,
+    "avg_llm_judge_score": 1,
     "avg_fact_recall": 1,
     "avg_faithfulness": 1,
     "exact_pass_rate": 1,
@@ -160,7 +161,7 @@ def render(df: pd.DataFrame) -> None:
     with left:
         metric_groups = {
             "Retrieval": ["hit@1", "hit@3", "mrr", "weighted_relevance"],
-            "Generation": ["avg_answer_similarity", "avg_fact_recall", "avg_faithfulness", "exact_pass_rate", "verification_pass_rate", "hallucination_rate"],
+            "Generation": ["avg_answer_similarity", "avg_deterministic_rubric", "avg_llm_judge_score", "avg_fact_recall", "avg_faithfulness", "exact_pass_rate", "verification_pass_rate", "hallucination_rate"],
             "Latency / reliability": ["avg_latency", "p95_latency", "queue_delay_avg", "api_failure_rate", "api_timeout_rate"],
             "Pipeline complexity": ["chunks_created"],
         }
@@ -187,7 +188,7 @@ def render(df: pd.DataFrame) -> None:
         st.altair_chart(chart, use_container_width=True)
 
     with right:
-        diagnostic_cols = ["hit@3", "lenient_success_score", "avg_answer_quality", "avg_judge_score", "p95_latency", "api_failure_rate", "hallucination_rate"]
+        diagnostic_cols = ["hit@3", "lenient_success_score", "avg_answer_quality", "avg_deterministic_rubric", "avg_llm_judge_score", "p95_latency", "api_failure_rate", "hallucination_rate"]
         heatmap_df = _normalize_for_heatmap(compare_df, diagnostic_cols)
         heatmap = (
             alt.Chart(heatmap_df)
@@ -215,12 +216,12 @@ def render(df: pd.DataFrame) -> None:
                 "run_label",
                 "chunking_strategy",
                 "retrieval_mode",
-                "pipeline_variant",
                 "llm_model",
                 "prompt_label",
                 "hit@3",
                 "avg_answer_quality",
-                "avg_judge_score",
+                "avg_deterministic_rubric",
+                "avg_llm_judge_score",
                 "avg_fact_recall",
                 "p95_latency",
                 "api_failure_rate",

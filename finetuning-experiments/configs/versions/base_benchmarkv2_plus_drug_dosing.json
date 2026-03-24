@@ -2,7 +2,7 @@
   "label": "v0_4",
   "dataset_path": "./datasets/document_sets/benchmark_v2_plus_biomarkers_plus_drug_dosing.json",
   "documents_version": "docs_v1",
-  "notes": "Clustered retrieval benchmark with biomarker and drug-dosing observation cases.",
+  "notes": " drug-dosing observation cases. Plus enhanced question inference via clustering.",
   "change_note": "",
   "ingestion": {
     "cleaning_strategy": "deep",
@@ -22,7 +22,6 @@
     "include_chunk_pairs": true
   },
   "inference": {
-    "top_k": 3,
     "temperature": 0.0,
     "max_tokens": 256,
     "retrieval_mode": "hybrid",
