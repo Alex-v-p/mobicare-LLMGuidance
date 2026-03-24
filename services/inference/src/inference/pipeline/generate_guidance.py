@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from inference.http.clients.ollama_client import OllamaClient
 from inference.pipeline.steps import (
     AnswerGenerator,
     ExampleResponseBuilder,
@@ -9,6 +10,7 @@ from inference.pipeline.steps import (
     ResponseVerifier,
 )
 from inference.pipeline.runners import (
+    DrugDosingPipelineDependencies,
     DrugDosingPipelineRunner,
     PipelineRunnerRegistry,
     StandardPipelineDependencies,
@@ -35,7 +37,7 @@ class GuidancePipeline:
         shared_ollama_client = ollama_client or OllamaClient()
         shared_retriever = retriever or DenseRetriever()
         shared_hybrid_retriever = hybrid_retriever or HybridRetriever()
-        dependencies = StandardPipelineDependencies(
+        standard_dependencies = StandardPipelineDependencies(
             query_planner=query_planner or QueryPlanner(),
             query_rewriter=query_rewriter or QueryRewriter(shared_ollama_client),
             retrieval_orchestrator=retrieval_orchestrator or RetrievalOrchestrator(
@@ -48,9 +50,14 @@ class GuidancePipeline:
             default_llm_model=shared_ollama_client.model,
             default_embedding_model=shared_retriever._embedding_client.model,
         )
+        drug_dependencies = DrugDosingPipelineDependencies(
+            retriever=shared_retriever,
+            hybrid_retriever=shared_hybrid_retriever,
+            default_embedding_model=shared_retriever._embedding_client.model,
+        )
         self._runner_registry = PipelineRunnerRegistry(
-            standard_runner=StandardPipelineRunner(dependencies),
-            drug_dosing_runner=DrugDosingPipelineRunner(),
+            standard_runner=StandardPipelineRunner(standard_dependencies),
+            drug_dosing_runner=DrugDosingPipelineRunner(drug_dependencies),
         )
 
     async def run(self, request: InferenceRequest) -> InferenceResponse:
