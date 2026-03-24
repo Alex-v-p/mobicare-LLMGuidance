@@ -7,10 +7,10 @@ from typing import Any
 
 from adapters.guidance import GuidanceClient
 from adapters.guidance_payloads import normalize_guidance_record
-from caching.fingerprints import build_run_fingerprint
-from caching.run_registry import RunRegistry
 from artifacts.models import CURRENT_ARTIFACT_VERSION, RunArtifact
 from artifacts.writer import write_run_artifact
+from caching.fingerprints import build_run_fingerprint
+from caching.run_registry import RunRegistry
 from configs.schema import BenchmarkRunConfig
 from datasets.loader import load_benchmark_dataset
 from datasets.schema import BenchmarkCase
@@ -22,16 +22,14 @@ from scoring.aggregation import summarize_results
 from scoring.normalization import normalize_run_metrics
 from telemetry.stage_recorder import extract_guidance_telemetry
 from utils.datetime import utc_now_iso
-from utils.ids import build_run_id
 from utils.environment import collect_environment_snapshot
+from utils.ids import build_run_id
 
 logger = logging.getLogger(__name__)
 
 
-
 def _build_cases(raw_dataset: dict[str, Any]) -> list[BenchmarkCase]:
     return [BenchmarkCase(**case) for case in raw_dataset.get("cases", [])]
-
 
 
 def _build_guidance_payload(case: BenchmarkCase, config: BenchmarkRunConfig) -> dict[str, Any]:
@@ -62,10 +60,8 @@ def _build_guidance_payload(case: BenchmarkCase, config: BenchmarkRunConfig) -> 
     }
 
 
-
 def _timing_seconds(start: float) -> float:
     return max(0.0, time.monotonic() - start)
-
 
 
 def _run_warmups(cases: list[BenchmarkCase], config: BenchmarkRunConfig, guidance_client: GuidanceClient) -> None:
@@ -81,17 +77,22 @@ def _run_warmups(cases: list[BenchmarkCase], config: BenchmarkRunConfig, guidanc
             logger.warning("Warm-up failed for case=%s: %s", case.id, exc)
 
 
-
 def _build_success_case_result(
     *,
     case: BenchmarkCase,
     source_mapping: dict[str, Any] | None,
     guidance_record: dict[str, Any],
     total_latency: float,
+    evaluation_config: BenchmarkRunConfig.EvaluationConfig | None = None,
 ) -> dict[str, Any]:
     normalized_record = normalize_guidance_record(guidance_record)
     retrieval_result = run_retrieval_stage(source_mapping, normalized_record)
-    generation_result = run_generation_stage(case, normalized_record, retrieval_result.retrieved_chunks, config.evaluation)
+    generation_result = run_generation_stage(
+        case,
+        normalized_record,
+        retrieval_result.retrieved_chunks,
+        evaluation_config,
+    )
     telemetry = extract_guidance_telemetry(normalized_record)
     derived = telemetry.get("derived") or {}
     return {
@@ -126,16 +127,21 @@ def _build_success_case_result(
     }
 
 
-
 def _build_failed_case_result(
     *,
     case: BenchmarkCase,
     source_mapping: dict[str, Any] | None,
     error: Exception,
     total_latency: float,
+    evaluation_config: BenchmarkRunConfig.EvaluationConfig | None = None,
 ) -> dict[str, Any]:
     retrieval_result = run_retrieval_stage(source_mapping, {})
-    generation_result = run_generation_stage(case, {}, retrieval_result.retrieved_chunks, config.evaluation)
+    generation_result = run_generation_stage(
+        case,
+        {},
+        retrieval_result.retrieved_chunks,
+        evaluation_config,
+    )
     failed_record = {"status": "failed", "error": str(error)}
     return {
         "status": "failed",
@@ -158,7 +164,6 @@ def _build_failed_case_result(
         "raw_endpoint_result": failed_record,
         "error": str(error),
     }
-
 
 
 def run_benchmark(config: BenchmarkRunConfig) -> Path:
@@ -219,6 +224,7 @@ def run_benchmark(config: BenchmarkRunConfig) -> Path:
                         source_mapping=source_mapping,
                         guidance_record=result.record,
                         total_latency=_timing_seconds(start),
+                        evaluation_config=config.evaluation,
                     )
                 )
             except Exception as exc:  # noqa: BLE001
@@ -228,6 +234,7 @@ def run_benchmark(config: BenchmarkRunConfig) -> Path:
                         source_mapping=source_mapping,
                         error=exc,
                         total_latency=_timing_seconds(start),
+                        evaluation_config=config.evaluation,
                     )
                 )
 
