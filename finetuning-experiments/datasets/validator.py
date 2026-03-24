@@ -4,6 +4,19 @@ from typing import Any
 
 from .schema import BenchmarkCase
 
+
+def _is_observation_only(case: dict[str, Any]) -> bool:
+    generation_metadata = case.get("generation_metadata") or {}
+    tags = {str(tag).strip().lower() for tag in (case.get("tags") or [])}
+    return bool(
+        generation_metadata.get("evaluation_profile") == "observation_only"
+        or generation_metadata.get("request_mode") == "biomarker_only"
+        or generation_metadata.get("omit_question_from_request")
+        or "observation-case" in tags
+        or "biomarker-only" in tags
+    )
+
+
 _REQUIRED_CASE_FIELDS = {
     "id",
     "question",
@@ -11,12 +24,10 @@ _REQUIRED_CASE_FIELDS = {
 }
 
 
-
 def _fail(errors: list[str]) -> None:
     if errors:
         message = "Benchmark dataset validation failed:\n- " + "\n- ".join(errors)
         raise ValueError(message)
-
 
 
 def validate_benchmark_dataset(raw_dataset: dict[str, Any]) -> None:
@@ -68,7 +79,7 @@ def validate_benchmark_dataset(raw_dataset: dict[str, Any]) -> None:
             errors.append(f"{prefix}.case_weight must be positive.")
         if benchmark_case.answerability == "unanswerable" and benchmark_case.gold_passage_id:
             errors.append(f"{prefix} is unanswerable but still has a gold_passage_id.")
-        if benchmark_case.answerability == "answerable" and not benchmark_case.gold_passage_text:
+        if benchmark_case.answerability == "answerable" and not benchmark_case.gold_passage_text and not _is_observation_only(case):
             errors.append(f"{prefix} is answerable but has no gold_passage_text.")
 
     _fail(errors)

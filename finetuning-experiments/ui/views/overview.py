@@ -21,6 +21,8 @@ RUN_COLUMNS = [
     "hit@3",
     "mrr",
     "avg_answer_similarity",
+    "avg_answer_quality",
+    "avg_judge_score",
     "avg_fact_recall",
     "avg_faithfulness",
     "exact_pass_rate",
@@ -37,8 +39,12 @@ HIGHER_IS_BETTER = {
     "hit@5",
     "mrr",
     "weighted_relevance",
+    "lenient_success_score",
+    "context_diversity_score",
     "soft_ndcg",
     "avg_answer_similarity",
+    "avg_answer_quality",
+    "avg_judge_score",
     "avg_fact_recall",
     "avg_faithfulness",
     "exact_pass_rate",
@@ -93,6 +99,8 @@ def _build_scorecard(df: pd.DataFrame) -> pd.DataFrame:
         "hit@3",
         "mrr",
         "avg_answer_similarity",
+        "avg_answer_quality",
+        "avg_judge_score",
         "avg_fact_recall",
         "avg_faithfulness",
         "exact_pass_rate",
@@ -134,31 +142,31 @@ def _summarize_patterns(df: pd.DataFrame) -> list[str]:
     ranked = df.sort_values("composite_score", ascending=False)
     best = ranked.iloc[0]
     findings.append(
-        f"**Top overall run:** `{best['run_id']}` ({best.get('label') or 'unlabeled'}) with composite score **{best['composite_score']:.3f}**, hit@3 **{best.get('hit@3', 0.0):.3f}**, and answer similarity **{best.get('avg_answer_similarity', 0.0):.3f}**."
+        f"**Top overall run:** `{best['run_id']}` ({best.get('label') or 'unlabeled'}) with composite score **{best['composite_score']:.3f}**, hit@3 **{best.get('hit@3', 0.0):.3f}**, and answer quality **{best.get('avg_answer_quality', 0.0):.3f}**."
     )
 
     if len(df) > 1:
         fastest = df.sort_values("p95_latency", ascending=True).iloc[0]
         strongest_retrieval = df.sort_values("hit@3", ascending=False).iloc[0]
-        strongest_generation = df.sort_values("avg_answer_similarity", ascending=False).iloc[0]
+        strongest_generation = df.sort_values("avg_answer_quality", ascending=False).iloc[0]
         findings.append(
             f"**Best trade-off on speed:** `{fastest['run_id']}` has the lowest p95 latency at **{fastest.get('p95_latency', 0.0):.1f} ms**."
         )
         findings.append(
-            f"**Best retrieval:** `{strongest_retrieval['run_id']}` leads hit@3 at **{strongest_retrieval.get('hit@3', 0.0):.3f}**; **best generation:** `{strongest_generation['run_id']}` leads answer similarity at **{strongest_generation.get('avg_answer_similarity', 0.0):.3f}**."
+            f"**Best retrieval:** `{strongest_retrieval['run_id']}` leads hit@3 at **{strongest_retrieval.get('hit@3', 0.0):.3f}**; **best generation:** `{strongest_generation['run_id']}` leads answer quality at **{strongest_generation.get('avg_answer_quality', 0.0):.3f}**."
         )
 
     for dimension in ["chunking_strategy", "retrieval_mode", "llm_model"]:
         if dimension in df.columns and df[dimension].nunique(dropna=True) > 1:
             grouped = (
-                df.groupby(dimension, dropna=False)[["composite_score", "hit@3", "avg_answer_similarity", "p95_latency"]]
+                df.groupby(dimension, dropna=False)[["composite_score", "hit@3", "avg_answer_quality", "p95_latency"]]
                 .mean(numeric_only=True)
                 .sort_values("composite_score", ascending=False)
                 .reset_index()
             )
             leader = grouped.iloc[0]
             findings.append(
-                f"**Strongest {dimension.replace('_', ' ')}:** `{leader[dimension] or 'unspecified'}` averages composite **{leader['composite_score']:.3f}**, hit@3 **{leader['hit@3']:.3f}**, answer similarity **{leader['avg_answer_similarity']:.3f}**, p95 latency **{leader['p95_latency']:.1f} ms**."
+                f"**Strongest {dimension.replace('_', ' ')}:** `{leader[dimension] or 'unspecified'}` averages composite **{leader['composite_score']:.3f}**, hit@3 **{leader['hit@3']:.3f}**, answer quality **{leader['avg_answer_quality']:.3f}**, p95 latency **{leader['p95_latency']:.1f} ms**."
             )
     return findings
 
@@ -189,7 +197,7 @@ def render(df: pd.DataFrame) -> None:
     with top2:
         metric_card("Best hit@3", round(float(df["hit@3"].max()), 4))
     with top3:
-        metric_card("Best answer similarity", round(float(df["avg_answer_similarity"].max()), 4))
+        metric_card("Best answer quality", round(float(df["avg_answer_quality"].max()), 4))
     with top4:
         valid_p95 = df["p95_latency"].replace(0, pd.NA).dropna()
         metric_card("Lowest p95 latency", round(float(valid_p95.min()), 2) if not valid_p95.empty else 0.0)
@@ -228,6 +236,8 @@ def render(df: pd.DataFrame) -> None:
         "efficiency_score",
         "hit@3",
         "avg_answer_similarity",
+        "avg_answer_quality",
+        "avg_judge_score",
         "avg_fact_recall",
         "avg_faithfulness",
         "p95_latency",
@@ -264,6 +274,8 @@ def render(df: pd.DataFrame) -> None:
                     "llm_model",
                     "hit@3",
                     "avg_answer_similarity",
+        "avg_answer_quality",
+        "avg_judge_score",
                     "avg_fact_recall",
                     "p95_latency",
                     "api_failure_rate",
@@ -307,6 +319,8 @@ def render(df: pd.DataFrame) -> None:
                 "hit@3",
                 "mrr",
                 "avg_answer_similarity",
+        "avg_answer_quality",
+        "avg_judge_score",
                 "avg_fact_recall",
                 "avg_faithfulness",
                 "exact_pass_rate",
@@ -332,6 +346,8 @@ def render(df: pd.DataFrame) -> None:
                     "composite_score",
                     "hit@3",
                     "avg_answer_similarity",
+        "avg_answer_quality",
+        "avg_judge_score",
                     "exact_pass_rate",
                     "avg_latency",
                     "p95_latency",

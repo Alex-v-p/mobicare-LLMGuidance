@@ -12,7 +12,7 @@ from ui.views.common import build_case_dataframe, load_full_run, load_source_map
 def _classify_bottleneck(row: pd.Series) -> str:
     if float(row.get("retrieval_hit@3", 0.0)) < 0.5:
         return "Retrieval bottleneck"
-    if float(row.get("answer_similarity", 0.0)) < 0.6 or float(row.get("fact_recall", 0.0)) < 0.6:
+    if float(row.get("answer_quality_score", 0.0)) < 0.6 or float(row.get("fact_recall", 0.0)) < 0.6:
         return "Generation bottleneck"
     if float(row.get("hallucination_rate", 0.0)) > 0.15:
         return "Grounding risk"
@@ -65,14 +65,14 @@ def render(run_df: pd.DataFrame, output_dir: str) -> None:
         bottlenecks = sorted(x for x in cases["bottleneck"].dropna().unique().tolist() if x)
         selected_bottlenecks = st.multiselect("Bottleneck type", bottlenecks, default=bottlenecks)
     with filter3:
-        min_similarity = st.slider("Minimum answer similarity", 0.0, 1.0, 0.0, 0.01)
+        min_similarity = st.slider("Minimum answer quality", 0.0, 1.0, 0.0, 0.01)
 
     filtered = cases.copy()
     if selected_statuses:
         filtered = filtered[filtered["status"].isin(selected_statuses)]
     if selected_bottlenecks:
         filtered = filtered[filtered["bottleneck"].isin(selected_bottlenecks)]
-    filtered = filtered[filtered["answer_similarity"] >= min_similarity]
+    filtered = filtered[filtered["answer_quality_score"] >= min_similarity]
 
     if filtered.empty:
         st.warning("Current filters removed all cases.")
@@ -88,6 +88,10 @@ def render(run_df: pd.DataFrame, output_dir: str) -> None:
                 "bottleneck",
                 "retrieval_hit@3",
                 "mrr",
+                "answer_quality_score",
+                "deterministic_rubric_score",
+                "judge_score",
+                "llm_judge_score",
                 "answer_similarity",
                 "fact_recall",
                 "faithfulness",
@@ -97,7 +101,7 @@ def render(run_df: pd.DataFrame, output_dir: str) -> None:
                 "retrieved_chunk_count",
                 "total_latency_ms",
             ]
-        ].sort_values(["answer_similarity", "retrieval_hit@3"], ascending=[True, True]),
+        ].sort_values(["answer_quality_score", "retrieval_hit@3"], ascending=[True, True]),
         use_container_width=True,
         hide_index=True,
     )
@@ -109,7 +113,7 @@ def render(run_df: pd.DataFrame, output_dir: str) -> None:
             .mark_circle(size=90)
             .encode(
                 x=alt.X("retrieval_hit@3:Q", title="retrieval hit@3"),
-                y=alt.Y("answer_similarity:Q", title="answer similarity"),
+                y=alt.Y("answer_quality_score:Q", title="answer quality"),
                 color=alt.Color("bottleneck:N", title="Bottleneck"),
                 size=alt.Size("total_latency_ms:Q", title="Latency (ms)"),
                 tooltip=[
@@ -117,7 +121,11 @@ def render(run_df: pd.DataFrame, output_dir: str) -> None:
                     "question",
                     "bottleneck",
                     "retrieval_hit@3",
-                    "answer_similarity",
+                    "answer_quality_score",
+                "deterministic_rubric_score",
+                "judge_score",
+                "llm_judge_score",
+                "answer_similarity",
                     "fact_recall",
                     "hallucination_rate",
                     "total_latency_ms",
@@ -145,7 +153,7 @@ def render(run_df: pd.DataFrame, output_dir: str) -> None:
     cohort_left, cohort_right = st.columns(2)
     with cohort_left:
         answerability_summary = (
-            filtered.groupby("answerability")[["retrieval_hit@3", "answer_similarity", "fact_recall", "total_latency_ms"]]
+            filtered.groupby("answerability")[["retrieval_hit@3", "deterministic_rubric_score", "llm_judge_score", "fact_recall", "total_latency_ms"]]
             .mean(numeric_only=True)
             .reset_index()
         )
@@ -153,10 +161,10 @@ def render(run_df: pd.DataFrame, output_dir: str) -> None:
         st.dataframe(answerability_summary, use_container_width=True, hide_index=True)
 
     with cohort_right:
-        hard_cases = filtered.sort_values(["answer_similarity", "fact_recall", "retrieval_hit@3"], ascending=True).head(10)
+        hard_cases = filtered.sort_values(["answer_quality_score", "fact_recall", "retrieval_hit@3"], ascending=True).head(10)
         st.markdown("### Lowest-confidence cases")
         st.dataframe(
-            hard_cases[["case_id", "bottleneck", "question", "retrieval_hit@3", "answer_similarity", "fact_recall", "hallucination_rate"]],
+            hard_cases[["case_id", "bottleneck", "question", "retrieval_hit@3", "deterministic_rubric_score", "llm_judge_score", "fact_recall", "hallucination_rate"]],
             use_container_width=True,
             hide_index=True,
         )

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-CURRENT_ARTIFACT_VERSION = "2.6"
+CURRENT_ARTIFACT_VERSION = "2.8"
 
 
 @dataclass(slots=True)

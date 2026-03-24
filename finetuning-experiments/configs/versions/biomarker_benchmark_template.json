@@ -1,0 +1,35 @@
+{
+  "run_name": "biomarker-observation-run",
+  "dataset_path": "./datasets/document_sets/benchmark_biomarker_v1.json",
+  "dataset_version": "benchmark_biomarker_v1",
+  "ingestion": {
+    "enabled": true,
+    "document_paths": ["./dataset_generation/docs/HF_GuidLine_Christof_ehab368_Suppl.pdf"],
+    "chunking_strategy": "basic",
+    "chunk_size": 300,
+    "chunk_overlap": 100,
+    "cleaning_level": "moderate"
+  },
+  "inference": {
+    "top_k": 6,
+    "temperature": 0.2,
+    "max_tokens": 700,
+    "use_example_response": false,
+    "retrieval_mode": "hybrid",
+    "hybrid_dense_weight": 0.65,
+    "hybrid_sparse_weight": 0.35,
+    "use_graph_augmentation": false,
+    "graph_max_extra_nodes": 0,
+    "enable_query_rewriting": true,
+    "enable_response_verification": true,
+    "enable_regeneration": true,
+    "max_regeneration_attempts": 1,
+    "llm_model": "qwen2.5:7b",
+    "embedding_model": "nomic-embed-text"
+  },
+  "execution": {
+    "warmup_cases": 1,
+    "poll_interval_seconds": 2,
+    "max_wait_seconds": 600
+  }
+}

@@ -7,6 +7,8 @@ from typing import Any
 
 import requests
 
+from adapters.guidance_payloads import extract_retrieved_context
+
 logger = logging.getLogger(__name__)
 
 
@@ -50,7 +52,7 @@ class GuidanceClient:
         while True:
             record = self.get_guidance_job(job_id)
             status = str(record.get("status", "unknown"))
-            rag = record.get("rag") or []
+            rag = extract_retrieved_context(record)
             logger.info(
                 "Guidance job %s status=%s rag=%s warnings=%s",
                 job_id,

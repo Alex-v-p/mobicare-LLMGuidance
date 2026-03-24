@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from inference.http.clients.ollama_client import OllamaClient
+from inference.pipeline.answer_support import build_deterministic_answer
 from inference.pipeline.components import (
     AnswerGenerator,
     ExampleResponseBuilder,
@@ -189,8 +190,29 @@ class GuidancePipeline:
                 retrieved_context=retrieved_context,
                 answer=final_answer,
             )
-            if final_verification.verdict == "pass" or attempt == attempt_limit:
+            if final_verification.verdict == "pass":
                 return final_answer, final_verification, final_prompt_length, attempt
+            if attempt == attempt_limit:
+                fallback_answer = build_deterministic_answer(
+                    question=query_plan.effective_question,
+                    patient_variables=request.patient_variables,
+                    clinical_profile=query_plan.clinical_profile,
+                    retrieved_context=retrieved_context,
+                    context_assessment=self._retrieval_orchestrator.assess_context(
+                        retrieved_context=retrieved_context,
+                        retrieval_query=query_plan.base_query,
+                        clinical_profile=query_plan.clinical_profile,
+                        minimum_results=request.options.retrieval_low_context_min_results,
+                    ),
+                )
+                fallback_verification = self._response_verifier.heuristic_verify(
+                    fallback_answer,
+                    question=query_plan.effective_question,
+                    patient_variables=request.patient_variables,
+                    clinical_profile=query_plan.clinical_profile,
+                    retrieved_context=retrieved_context,
+                )
+                return fallback_answer, fallback_verification, final_prompt_length, attempt
 
             verification_feedback = final_verification.issues
             warnings.append(

@@ -20,7 +20,11 @@ COMPARE_COLUMNS = [
     "hit@3",
     "mrr",
     "weighted_relevance",
+    "lenient_success_score",
+    "context_diversity_score",
     "avg_answer_similarity",
+    "avg_answer_quality",
+    "avg_judge_score",
     "avg_fact_recall",
     "avg_faithfulness",
     "exact_pass_rate",
@@ -39,7 +43,11 @@ BENEFIT_DIRECTION = {
     "hit@3": 1,
     "mrr": 1,
     "weighted_relevance": 1,
+    "lenient_success_score": 1,
+    "context_diversity_score": 1,
     "avg_answer_similarity": 1,
+    "avg_answer_quality": 1,
+    "avg_judge_score": 1,
     "avg_fact_recall": 1,
     "avg_faithfulness": 1,
     "exact_pass_rate": 1,
@@ -178,7 +186,7 @@ def render(df: pd.DataFrame) -> None:
         st.altair_chart(chart, use_container_width=True)
 
     with right:
-        diagnostic_cols = ["hit@3", "avg_answer_similarity", "avg_fact_recall", "p95_latency", "api_failure_rate", "hallucination_rate"]
+        diagnostic_cols = ["hit@3", "lenient_success_score", "avg_answer_quality", "avg_judge_score", "p95_latency", "api_failure_rate", "hallucination_rate"]
         heatmap_df = _normalize_for_heatmap(compare_df, diagnostic_cols)
         heatmap = (
             alt.Chart(heatmap_df)
@@ -199,7 +207,7 @@ def render(df: pd.DataFrame) -> None:
         .mark_circle(size=170)
         .encode(
             x=alt.X("p95_latency:Q", title="p95 latency (ms)"),
-            y=alt.Y("avg_answer_similarity:Q", title="Answer similarity"),
+            y=alt.Y("avg_answer_quality:Q", title="Answer quality"),
             color=alt.Color("hit@3:Q", title="hit@3"),
             shape=alt.Shape("retrieval_mode:N", title="Retrieval mode"),
             tooltip=[
@@ -209,7 +217,8 @@ def render(df: pd.DataFrame) -> None:
                 "llm_model",
                 "prompt_label",
                 "hit@3",
-                "avg_answer_similarity",
+                "avg_answer_quality",
+                "avg_judge_score",
                 "avg_fact_recall",
                 "p95_latency",
                 "api_failure_rate",

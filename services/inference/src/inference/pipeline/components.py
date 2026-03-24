@@ -10,12 +10,15 @@ from inference.pipeline.answer_support import (
     collect_answer_issues,
     context_key,
     context_matches_findings,
+    is_literal_question_mode,
     detected_clusters,
     extract_terms,
     normalize_generated_answer,
     should_force_deterministic_answer,
     build_deterministic_answer,
     infer_specialty_focus,
+    prioritized_clusters,
+    synthesize_clinical_state,
 )
 from inference.pipeline.prompts.multistep import (
     build_generation_prompt,
@@ -91,15 +94,83 @@ class ExampleResponseBuilder:
 
 
 class QueryPlanner:
+    def _build_effective_question(
+        self,
+        request: InferenceRequest,
+        profile: ClinicalProfile,
+        specialty_focus,
+    ) -> str:
+        explicit_question = request.question.strip()
+        if explicit_question:
+            return explicit_question
+
+        relevant_terms = [finding.label for finding in profile.abnormal_variables[:4]]
+        if specialty_focus.is_heart_failure:
+            focus = ", ".join(relevant_terms[:3]) or "congestion and cardio-renal safety"
+            return (
+                "For this heart-failure-oriented profile, what near-term management priorities, safety checks, "
+                f"and escalation considerations are most relevant, especially for {focus}?"
+            )
+        if specialty_focus.name == "renal":
+            focus = ", ".join(relevant_terms[:3]) or "renal function and electrolytes"
+            return (
+                "For this renal-safety-oriented profile, what near-term monitoring priorities and treatment "
+                f"safety considerations are most relevant, especially for {focus}?"
+            )
+        if specialty_focus.name == "metabolic":
+            focus = ", ".join(relevant_terms[:3]) or "glucose control"
+            return (
+                "For this metabolic profile, what follow-up priorities and interpretation points are most relevant, "
+                f"especially for {focus}?"
+            )
+        return build_question_from_patient_data(request.patient_variables, profile)
+
+    def _build_base_query(
+        self,
+        request: InferenceRequest,
+        profile: ClinicalProfile,
+        specialty_focus,
+    ) -> str:
+        explicit_question = request.question.strip()
+        if explicit_question:
+            return explicit_question
+
+        focus_clusters = prioritized_clusters(profile, specialty_focus, limit=2)
+        focus_findings = [finding.label for finding in profile.abnormal_variables[:4]]
+        if specialty_focus.is_heart_failure:
+            pieces = [
+                "heart failure guidance",
+                *(cluster.lower() for cluster in focus_clusters),
+                *(term.lower() for term in focus_findings[:4]),
+                "congestion",
+                "cardio-renal safety",
+                "follow-up",
+            ]
+            return " ".join(dict.fromkeys(piece for piece in pieces if piece))
+        if specialty_focus.name == "renal":
+            pieces = [
+                "renal function electrolyte safety guidance",
+                *(cluster.lower() for cluster in focus_clusters),
+                *(term.lower() for term in focus_findings[:4]),
+                "monitoring",
+            ]
+            return " ".join(dict.fromkeys(piece for piece in pieces if piece))
+        if specialty_focus.name == "metabolic":
+            pieces = [
+                "glycemic cardiometabolic guidance",
+                *(cluster.lower() for cluster in focus_clusters),
+                *(term.lower() for term in focus_findings[:4]),
+                "follow-up",
+            ]
+            return " ".join(dict.fromkeys(piece for piece in pieces if piece))
+        return build_question_from_patient_data(request.patient_variables, profile)
+
     def create_plan(self, request: InferenceRequest) -> QueryPlan:
         profile = build_clinical_profile(request.patient_variables)
-        effective_question = request.question.strip() or build_question_from_patient_data(
-            request.patient_variables,
-            profile,
-        )
-        base_query = effective_question.strip()
         abnormal_clusters = detected_clusters(profile)
         specialty_focus = infer_specialty_focus(request.patient_variables, profile)
+        effective_question = self._build_effective_question(request, profile, specialty_focus)
+        base_query = self._build_base_query(request, profile, specialty_focus).strip()
 
         expanded_queries: list[str] = []
         if request.options.adaptive_retrieval_enabled:
@@ -188,6 +259,8 @@ class ContextJudge:
         query_terms = extract_terms(retrieval_query)
         profile_terms = {term.lower() for term in clinical_profile.relevant_terms()}
         abnormal_clusters = detected_clusters(clinical_profile)
+        specialty_focus = infer_specialty_focus({}, clinical_profile, retrieved_context)
+        focus_clusters = prioritized_clusters(clinical_profile, specialty_focus, limit=2)
         coverage_hits = 0
         cluster_coverage = {cluster: 0 for cluster in abnormal_clusters}
         for item in retrieved_context:
@@ -207,7 +280,7 @@ class ContextJudge:
             reasons.append("no_clear_query_term_overlap")
         if clinical_profile.has_abnormal_variables and not profile_terms:
             reasons.append("no_abnormal_terms_available")
-        if cluster_coverage and any(count == 0 for count in cluster_coverage.values()):
+        if focus_clusters and any(cluster_coverage.get(cluster, 0) == 0 for cluster in focus_clusters):
             reasons.append("incomplete_cluster_coverage")
 
         sufficient = not reasons
@@ -454,6 +527,7 @@ class AnswerGenerator:
             allow_general_guidance=request.options.enable_general_guidance_section,
             context_assessment=context_assessment,
             specialty_focus=infer_specialty_focus(request.patient_variables, clinical_profile, retrieved_context),
+            literal_question_mode=is_literal_question_mode(effective_question, request.patient_variables, clinical_profile),
         )
         llm_response = await self._get_llm_client(request).generate(
             prompt=prompt,
@@ -467,8 +541,10 @@ class AnswerGenerator:
         )
         if should_force_deterministic_answer(
             answer=normalized_answer,
+            question=effective_question,
             patient_variables=request.patient_variables,
             clinical_profile=clinical_profile,
+            retrieved_context=retrieved_context,
             context_assessment=context_assessment,
         ):
             normalized_answer = build_deterministic_answer(
@@ -494,12 +570,14 @@ class ResponseVerifier:
         self,
         answer: str,
         *,
+        question: str = "",
         patient_variables: dict[str, Any] | None = None,
         clinical_profile: ClinicalProfile | None = None,
         retrieved_context: list[RetrievedContext] | None = None,
     ) -> VerificationResult:
         issues = collect_answer_issues(
             answer=answer,
+            question=question,
             patient_variables=patient_variables or {},
             clinical_profile=clinical_profile,
             retrieved_context=retrieved_context or [],
@@ -543,6 +621,7 @@ class ResponseVerifier:
     ) -> VerificationResult:
         heuristic = self.heuristic_verify(
             answer,
+            question=effective_question,
             patient_variables=request.patient_variables,
             clinical_profile=clinical_profile,
             retrieved_context=retrieved_context,

@@ -6,8 +6,8 @@
     "stop_at_references": true
   },
   "generation": {
-    "dataset_version": "benchmark_v1",
-    "dataset_id": "benchmark_v1",
+    "dataset_version": "benchmark_v2",
+    "dataset_id": "benchmark_v2",
     "dataset_size": 120,
     "seed": 42,
     "provider": "ollama",

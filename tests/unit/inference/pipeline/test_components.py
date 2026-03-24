@@ -1,5 +1,5 @@
 from inference.clinical import build_clinical_profile, build_question_from_patient_data
-from inference.pipeline.answer_support import infer_specialty_focus
+from inference.pipeline.answer_support import build_caution_lines, build_deterministic_answer, infer_specialty_focus
 from inference.pipeline.components import ChunkRelevanceRanker, ContextJudge, QueryPlanner, ResponseVerifier
 from shared.contracts.inference import GenerationOptions, InferenceRequest, RetrievedContext
 
@@ -26,7 +26,7 @@ def test_build_question_from_patient_data_infers_task_without_question():
 
     question = build_question_from_patient_data({"gender": "male", "ef": 30, "nt_pro_bnp": 900}, profile)
 
-    assert "treatment" in question.lower()
+    assert "next-step priorities" in question.lower()
     assert "Ejection fraction" in question
 
 
@@ -45,6 +45,7 @@ def test_query_planner_adds_targeted_adaptive_queries_for_abnormal_variables():
     assert len(plan.expanded_queries) >= 3
     assert any("clinical management" in query.lower() for query in plan.expanded_queries)
     assert any("heart failure" in query.lower() or "hf severity and congestion" in query.lower() for query in plan.expanded_queries)
+    assert "heart-failure-oriented profile" in plan.effective_question.lower()
 
 
 def test_context_judge_marks_context_as_insufficient_when_overlap_is_missing():
@@ -59,6 +60,40 @@ def test_context_judge_marks_context_as_insufficient_when_overlap_is_missing():
 
     assert assessment.sufficient is False
     assert "too_few_context_chunks" in assessment.reasons
+
+
+def test_context_judge_allows_secondary_clusters_to_remain_uncovered_when_primary_hf_clusters_are_covered():
+    judge = ContextJudge()
+    profile = build_clinical_profile(
+        {
+            "ef": 30,
+            "nt_pro_bnp": 2400,
+            "creatinine": 1.8,
+            "potassium": 5.4,
+            "glucose": 155,
+            "hba1c": 7.2,
+        }
+    )
+    assessment = judge.assess(
+        retrieved_context=[
+            RetrievedContext(
+                source_id="a",
+                title="Heart failure",
+                snippet="Heart failure follow-up should monitor congestion, creatinine, potassium, and renal function.",
+            ),
+            RetrievedContext(
+                source_id="b",
+                title="Cardio-renal safety",
+                snippet="Review diuretic and RAAS-related safety when creatinine or potassium worsen.",
+            ),
+        ],
+        retrieval_query="heart failure guidance congestion creatinine potassium follow-up",
+        clinical_profile=profile,
+        minimum_results=2,
+    )
+
+    assert assessment.sufficient is True
+    assert assessment.cluster_coverage["Glycemic and cardiometabolic risk"] == 0
 
 
 def test_chunk_ranker_prefers_chunks_with_clinical_term_overlap():
@@ -128,3 +163,128 @@ def test_query_planner_marks_heart_failure_specialty_focus_for_cardiac_cases():
 
     assert plan.specialty_focus == "heart_failure"
     assert any("heart failure" in query.lower() for query in plan.expanded_queries)
+
+
+def test_build_caution_lines_uses_proxy_fields_and_aggregates_missing_context():
+    profile = build_clinical_profile(
+        {
+            "ef": 28,
+            "nt_pro_bnp": 2400,
+            "creatinine": 1.7,
+            "potassium": 5.4,
+            "bpsyst": 102,
+            "bpdiast": 68,
+            "edema": 1,
+            "dosebb_prev": 1,
+        }
+    )
+    specialty = infer_specialty_focus(
+        {
+            "ef": 28,
+            "nt_pro_bnp": 2400,
+            "creatinine": 1.7,
+            "potassium": 5.4,
+            "bpsyst": 102,
+            "bpdiast": 68,
+            "edema": 1,
+            "dosebb_prev": 1,
+        },
+        profile,
+    )
+    context_assessment = type(
+        "Assessment",
+        (),
+        {
+            "reasons": ["incomplete_cluster_coverage"],
+            "cluster_coverage": {
+                "HF severity and congestion": 1,
+                "Cardio-renal and electrolyte safety": 1,
+                "Glycemic and cardiometabolic risk": 0,
+            },
+        },
+    )()
+
+    caution = build_caution_lines(
+        {
+            "ef": 28,
+            "nt_pro_bnp": 2400,
+            "creatinine": 1.7,
+            "potassium": 5.4,
+            "bpsyst": 102,
+            "bpdiast": 68,
+            "edema": 1,
+            "dosebb_prev": 1,
+        },
+        context_assessment,
+        profile,
+        specialty,
+    )
+
+    caution_text = " ".join(caution).lower()
+    assert "blood pressure" not in caution_text
+    assert "volume status" not in caution_text
+    assert "medications" not in caution_text
+    assert "key missing context" in caution_text
+
+
+
+
+def test_response_verifier_accepts_excerpt_based_uncertainty_language():
+    verifier = ResponseVerifier(ollama_client=None)
+    result = verifier.heuristic_verify(
+        "1. Direct answer\n- intra-aortic devices.\n- transvalvular aortic (Impella).\n- left atrium to systemic artery (TandemHeart).\n- right atrium to systemic artery (veno-arterial extracorporeal membrane oxygenation).\n\n"
+        "2. Rationale\n- The retrieved excerpts explicitly enumerate four items relevant to the question.\n\n"
+        "3. Caution\n- I am relying only on the supplied excerpts and may miss detail that appears in adjacent text.\n\n"
+        "4. General advice\n- If exact wording matters, retrieve the adjacent excerpt or the full table entry before making the answer more specific."
+    )
+
+    assert all("uncertainty" not in issue.lower() for issue in result.issues)
+
+def test_response_verifier_flags_literal_question_answers_that_fall_back_to_generic_clinical_summary():
+    verifier = ResponseVerifier(ollama_client=None)
+    question = "What are the four circuit configurations for percutaneous mechanical circulatory support as described in Supplementary Table 22?"
+    retrieved = [
+        RetrievedContext(
+            source_id="1",
+            title="Supplementary Table 22",
+            snippet="Percutaneous mechanical circulatory supports can be characterized by one of four circuit configurations: 1. intra-aortic devices, 2. transvalvular aortic (Impella) 3. left atrium to systemic artery (TandemHeart); 4. right atrium to systemic artery (veno-arterial extracorporeal memb",
+            chunk_id="c1",
+        )
+    ]
+
+    result = verifier.heuristic_verify(
+        "1. Direct answer\n- The main value abnormalities point to a clinically relevant pattern that should be interpreted as a whole rather than marker by marker.\n- Use the retrieved guidance to prioritize the most abnormal findings first, while keeping uncertainty explicit where evidence is thin.\n\n2. Rationale\n- The main value abnormalities point to a clinically relevant pattern that should be interpreted as a whole rather than marker by marker.\n\n3. Caution\n- Key missing context that could change the recommendation: current symptoms, medication history, prior laboratory trends.\n\n4. General advice\n- Review these results together with symptoms, medication history, and prior laboratory trends.",
+        question=question,
+        retrieved_context=retrieved,
+    )
+
+    assert result.verdict == "fail"
+    assert any("literal question" in issue.lower() for issue in result.issues)
+
+
+def test_build_deterministic_answer_for_literal_question_extracts_enumerated_items_from_context():
+    question = "What are the four circuit configurations for percutaneous mechanical circulatory support as described in Supplementary Table 22?"
+    retrieved = [
+        RetrievedContext(
+            source_id="1",
+            title="Supplementary Table 22",
+            snippet="Percutaneous mechanical circulatory supports can be characterized by one of four circuit configurations: 1. intra-aortic devices, 2. transvalvular aortic (Impella) 3. left atrium to systemic artery (TandemHeart); 4. right atrium to systemic artery (veno-arterial extracorporeal memb",
+            chunk_id="c1",
+        )
+    ]
+    profile = build_clinical_profile({})
+    context_assessment = type("Assessment", (), {"sufficient": True})()
+
+    answer = build_deterministic_answer(
+        question=question,
+        patient_variables={},
+        clinical_profile=profile,
+        retrieved_context=retrieved,
+        context_assessment=context_assessment,
+    )
+
+    lowered = answer.lower()
+    assert "intra-aortic devices" in lowered
+    assert "transvalvular aortic" in lowered
+    assert "tandemheart" in lowered
+    assert "right atrium to systemic artery" in lowered
