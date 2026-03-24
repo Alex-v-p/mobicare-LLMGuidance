@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from inference.http.clients.ollama_client import OllamaClient
-from inference.pipeline.answer_support import build_deterministic_answer
+from inference.pipeline.answer_support import build_deterministic_answer, looks_like_generic_clinical_fallback
 from inference.pipeline.components import (
     AnswerGenerator,
     ExampleResponseBuilder,
@@ -203,6 +203,10 @@ class GuidancePipeline:
                         retrieval_query=query_plan.base_query,
                         clinical_profile=query_plan.clinical_profile,
                         minimum_results=request.options.retrieval_low_context_min_results,
+                    ),
+                    prefer_unknown_fallback=(
+                        request.options.enable_unknown_fallback
+                        and looks_like_generic_clinical_fallback(final_answer)
                     ),
                 )
                 fallback_verification = self._response_verifier.heuristic_verify(

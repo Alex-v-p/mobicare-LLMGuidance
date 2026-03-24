@@ -17,6 +17,8 @@ from inference.pipeline.answer_support import (
     should_force_deterministic_answer,
     build_deterministic_answer,
     infer_specialty_focus,
+    is_minimal_unknown_fallback_answer,
+    looks_like_generic_clinical_fallback,
     prioritized_clusters,
     synthesize_clinical_state,
 )
@@ -604,13 +606,17 @@ class AnswerGenerator:
             clinical_profile=clinical_profile,
             retrieved_context=retrieved_context,
             context_assessment=context_assessment,
-        ):
+        ) and not is_minimal_unknown_fallback_answer(normalized_answer):
             normalized_answer = build_deterministic_answer(
                 question=effective_question,
                 patient_variables=request.patient_variables,
                 clinical_profile=clinical_profile,
                 retrieved_context=retrieved_context,
                 context_assessment=context_assessment,
+                prefer_unknown_fallback=(
+                    request.options.enable_unknown_fallback
+                    and looks_like_generic_clinical_fallback(normalized_answer)
+                ),
             )
         return normalized_answer, len(prompt)
 

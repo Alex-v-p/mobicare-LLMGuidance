@@ -119,6 +119,38 @@ async def test_guidance_pipeline_falls_back_to_deterministic_answer_on_contradic
     assert "4. General advice" in response.answer
 
 
+
+
+@pytest.mark.asyncio
+async def test_guidance_pipeline_returns_minimal_unknown_fallback_for_generic_patient_only_non_answer():
+    retrieved = [
+        RetrievedContext(
+            source_id="doc-1",
+            title="Heart failure guideline",
+            snippet="Monitor congestion, creatinine, potassium, and diuretic tolerance in heart failure follow-up.",
+            chunk_id="c1",
+        )
+    ]
+    pipeline = GuidancePipeline(
+        retriever=FakeDenseRetriever(retrieved),
+        hybrid_retriever=FakeHybridRetriever(retrieved),
+        ollama_client=FakeOllamaClient([
+            "1. Direct answer\n- The main value abnormalities point to a clinically relevant pattern that should be interpreted as a whole rather than marker by marker.\n- Use the retrieved guidance to prioritize the most abnormal findings first, while keeping uncertainty explicit where evidence is thin.\n\n2. Rationale\n- The main value abnormalities point to a clinically relevant pattern that should be interpreted as a whole rather than marker by marker.\n\n3. Caution\n- Key missing context that could change the recommendation: current symptoms, medication history, prior laboratory trends.\n\n4. General advice\n- Review these results together with symptoms, medication history, and prior laboratory trends."
+        ]),
+    )
+
+    response = await pipeline.run(
+        InferenceRequest(
+            request_id="req-generic-patient-fallback",
+            question="",
+            patient_variables={"ef": 28, "nt_pro_bnp": 2400, "creatinine": 1.8, "potassium": 5.4},
+            options=GenerationOptions(use_retrieval=True, retrieval_mode="dense", top_k=1),
+        )
+    )
+
+    assert response.answer == "Based on the provided context, I don't know."
+
+
 @pytest.mark.asyncio
 async def test_guidance_pipeline_surfaces_heart_failure_specialty_focus_metadata():
     retrieved = [

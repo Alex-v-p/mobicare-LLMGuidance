@@ -431,6 +431,36 @@ def has_actionable_guidance(answer: str) -> bool:
 
 
 
+def is_minimal_unknown_fallback_answer(answer: str) -> bool:
+    lowered = re.sub(r"\s+", " ", answer.strip().lower())
+    accepted_prefixes = (
+        "based on the provided context, i don't know",
+        "based on the provided context i don't know",
+        "i can't give a grounded answer from the provided context",
+        "i cannot give a grounded answer from the provided context",
+    )
+    return any(lowered.startswith(prefix) for prefix in accepted_prefixes)
+
+
+
+def build_unknown_fallback_answer() -> str:
+    return "Based on the provided context, I don't know."
+
+
+
+def looks_like_generic_clinical_fallback(answer: str) -> bool:
+    lowered = answer.strip().lower()
+    fallback_markers = (
+        "the main value abnormalities point to a clinically relevant pattern",
+        "interpreted as a whole rather than marker by marker",
+        "use the retrieved guidance to prioritize the most abnormal findings first",
+        "review these results together with symptoms",
+        "key missing context that could change the recommendation",
+    )
+    return sum(marker in lowered for marker in fallback_markers) >= 2
+
+
+
 def normalize_generated_answer(
     answer: str,
     *,
@@ -531,6 +561,8 @@ def collect_answer_issues(
 ) -> list[str]:
     issues: list[str] = []
     normalized = answer.strip()
+    if is_minimal_unknown_fallback_answer(normalized):
+        return []
     lowered = normalized.lower()
     required_sections = ["direct answer", "rationale", "caution", "general advice"]
     if not normalized:
@@ -614,6 +646,7 @@ def build_deterministic_answer(
     clinical_profile: ClinicalProfile,
     retrieved_context: list[RetrievedContext],
     context_assessment: Any,
+    prefer_unknown_fallback: bool = False,
 ) -> str:
     if is_literal_question_mode(question, patient_variables, clinical_profile):
         return build_literal_question_answer(
@@ -627,6 +660,8 @@ def build_deterministic_answer(
             retrieved_context=retrieved_context,
             context_assessment=context_assessment,
         )
+    if prefer_unknown_fallback:
+        return build_unknown_fallback_answer()
 
     clusters = detected_clusters(clinical_profile)
     specialty = infer_specialty_focus(patient_variables, clinical_profile, retrieved_context)

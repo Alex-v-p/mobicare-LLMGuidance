@@ -173,6 +173,14 @@ def test_response_verifier_flags_potassium_contradiction():
     assert any("potassium value" in issue for issue in result.issues)
 
 
+def test_response_verifier_accepts_minimal_unknown_fallback():
+    verifier = ResponseVerifier(ollama_client=None)
+    result = verifier.heuristic_verify("Based on the provided context, I don't know.")
+
+    assert result.verdict == "pass"
+    assert result.issues == ["none"]
+
+
 def test_response_verifier_flags_generic_non_answer_for_explicit_question_only_prompt():
     verifier = ResponseVerifier(ollama_client=None)
     retrieved = [
@@ -344,6 +352,29 @@ def test_build_deterministic_answer_for_literal_question_extracts_enumerated_ite
     assert "transvalvular aortic" in lowered
     assert "tandemheart" in lowered
     assert "right atrium to systemic artery" in lowered
+
+
+def test_build_deterministic_answer_prefers_minimal_unknown_fallback_when_enabled_for_patient_only_cases():
+    profile = build_clinical_profile({"creatinine": 1.8, "potassium": 5.6})
+    context_assessment = type("Assessment", (), {"sufficient": True})()
+
+    answer = build_deterministic_answer(
+        question="",
+        patient_variables={"creatinine": 1.8, "potassium": 5.6},
+        clinical_profile=profile,
+        retrieved_context=[
+            RetrievedContext(
+                source_id="1",
+                title="Heart failure",
+                snippet="Review creatinine and potassium when renal safety concerns are present.",
+                chunk_id="c1",
+            )
+        ],
+        context_assessment=context_assessment,
+        prefer_unknown_fallback=True,
+    )
+
+    assert answer == "Based on the provided context, I don't know."
 
 
 class _StubDenseRetriever:
