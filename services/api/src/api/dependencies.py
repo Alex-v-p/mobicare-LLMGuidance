@@ -5,6 +5,7 @@ from functools import lru_cache
 from minio import Minio
 
 from api.application.services.auth_service import AuthService
+from api.application.services.clinical_config_service import ClinicalConfigService
 from api.application.services.document_service import DocumentService
 from api.application.services.guidance_service import GuidanceService
 from api.application.services.health_service import HealthService
@@ -12,6 +13,7 @@ from api.application.services.ingestion_service import IngestionService
 from api.clients.auth_client import AuthClient
 from api.clients.inference_client import InferenceClient
 from api.infrastructure.minio import create_minio_client
+from api.repositories.clinical_config_repository import ClinicalConfigRepository
 from api.repositories.document_repository import DocumentRepository
 from shared.config import Settings, get_settings
 
@@ -60,6 +62,15 @@ def get_inference_client() -> InferenceClient:
 
 def get_document_service() -> DocumentService:
     return DocumentService(repository=get_document_repository())
+
+
+@lru_cache(maxsize=1)
+def get_clinical_config_repository() -> ClinicalConfigRepository:
+    return ClinicalConfigRepository(client=get_minio_client(), settings=get_api_settings())
+
+
+def get_clinical_config_service() -> ClinicalConfigService:
+    return ClinicalConfigService(repository=get_clinical_config_repository())
 
 
 def get_guidance_service() -> GuidanceService:
