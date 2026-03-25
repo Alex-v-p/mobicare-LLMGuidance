@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
-from functools import lru_cache
-from importlib import resources
 from typing import Any
+
+from inference.clinical.config_repository import load_marker_ranges_payload
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,10 +95,8 @@ class ClinicalProfile:
         return terms
 
 
-@lru_cache(maxsize=1)
 def load_marker_ranges() -> dict[str, MarkerDefinition]:
-    with resources.files("inference.clinical").joinpath("marker_ranges.json").open("r", encoding="utf-8") as handle:
-        raw = json.load(handle)
+    raw = load_marker_ranges_payload()
 
     definitions: dict[str, MarkerDefinition] = {}
     for key, payload in raw.items():

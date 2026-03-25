@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from api.exception_handlers import register_exception_handlers
 from api.routes.auth import router as auth_router
+from api.routes.clinical_configs import router as clinical_configs_router
 from api.routes.documents import router as documents_router
 from api.routes.guidance import router as guidance_router
 from api.routes.health import router as health_router
@@ -19,8 +20,10 @@ def create_app() -> FastAPI:
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(MetricsMiddleware, service_name=SERVICE_NAME)
     register_exception_handlers(app)
+    
     app.include_router(health_router)
     app.include_router(auth_router)
+    app.include_router(clinical_configs_router)
     app.include_router(guidance_router)
     app.include_router(ingestion_router)
     app.include_router(documents_router)

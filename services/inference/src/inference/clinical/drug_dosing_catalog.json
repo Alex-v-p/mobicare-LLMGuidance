@@ -1,0 +1,51 @@
+{
+  "family_priority": {
+    "sglt2": 0,
+    "beta_blocker": 1,
+    "arni": 2,
+    "ras": 3,
+    "mra": 4,
+    "loop_diuretic": 5
+  },
+  "default_agents": {
+    "mra": "spironolactone",
+    "beta_blocker": "bisoprolol",
+    "ras": "enalapril",
+    "sglt2": "dapagliflozin",
+    "loop_diuretic": "furosemide"
+  },
+  "family_query_order": [
+    "mra",
+    "beta_blocker",
+    "ras",
+    "arni",
+    "sglt2",
+    "loop_diuretic"
+  ],
+  "families": {
+    "mra": {
+      "keywords": ["mra", "spironolactone", "eplerenone"],
+      "query_template": "{agent} MRA starting dose target dose consider dose up-titration after 4-8 weeks significant hyperkalaemia K >5.0 creatinine 2.5 egfr 30 stop >5.5 HFrEF"
+    },
+    "beta_blocker": {
+      "keywords": ["beta-blocker", "beta blocker", "bisoprolol", "carvedilol", "metoprolol", "nebivolol"],
+      "query_template": "{agent} beta-blocker starting dose target dose double the dose at not less than 2-week intervals heart rate <50 SBP <90 congestion euvolaemia HFrEF"
+    },
+    "ras": {
+      "keywords": ["ace-i", "ace i", "arb", "enalapril", "lisinopril", "ramipril", "trandolapril", "captopril"],
+      "query_template": "{agent} ACE-I ARB starting dose target dose double the dose at not less than 2-week intervals significant hyperkalaemia K >5.0 creatinine 2.5 3.5 egfr 30 20 SBP <90 HFrEF"
+    },
+    "arni": {
+      "keywords": ["arni", "sacubitril", "valsartan", "sac/val"],
+      "query_template": "sacubitril valsartan ARNI starting dose 49/51 target dose 97/103 24/26 reduced starting dose washout 36 h significant hyperkalaemia K >5.0 egfr 30 SBP 90 HFrEF"
+    },
+    "sglt2": {
+      "keywords": ["sglt2", "dapagliflozin", "empagliflozin"],
+      "query_template": "{agent} SGLT2 starting and target dose 10 mg egfr 20 SBP 95 fluid balance intensify diuresis HFrEF"
+    },
+    "loop_diuretic": {
+      "keywords": ["diuretic", "loop diuretic", "furosemide", "bumetanide", "torasemide", "congestion"],
+      "query_template": "{agent} loop diuretic starting dose usual dose not indicated without congestion hypovolaemia dehydration consider a diuretic dosage reduction SBP <90 HFrEF"
+    }
+  }
+}
