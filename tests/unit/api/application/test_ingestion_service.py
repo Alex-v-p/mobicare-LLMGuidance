@@ -89,10 +89,28 @@ async def test_prod_submit_job_uses_safe_ingestion_defaults():
 
 
 @pytest.mark.asyncio
-async def test_prod_delete_collection_is_disabled():
+async def test_prod_delete_collection_is_enabled_by_default():
+    delete_response = IngestionCollectionDeleteResponse(collection="guidance_chunks", existed=True)
+    service = IngestionService(
+        inference_client=StubInferenceClient(delete_response=delete_response),
+        settings=Settings(app_env="prod", jwt_secret_key="secret", internal_service_token="token"),
+    )
+
+    result = await service.delete_collection()
+
+    assert result == delete_response
+
+
+@pytest.mark.asyncio
+async def test_prod_delete_collection_can_be_disabled_explicitly():
     service = IngestionService(
         inference_client=StubInferenceClient(delete_response=IngestionCollectionDeleteResponse(collection="guidance_chunks", existed=True)),
-        settings=Settings(app_env="prod", jwt_secret_key="secret", internal_service_token="token"),
+        settings=Settings(
+            app_env="prod",
+            jwt_secret_key="secret",
+            internal_service_token="token",
+            ingestion_collection_delete_enabled=False,
+        ),
     )
 
     with pytest.raises(NotFoundError):

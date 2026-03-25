@@ -20,20 +20,21 @@ class GatewayGuidanceResult:
 
 
 class GuidanceClient:
-    def __init__(self, base_url: str = "http://localhost:8000", timeout_seconds: int = 60) -> None:
+    def __init__(self, base_url: str = "http://localhost:8000", timeout_seconds: int = 60, bearer_token: str | None = None) -> None:
         self._base_url = base_url.rstrip("/")
         self._timeout_seconds = timeout_seconds
+        self._bearer_token = bearer_token.strip() if isinstance(bearer_token, str) and bearer_token.strip() else None
 
     def submit_guidance_job(self, payload: dict[str, Any]) -> dict[str, Any]:
         url = f"{self._base_url}/guidance/jobs"
         logger.info("Submitting guidance job to %s", url)
-        response = requests.post(url, json=payload, timeout=self._timeout_seconds)
+        response = requests.post(url, json=payload, headers=self._build_headers(), timeout=self._timeout_seconds)
         response.raise_for_status()
         return response.json()
 
     def get_guidance_job(self, job_id: str) -> dict[str, Any]:
         url = f"{self._base_url}/guidance/jobs/{job_id}"
-        response = requests.get(url, timeout=self._timeout_seconds)
+        response = requests.get(url, headers=self._build_headers(), timeout=self._timeout_seconds)
         response.raise_for_status()
         return response.json()
 
@@ -67,3 +68,8 @@ class GuidanceClient:
             if time.monotonic() - start > max_wait_seconds:
                 raise TimeoutError(f"Timed out waiting for guidance job {job_id}")
             time.sleep(poll_interval_seconds)
+
+    def _build_headers(self) -> dict[str, str]:
+        if not self._bearer_token:
+            return {}
+        return {"Authorization": f"Bearer {self._bearer_token}"}

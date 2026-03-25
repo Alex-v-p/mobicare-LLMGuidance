@@ -26,27 +26,28 @@ class GatewayAPIResponse:
 
 
 class GatewayClient:
-    def __init__(self, base_url: str = "http://localhost:8000", timeout_seconds: int = 30) -> None:
+    def __init__(self, base_url: str = "http://localhost:8000", timeout_seconds: int = 30, bearer_token: str | None = None) -> None:
         self._base_url = base_url.rstrip("/")
         self._timeout_seconds = timeout_seconds
+        self._bearer_token = bearer_token.strip() if isinstance(bearer_token, str) and bearer_token.strip() else None
 
     def submit_ingestion_job(self, payload: dict[str, Any]) -> dict[str, Any]:
         url = f"{self._base_url}/ingestion/jobs"
         logger.info("Submitting ingestion job to %s", url)
-        response = requests.post(url, json=payload, timeout=self._timeout_seconds)
+        response = requests.post(url, json=payload, headers=self._build_headers(), timeout=self._timeout_seconds)
         response.raise_for_status()
         return response.json()
 
     def get_ingestion_job(self, job_id: str) -> dict[str, Any]:
         url = f"{self._base_url}/ingestion/jobs/{job_id}"
-        response = requests.get(url, timeout=self._timeout_seconds)
+        response = requests.get(url, headers=self._build_headers(), timeout=self._timeout_seconds)
         response.raise_for_status()
         return response.json()
 
     def delete_ingestion_collection(self) -> dict[str, Any]:
         url = f"{self._base_url}/ingestion/collection"
         logger.info("Deleting ingestion collection via %s", url)
-        response = requests.delete(url, timeout=self._timeout_seconds)
+        response = requests.delete(url, headers=self._build_headers(), timeout=self._timeout_seconds)
         response.raise_for_status()
         return response.json()
 
@@ -160,7 +161,7 @@ class GatewayClient:
         expected_etag: str | None = None,
         expected_checksum_sha256: str | None = None,
     ) -> GatewayAPIResponse:
-        headers = self._build_concurrency_headers(
+        headers = self._build_headers(
             expected_etag=expected_etag,
             expected_checksum_sha256=expected_checksum_sha256,
         )
@@ -181,13 +182,15 @@ class GatewayClient:
             headers={key: value for key, value in response.headers.items()},
         )
 
-    @staticmethod
-    def _build_concurrency_headers(
+    def _build_headers(
+        self,
         *,
-        expected_etag: str | None,
-        expected_checksum_sha256: str | None,
+        expected_etag: str | None = None,
+        expected_checksum_sha256: str | None = None,
     ) -> dict[str, str]:
         headers: dict[str, str] = {}
+        if self._bearer_token:
+            headers["Authorization"] = f"Bearer {self._bearer_token}"
         if expected_etag:
             headers["If-Match"] = expected_etag
         if expected_checksum_sha256:

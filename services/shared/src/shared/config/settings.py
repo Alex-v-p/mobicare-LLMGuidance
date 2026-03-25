@@ -58,7 +58,7 @@ class Settings(BaseSettings):
 
     ollama_url: str = "http://ollama:11434"
     ollama_model: str = "qwen2.5:0.5b"
-    ollama_embedding_model: str = "nomic-embed-text"
+    ollama_embedding_model: str = "qwen3-embedding:0.6b"
     ollama_timeout_s: float = 120.0
     ollama_embedding_batch_size: int = 8
     ollama_embedding_fallback_concurrency: int = 2
@@ -124,9 +124,11 @@ class Settings(BaseSettings):
     def allow_runtime_option_overrides(self) -> bool:
         return not self.is_production
 
+    ingestion_collection_delete_enabled: bool = True
+
     @property
     def allow_ingestion_collection_delete(self) -> bool:
-        return not self.is_production
+        return self.ingestion_collection_delete_enabled
 
     @property
     def expose_api_docs(self) -> bool:
