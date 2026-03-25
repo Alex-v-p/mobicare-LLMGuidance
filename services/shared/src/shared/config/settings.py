@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import os
+import sys
 from functools import lru_cache
+from typing import Literal
 
-from pydantic import computed_field
+from pydantic import computed_field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,6 +15,8 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    app_env: Literal["dev", "prod"] = "dev"
 
     api_port: int = 8000
     inference_port: int = 8001
@@ -67,10 +72,24 @@ class Settings(BaseSettings):
     jwt_access_token_exp_minutes: int = 60
     jwt_issuer: str = "mobicare-llm-api"
     jwt_audience: str = "mobicare-gateway"
+    internal_service_token: str = ""
 
     retrieval_top_k: int = 3
     jobs_dir: str = "/data/jobs"
     worker_id: str | None = None
+
+    production_guidance_top_k: int = 3
+    production_guidance_temperature: float = 0.2
+    production_guidance_max_tokens: int = 256
+    production_guidance_use_graph_augmentation: bool = True
+    production_guidance_pipeline_variant: Literal["standard", "drug_dosing"] = "standard"
+    production_guidance_enable_response_verification: bool = True
+    production_guidance_enable_unknown_fallback: bool = True
+
+    production_ingestion_cleaning_strategy: Literal["none", "basic", "deep", "medical_guideline_deep"] = "deep"
+    production_ingestion_chunking_strategy: Literal["naive", "page_indexed", "late"] = "naive"
+    production_ingestion_chunk_size: int = 300
+    production_ingestion_chunk_overlap: int = 100
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -85,7 +104,59 @@ class Settings(BaseSettings):
     def document_allowed_content_types(self) -> set[str]:
         return {value.strip().lower() for value in self.document_allowed_content_types_csv.split(",") if value.strip()}
 
+    @property
+    def is_production(self) -> bool:
+        return self.app_env == "prod"
+
+    @property
+    def require_public_auth(self) -> bool:
+        return self.is_production
+
+    @property
+    def enable_internal_service_auth(self) -> bool:
+        return self.is_production
+
+    @property
+    def expose_debug_metadata(self) -> bool:
+        return not self.is_production
+
+    @property
+    def allow_runtime_option_overrides(self) -> bool:
+        return not self.is_production
+
+    @property
+    def allow_ingestion_collection_delete(self) -> bool:
+        return not self.is_production
+
+    @property
+    def expose_api_docs(self) -> bool:
+        return not self.is_production
+
+    @model_validator(mode="after")
+    def validate_production_security(self) -> "Settings":
+        if not self.is_production:
+            return self
+
+        errors: list[str] = []
+        if not self.internal_service_token.strip():
+            errors.append("INTERNAL_SERVICE_TOKEN must be set when APP_ENV=prod.")
+        if self.jwt_secret_key.strip() in {"", "change-me", "replace-this-in-real-environments"}:
+            errors.append("JWT_SECRET_KEY must be changed from its development default when APP_ENV=prod.")
+        if errors:
+            raise ValueError(" ".join(errors))
+        return self
+
+
+def _resolve_settings() -> Settings:
+    app_env = os.environ.get("APP_ENV")
+    is_pytest = "PYTEST_CURRENT_TEST" in os.environ or "pytest" in sys.modules
+
+    if is_pytest and app_env is None:
+        return Settings(_env_file=None, app_env="dev")
+
+    return Settings()
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    return Settings()
+    return _resolve_settings()

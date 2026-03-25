@@ -74,11 +74,13 @@ def get_clinical_config_service() -> ClinicalConfigService:
 
 
 def get_guidance_service() -> GuidanceService:
-    return GuidanceService(inference_client=get_inference_client())
+    settings = get_api_settings()
+    return GuidanceService(inference_client=get_inference_client(), settings=settings)
 
 
 def get_ingestion_service() -> IngestionService:
-    return IngestionService(inference_client=get_inference_client())
+    settings = get_api_settings()
+    return IngestionService(inference_client=get_inference_client(), settings=settings)
 
 
 def get_health_service() -> HealthService:

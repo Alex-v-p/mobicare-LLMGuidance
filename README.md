@@ -272,3 +272,14 @@ Validate Docker Compose:
 ```bash
 docker compose config
 ```
+
+
+
+### Local production-like run
+
+1. Copy `.env.production.example` to `.env` and replace the secrets.
+2. Start with:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
