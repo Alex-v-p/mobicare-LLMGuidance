@@ -5,6 +5,7 @@ import re
 from dataclasses import asdict, dataclass, field
 from typing import Any, Iterable
 
+from inference.clinical.config_repository import load_drug_dosing_catalog_payload
 from shared.contracts.inference import RetrievedContext
 
 
@@ -15,30 +16,45 @@ ACTION_PRIORITY = {
     "increase": 2,
     "maintain": 3,
 }
-FAMILY_PRIORITY = {
-    "sglt2": 0,
-    "beta_blocker": 1,
-    "arni": 2,
-    "ras": 3,
-    "mra": 4,
-    "loop_diuretic": 5,
-}
-DEFAULT_AGENTS = {
-    "mra": "spironolactone",
-    "beta_blocker": "bisoprolol",
-    "ras": "enalapril",
-    "sglt2": "dapagliflozin",
-    "loop_diuretic": "furosemide",
-}
-FAMILY_QUERY_ORDER = ("mra", "beta_blocker", "ras", "arni", "sglt2", "loop_diuretic")
-FAMILY_KEYWORDS = {
-    "mra": {"mra", "spironolactone", "eplerenone"},
-    "beta_blocker": {"beta-blocker", "beta blocker", "bisoprolol", "carvedilol", "metoprolol", "nebivolol"},
-    "ras": {"ace-i", "ace i", "arb", "enalapril", "lisinopril", "ramipril", "trandolapril", "captopril"},
-    "arni": {"arni", "sacubitril", "valsartan", "sac/val"},
-    "sglt2": {"sglt2", "dapagliflozin", "empagliflozin"},
-    "loop_diuretic": {"diuretic", "loop diuretic", "furosemide", "bumetanide", "torasemide", "congestion"},
-}
+
+
+def _drug_dosing_catalog() -> dict[str, Any]:
+    return load_drug_dosing_catalog_payload()
+
+
+
+def _family_priority() -> dict[str, int]:
+    raw = _drug_dosing_catalog().get("family_priority") or {}
+    return {str(key): int(value) for key, value in raw.items()}
+
+
+
+def _default_agent(family: str) -> str:
+    raw = _drug_dosing_catalog().get("default_agents") or {}
+    value = raw.get(family)
+    return str(value or family)
+
+
+
+def _family_query_order() -> tuple[str, ...]:
+    raw = _drug_dosing_catalog().get("family_query_order") or []
+    return tuple(str(item) for item in raw)
+
+
+
+def _family_keywords() -> dict[str, set[str]]:
+    families = _drug_dosing_catalog().get("families") or {}
+    return {
+        str(family): {str(keyword).lower() for keyword in (spec.get("keywords") or [])}
+        for family, spec in families.items()
+    }
+
+
+
+def _family_query_template(family: str) -> str:
+    families = _drug_dosing_catalog().get("families") or {}
+    spec = families.get(family) or {}
+    return str(spec.get("query_template") or "")
 
 
 @dataclass(slots=True)
@@ -115,62 +131,31 @@ def build_snapshot(patient_variables: dict[str, Any]) -> dict[str, Any]:
         "dose_arni_prev": _first_raw(patient_variables, "arnidose_prev", "arni_dose_prev", "ARNIDose_prev"),
         "dose_sglt2_prev": _first_raw(patient_variables, "sglt2dose_prev", "sglt2_dose_prev", "SGLT2Dose_prev"),
         "dose_loop_prev": _first_raw(patient_variables, "loop_dose_prev", "loop_dose", "loop_diuretic_dose_prev", "Loop_dose_prev"),
-        "mra_agent": _normalize_agent(_first_str(patient_variables, "mra_agent", "spiro_agent", "mineralocorticoid_agent"), DEFAULT_AGENTS["mra"]),
-        "beta_blocker_agent": _normalize_agent(_first_str(patient_variables, "beta_blocker_agent", "bb_agent"), DEFAULT_AGENTS["beta_blocker"]),
-        "ras_agent": _normalize_agent(_first_str(patient_variables, "ras_agent", "acei_agent", "arb_agent"), DEFAULT_AGENTS["ras"]),
-        "sglt2_agent": _normalize_agent(_first_str(patient_variables, "sglt2_agent"), DEFAULT_AGENTS["sglt2"]),
-        "loop_agent": _normalize_agent(_first_str(patient_variables, "loop_agent", "diuretic_agent"), DEFAULT_AGENTS["loop_diuretic"]),
+        "mra_agent": _normalize_agent(_first_str(patient_variables, "mra_agent", "spiro_agent", "mineralocorticoid_agent"), _default_agent("mra")),
+        "beta_blocker_agent": _normalize_agent(_first_str(patient_variables, "beta_blocker_agent", "bb_agent"), _default_agent("beta_blocker")),
+        "ras_agent": _normalize_agent(_first_str(patient_variables, "ras_agent", "acei_agent", "arb_agent"), _default_agent("ras")),
+        "sglt2_agent": _normalize_agent(_first_str(patient_variables, "sglt2_agent"), _default_agent("sglt2")),
+        "loop_agent": _normalize_agent(_first_str(patient_variables, "loop_agent", "diuretic_agent"), _default_agent("loop_diuretic")),
     }
 
 
 def build_drug_retrieval_queries(snapshot: dict[str, Any]) -> list[dict[str, str]]:
+    agent_keys = {
+        "mra": "mra_agent",
+        "beta_blocker": "beta_blocker_agent",
+        "ras": "ras_agent",
+        "sglt2": "sglt2_agent",
+        "loop_diuretic": "loop_agent",
+    }
     queries: list[dict[str, str]] = []
-    mra_agent = snapshot.get("mra_agent") or DEFAULT_AGENTS["mra"]
-    queries.append({
-        "family": "mra",
-        "query": (
-            f"{mra_agent} MRA starting dose target dose consider dose up-titration after 4-8 weeks "
-            "significant hyperkalaemia K >5.0 creatinine 2.5 egfr 30 stop >5.5 HFrEF"
-        ),
-    })
-    bb_agent = snapshot.get("beta_blocker_agent") or DEFAULT_AGENTS["beta_blocker"]
-    queries.append({
-        "family": "beta_blocker",
-        "query": (
-            f"{bb_agent} beta-blocker starting dose target dose double the dose at not less than 2-week intervals "
-            "heart rate <50 SBP <90 congestion euvolaemia HFrEF"
-        ),
-    })
-    ras_agent = snapshot.get("ras_agent") or DEFAULT_AGENTS["ras"]
-    queries.append({
-        "family": "ras",
-        "query": (
-            f"{ras_agent} ACE-I ARB starting dose target dose double the dose at not less than 2-week intervals "
-            "significant hyperkalaemia K >5.0 creatinine 2.5 3.5 egfr 30 20 SBP <90 HFrEF"
-        ),
-    })
-    queries.append({
-        "family": "arni",
-        "query": (
-            "sacubitril valsartan ARNI starting dose 49/51 target dose 97/103 24/26 reduced starting dose "
-            "washout 36 h significant hyperkalaemia K >5.0 egfr 30 SBP 90 HFrEF"
-        ),
-    })
-    sglt2_agent = snapshot.get("sglt2_agent") or DEFAULT_AGENTS["sglt2"]
-    queries.append({
-        "family": "sglt2",
-        "query": (
-            f"{sglt2_agent} SGLT2 starting and target dose 10 mg egfr 20 SBP 95 fluid balance intensify diuresis HFrEF"
-        ),
-    })
-    loop_agent = snapshot.get("loop_agent") or DEFAULT_AGENTS["loop_diuretic"]
-    queries.append({
-        "family": "loop_diuretic",
-        "query": (
-            f"{loop_agent} loop diuretic starting dose usual dose not indicated without congestion hypovolaemia dehydration "
-            "consider a diuretic dosage reduction SBP <90 HFrEF"
-        ),
-    })
+    for family in _family_query_order():
+        template = _family_query_template(family)
+        if not template:
+            continue
+        agent = snapshot.get(agent_keys.get(family, "")) if family in agent_keys else None
+        resolved_agent = agent or _default_agent(family)
+        query = template.format(agent=resolved_agent) if "{agent}" in template else template
+        queries.append({"family": family, "query": query})
     return queries
 
 
@@ -274,17 +259,17 @@ def verify_grounded_payload(payload: dict[str, Any]) -> tuple[str, list[str], st
 # ---------- evidence extraction ----------
 
 def _group_context_by_family(retrieved_context: list[RetrievedContext]) -> dict[str, list[RetrievedContext]]:
-    grouped = {family: [] for family in FAMILY_QUERY_ORDER}
+    grouped = {family: [] for family in _family_query_order()}
     for item in retrieved_context:
         combined = f"{item.title} {item.snippet}".lower()
-        for family, keywords in FAMILY_KEYWORDS.items():
+        for family, keywords in _family_keywords().items():
             if any(keyword in combined for keyword in keywords):
                 grouped[family].append(item)
     return grouped
 
 
 def _extract_mra_evidence(contexts: list[RetrievedContext], snapshot: dict[str, Any]) -> DrugEvidence:
-    agent, _ = _agent_or_default(snapshot.get("mra_agent"), DEFAULT_AGENTS["mra"])
+    agent, _ = _agent_or_default(snapshot.get("mra_agent"), _default_agent("mra"))
     evidence = _base_evidence("mra", agent, contexts)
     text = _combined_text(contexts)
     line = _find_agent_line(contexts, agent)
@@ -310,7 +295,7 @@ def _extract_mra_evidence(contexts: list[RetrievedContext], snapshot: dict[str, 
 
 
 def _extract_beta_blocker_evidence(contexts: list[RetrievedContext], snapshot: dict[str, Any]) -> DrugEvidence:
-    agent, _ = _agent_or_default(snapshot.get("beta_blocker_agent"), DEFAULT_AGENTS["beta_blocker"])
+    agent, _ = _agent_or_default(snapshot.get("beta_blocker_agent"), _default_agent("beta_blocker"))
     evidence = _base_evidence("beta_blocker", agent, contexts)
     line = _find_agent_line(contexts, agent)
     evidence.starting_dose, evidence.start_low_value, evidence.target_frequency = _parse_labeled_single_dose(line, "starting dose")
@@ -327,7 +312,7 @@ def _extract_beta_blocker_evidence(contexts: list[RetrievedContext], snapshot: d
 
 
 def _extract_ras_evidence(contexts: list[RetrievedContext], snapshot: dict[str, Any]) -> DrugEvidence:
-    agent, _ = _agent_or_default(snapshot.get("ras_agent"), DEFAULT_AGENTS["ras"])
+    agent, _ = _agent_or_default(snapshot.get("ras_agent"), _default_agent("ras"))
     evidence = _base_evidence("ras", agent, contexts)
     line = _find_agent_line(contexts, agent)
     evidence.starting_dose, evidence.start_low_value, evidence.target_frequency = _parse_labeled_single_dose(line, "starting dose")
@@ -380,7 +365,7 @@ def _extract_arni_evidence(contexts: list[RetrievedContext], snapshot: dict[str,
 
 
 def _extract_sglt2_evidence(contexts: list[RetrievedContext], snapshot: dict[str, Any]) -> DrugEvidence:
-    agent, _ = _agent_or_default(snapshot.get("sglt2_agent"), DEFAULT_AGENTS["sglt2"])
+    agent, _ = _agent_or_default(snapshot.get("sglt2_agent"), _default_agent("sglt2"))
     evidence = _base_evidence("sglt2", agent, contexts)
     line = _find_agent_line(contexts, agent)
     evidence.starting_dose, evidence.start_low_value, evidence.target_frequency = _parse_labeled_single_dose(line, "starting (and target) dose")
@@ -397,7 +382,7 @@ def _extract_sglt2_evidence(contexts: list[RetrievedContext], snapshot: dict[str
 
 
 def _extract_loop_evidence(contexts: list[RetrievedContext], snapshot: dict[str, Any]) -> DrugEvidence:
-    agent, _ = _agent_or_default(snapshot.get("loop_agent"), DEFAULT_AGENTS["loop_diuretic"])
+    agent, _ = _agent_or_default(snapshot.get("loop_agent"), _default_agent("loop_diuretic"))
     evidence = _base_evidence("loop_diuretic", agent, contexts)
     line = _find_agent_line(contexts, agent)
     evidence.starting_dose, evidence.start_low_value, evidence.start_high_value = _parse_loop_start_range(line)
@@ -469,7 +454,7 @@ def _triggers_conservative_raas_hold(
 
 
 def _recommend_mra(snapshot: dict[str, Any], evidence: DrugEvidence) -> DrugRecommendation:
-    agent, assumed = _agent_or_default(snapshot.get("mra_agent"), DEFAULT_AGENTS["mra"])
+    agent, assumed = _agent_or_default(snapshot.get("mra_agent"), _default_agent("mra"))
     if not evidence.source_chunk_ids or not evidence.starting_dose:
         return _ungrounded_recommendation("mra", agent, assumed)
     potassium = snapshot.get("potassium")
@@ -500,7 +485,7 @@ def _recommend_mra(snapshot: dict[str, Any], evidence: DrugEvidence) -> DrugReco
 
 
 def _recommend_beta_blocker(snapshot: dict[str, Any], evidence: DrugEvidence) -> DrugRecommendation:
-    agent, assumed = _agent_or_default(snapshot.get("beta_blocker_agent"), DEFAULT_AGENTS["beta_blocker"])
+    agent, assumed = _agent_or_default(snapshot.get("beta_blocker_agent"), _default_agent("beta_blocker"))
     if not evidence.source_chunk_ids or not evidence.starting_dose:
         return _ungrounded_recommendation("beta_blocker", agent, assumed)
     current = _parse_numeric_value(snapshot.get("dose_bb_prev"))
@@ -540,7 +525,7 @@ def _recommend_beta_blocker(snapshot: dict[str, Any], evidence: DrugEvidence) ->
 def _recommend_ras(snapshot: dict[str, Any], evidence: DrugEvidence) -> DrugRecommendation:
     if snapshot.get("dose_arni_prev") not in {None, "", 0, 0.0} or snapshot.get("switch_to_arni"):
         return DrugRecommendation(family="ras", drug=None, action="do_not_combine", recommended_dose=None, status="not_applicable", note="ARNI pathway takes precedence over ACE-I/ARB co-prescription.")
-    agent, assumed = _agent_or_default(snapshot.get("ras_agent"), DEFAULT_AGENTS["ras"])
+    agent, assumed = _agent_or_default(snapshot.get("ras_agent"), _default_agent("ras"))
     if not evidence.source_chunk_ids or not evidence.starting_dose:
         return _ungrounded_recommendation("ras", agent, assumed)
     current = _parse_numeric_value(snapshot.get("dose_ras_prev"))
@@ -627,7 +612,7 @@ def _recommend_arni(snapshot: dict[str, Any], evidence: DrugEvidence) -> DrugRec
 
 
 def _recommend_sglt2(snapshot: dict[str, Any], evidence: DrugEvidence) -> DrugRecommendation:
-    agent, assumed = _agent_or_default(snapshot.get("sglt2_agent"), DEFAULT_AGENTS["sglt2"])
+    agent, assumed = _agent_or_default(snapshot.get("sglt2_agent"), _default_agent("sglt2"))
     if not evidence.source_chunk_ids or not evidence.starting_dose:
         return _ungrounded_recommendation("sglt2", agent, assumed)
     egfr = snapshot.get("egfr")
@@ -643,7 +628,7 @@ def _recommend_sglt2(snapshot: dict[str, Any], evidence: DrugEvidence) -> DrugRe
 
 
 def _recommend_loop(snapshot: dict[str, Any], evidence: DrugEvidence) -> DrugRecommendation:
-    agent, assumed = _agent_or_default(snapshot.get("loop_agent"), DEFAULT_AGENTS["loop_diuretic"])
+    agent, assumed = _agent_or_default(snapshot.get("loop_agent"), _default_agent("loop_diuretic"))
     if not evidence.source_chunk_ids or evidence.start_low_value is None:
         return _ungrounded_recommendation("loop_diuretic", agent, assumed)
     current = _parse_numeric_value(snapshot.get("dose_loop_prev"))
@@ -781,7 +766,7 @@ def _select_visible_recommendations(
 def _recommendation_sort_key(recommendation: DrugRecommendation) -> tuple[int, int, str]:
     return (
         ACTION_PRIORITY.get(recommendation.action, 99),
-        FAMILY_PRIORITY.get(recommendation.family, 99),
+        _family_priority().get(recommendation.family, 99),
         recommendation.drug or recommendation.family,
     )
 
