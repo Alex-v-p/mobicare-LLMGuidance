@@ -6,6 +6,7 @@ from api.repositories.clinical_config_repository import (
     ClinicalConfigAlreadyExistsError,
     ClinicalConfigRepository,
     ClinicalConfigRepositoryError,
+    ClinicalConfigVersionNotFoundError,
     InvalidClinicalConfigError,
     UnknownClinicalConfigError,
 )
@@ -14,6 +15,8 @@ from shared.contracts.clinical_config import (
     ClinicalConfigListResponse,
     ClinicalConfigName,
     ClinicalConfigReadResponse,
+    ClinicalConfigRollbackResponse,
+    ClinicalConfigVersionListResponse,
     ClinicalConfigWriteResponse,
 )
 
@@ -29,22 +32,83 @@ class ClinicalConfigService:
         metadata, payload = self._repository.get_payload(config_name)
         return ClinicalConfigReadResponse(config=metadata, payload=payload)
 
-    def create_config(self, config_name: ClinicalConfigName, payload: dict[str, Any]) -> ClinicalConfigWriteResponse:
+    def create_config(
+        self,
+        config_name: ClinicalConfigName,
+        payload: dict[str, Any],
+        *,
+        expected_etag: str | None = None,
+        expected_checksum_sha256: str | None = None,
+    ) -> ClinicalConfigWriteResponse:
         validated = _validate_payload(config_name, payload)
-        metadata = self._repository.create_payload(config_name, validated)
-        return ClinicalConfigWriteResponse(config=metadata, status="created")
+        metadata, archived_version = self._repository.create_payload(
+            config_name,
+            validated,
+            expected_etag=expected_etag,
+            expected_checksum_sha256=expected_checksum_sha256,
+        )
+        return ClinicalConfigWriteResponse(config=metadata, status="created", archived_version=archived_version)
 
-    def upsert_config(self, config_name: ClinicalConfigName, payload: dict[str, Any]) -> ClinicalConfigWriteResponse:
+    def upsert_config(
+        self,
+        config_name: ClinicalConfigName,
+        payload: dict[str, Any],
+        *,
+        expected_etag: str | None = None,
+        expected_checksum_sha256: str | None = None,
+    ) -> ClinicalConfigWriteResponse:
         validated = _validate_payload(config_name, payload)
-        metadata, status = self._repository.upsert_payload(config_name, validated)
-        return ClinicalConfigWriteResponse(config=metadata, status=status)
+        metadata, status, archived_version = self._repository.upsert_payload(
+            config_name,
+            validated,
+            expected_etag=expected_etag,
+            expected_checksum_sha256=expected_checksum_sha256,
+        )
+        return ClinicalConfigWriteResponse(config=metadata, status=status, archived_version=archived_version)
 
-    def delete_config(self, config_name: ClinicalConfigName) -> ClinicalConfigDeleteResponse:
-        metadata = self._repository.delete_payload(config_name)
+    def delete_config(
+        self,
+        config_name: ClinicalConfigName,
+        *,
+        expected_etag: str | None = None,
+        expected_checksum_sha256: str | None = None,
+    ) -> ClinicalConfigDeleteResponse:
+        metadata, archived_version = self._repository.delete_payload(
+            config_name,
+            expected_etag=expected_etag,
+            expected_checksum_sha256=expected_checksum_sha256,
+        )
         return ClinicalConfigDeleteResponse(
             config_name=metadata.config_name,
             bucket=metadata.bucket,
             object_name=metadata.object_name,
+            archived_version=archived_version,
+        )
+
+    def list_versions(self, config_name: ClinicalConfigName) -> ClinicalConfigVersionListResponse:
+        return ClinicalConfigVersionListResponse(
+            config_name=config_name,
+            versions=self._repository.list_versions(config_name),
+        )
+
+    def rollback_config(
+        self,
+        config_name: ClinicalConfigName,
+        version_id: str,
+        *,
+        expected_etag: str | None = None,
+        expected_checksum_sha256: str | None = None,
+    ) -> ClinicalConfigRollbackResponse:
+        metadata, restored_from_version, archived_version = self._repository.rollback_payload(
+            config_name,
+            version_id,
+            expected_etag=expected_etag,
+            expected_checksum_sha256=expected_checksum_sha256,
+        )
+        return ClinicalConfigRollbackResponse(
+            config=metadata,
+            restored_from_version=restored_from_version,
+            archived_version=archived_version,
         )
 
 
@@ -118,6 +182,7 @@ __all__ = [
     "ClinicalConfigAlreadyExistsError",
     "ClinicalConfigRepositoryError",
     "ClinicalConfigService",
+    "ClinicalConfigVersionNotFoundError",
     "InvalidClinicalConfigError",
     "UnknownClinicalConfigError",
 ]

@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     clinical_config_cache_seconds: int = 60
     clinical_marker_ranges_object_name: str = "marker_ranges.json"
     clinical_drug_dosing_catalog_object_name: str = "drug_dosing_catalog.json"
+    clinical_config_versions_prefix: str = "_versions"
 
     document_upload_max_bytes: int = 50 * 1024 * 1024
     document_allowed_extensions_csv: str = ""
