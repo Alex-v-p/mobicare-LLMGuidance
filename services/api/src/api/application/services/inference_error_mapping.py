@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from api.clients.inference_client import InferenceClientError
+from api.infrastructure.clients.inference_client import InferenceClientError
 from api.errors import AppError, ServiceUnavailableError
 
 

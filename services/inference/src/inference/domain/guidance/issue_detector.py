@@ -7,14 +7,14 @@ from inference.domain.guidance.answer_normalizer import (
     has_actionable_guidance,
     is_minimal_unknown_fallback_answer,
 )
-from inference.pipeline.prompts.multistep import DISALLOWED_SOURCE_REFERENCES
-from inference.pipeline.support.question_analysis import (
+from inference.application.pipelines.prompts.multistep import DISALLOWED_SOURCE_REFERENCES
+from inference.domain.guidance.question_analysis import (
     answer_addresses_explicit_question,
     answer_addresses_literal_question,
     is_explicit_question_only_mode,
     is_literal_question_mode,
 )
-from inference.pipeline.support.specialty import (
+from inference.domain.guidance.specialty import (
     detected_clusters,
     infer_specialty_focus,
     prioritized_clusters,

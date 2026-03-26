@@ -4,7 +4,7 @@ from typing import Any
 
 from inference.clinical import ClinicalProfile
 from inference.domain.guidance.missing_context import missing_details
-from inference.pipeline.support.specialty import (
+from inference.domain.guidance.specialty import (
     ClinicalSynthesis,
     SpecialtyFocus,
     finding_phrase,

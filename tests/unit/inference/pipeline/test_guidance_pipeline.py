@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from inference.pipeline.factory import build_guidance_pipeline
+from inference.application.pipelines.factory import build_guidance_pipeline
 from shared.contracts.inference import GenerationOptions, InferenceRequest, OllamaGenerateResponse, RetrievedContext
 
 

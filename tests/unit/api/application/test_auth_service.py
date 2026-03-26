@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from api.application.services.auth_service import AuthService
-from api.clients.auth_client import AuthClientError
+from api.infrastructure.clients.auth_client import AuthClientError
 from api.errors import ServiceUnavailableError, UnauthorizedError
 from shared.contracts.auth import LoginRequest
 from shared.config import Settings

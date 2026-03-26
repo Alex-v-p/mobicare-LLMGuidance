@@ -3,7 +3,7 @@ from __future__ import annotations
 import traceback
 
 from inference.callbacks.notifier import CallbackNotifier
-from inference.http.dependencies import (
+from inference.infrastructure.http.dependencies import (
     get_guidance_job_result_store,
     get_guidance_job_store,
     get_guidance_pipeline,

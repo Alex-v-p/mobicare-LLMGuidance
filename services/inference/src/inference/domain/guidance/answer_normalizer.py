@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from inference.pipeline.support.specialty import to_float
+from inference.domain.guidance.specialty import to_float
 from shared.contracts.inference import RetrievedContext
 
 

@@ -214,7 +214,7 @@ class StubDocumentService:
         )
 
     def get_document(self, object_name: str):
-        from api.repositories.documents.models import DocumentBlob
+        from api.infrastructure.repositories.documents.models import DocumentBlob
 
         return DocumentBlob(
             object_name=object_name,

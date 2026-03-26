@@ -34,7 +34,7 @@ def test_upload_document_rejects_disallowed_extension(monkeypatch):
 
     original = get_settings()
     monkeypatch.setattr(
-        "api.routes.documents.get_settings",
+        "api.presentation.routes.documents.get_settings",
         lambda: original.model_copy(update={"document_allowed_extensions_csv": "pdf"}),
     )
 
@@ -51,7 +51,7 @@ def test_upload_document_rejects_disallowed_extension(monkeypatch):
 
 class MissingDocumentService:
     def get_document(self, object_name: str):
-        from api.repositories.documents import DocumentNotFoundError
+        from api.infrastructure.repositories.documents import DocumentNotFoundError
 
         raise DocumentNotFoundError("missing")
 

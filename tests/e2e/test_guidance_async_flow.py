@@ -4,9 +4,9 @@ import httpx
 import pytest
 
 from api.main import create_app as create_api_app
-from inference.http.dependencies import get_guidance_job_service
-from inference.http.main import create_app as create_inference_app
-from inference.http.services.guidance_service import GuidanceJobService
+from inference.infrastructure.http.dependencies import get_guidance_job_service
+from inference.infrastructure.http.main import create_app as create_inference_app
+from inference.application.services.guidance_service import GuidanceJobService
 from inference.worker.handlers import guidance_handler
 from shared.contracts.inference import ApiGuidanceJobStatus
 from tests.support.fakes import DummyAsyncClientContext, InMemoryGuidanceJobStore, InMemoryJobResultStore, RecordingNotifier, StaticGuidancePipeline
@@ -31,7 +31,7 @@ async def test_async_guidance_job_flow_end_to_end(guidance_request, inference_re
     monkeypatch.setattr(guidance_handler, "with_heartbeat", lambda **kwargs: kwargs["operation"]())
     monkeypatch.setattr(guidance_handler, "utc_now_iso", lambda: "2026-03-16T10:30:00+00:00")
     monkeypatch.setattr(
-        "api.clients.inference_client.create_async_client",
+        "api.infrastructure.clients.inference_client.create_async_client",
         lambda timeout_s: DummyAsyncClientContext(
             httpx.AsyncClient(transport=httpx.ASGITransport(app=inference_app), base_url="http://inference.test", timeout=timeout_s)
         ),

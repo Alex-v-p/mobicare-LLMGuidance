@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from inference.clinical import ClinicalProfile
-from inference.pipeline.support.specialty import SpecialtyFocus, detected_clusters
+from inference.domain.guidance.specialty import SpecialtyFocus, detected_clusters
 
 
 def missing_details(

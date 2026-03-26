@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from api.repositories.clinical_config_repository import InvalidClinicalConfigError, UnknownClinicalConfigError
+from api.infrastructure.repositories.clinical_config import InvalidClinicalConfigError, UnknownClinicalConfigError
 from shared.contracts.clinical_config import ClinicalConfigName
 
 

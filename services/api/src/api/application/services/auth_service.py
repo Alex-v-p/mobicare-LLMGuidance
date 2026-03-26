@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from api.auth import create_access_token
-from api.clients.auth_client import AuthClient, AuthClientError
+from api.infrastructure.clients.auth_client import AuthClient, AuthClientError
 from api.errors import ServiceUnavailableError, UnauthorizedError
 from shared.config import Settings, get_settings
 from shared.contracts.auth import LoginRequest, TokenResponse

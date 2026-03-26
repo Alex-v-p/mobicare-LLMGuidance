@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from api.repositories.documents.models import DocumentLocation
-from api.repositories.documents.storage import DocumentStorage
+from api.infrastructure.repositories.documents.models import DocumentLocation
+from api.infrastructure.repositories.documents.storage import DocumentStorage
 from minio.error import S3Error
 
 

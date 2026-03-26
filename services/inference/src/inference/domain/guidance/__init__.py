@@ -19,8 +19,35 @@ from inference.domain.guidance.deterministic_fallback import (
 )
 from inference.domain.guidance.issue_detector import collect_answer_issues, should_force_deterministic_answer
 from inference.domain.guidance.missing_context import missing_details
+from inference.domain.guidance.question_analysis import (
+    answer_addresses_explicit_question,
+    answer_addresses_literal_question,
+    context_key,
+    expected_item_count,
+    extract_numbered_items,
+    extract_terms,
+    is_explicit_question_only_mode,
+    is_literal_question_mode,
+    select_relevant_context_sentences,
+)
+from inference.domain.guidance.specialty import (
+    ClinicalSynthesis,
+    SpecialtyFocus,
+    cluster_for_finding,
+    context_matches_findings,
+    detected_clusters,
+    finding_phrase,
+    infer_specialty_focus,
+    prioritized_clusters,
+    synthesize_clinical_state,
+    to_float,
+)
 
 __all__ = [
+    "ClinicalSynthesis",
+    "SpecialtyFocus",
+    "answer_addresses_explicit_question",
+    "answer_addresses_literal_question",
     "build_caution_lines",
     "build_context_question_answer",
     "build_deterministic_answer",
@@ -30,11 +57,26 @@ __all__ = [
     "build_literal_question_answer",
     "build_rationale_lines",
     "build_unknown_fallback_answer",
+    "cluster_for_finding",
     "collect_answer_issues",
+    "context_key",
+    "context_matches_findings",
+    "detected_clusters",
+    "expected_item_count",
+    "extract_numbered_items",
+    "extract_terms",
+    "finding_phrase",
     "has_actionable_guidance",
+    "infer_specialty_focus",
+    "is_explicit_question_only_mode",
+    "is_literal_question_mode",
     "is_minimal_unknown_fallback_answer",
     "looks_like_generic_clinical_fallback",
     "missing_details",
     "normalize_generated_answer",
+    "prioritized_clusters",
+    "select_relevant_context_sentences",
     "should_force_deterministic_answer",
+    "synthesize_clinical_state",
+    "to_float",
 ]

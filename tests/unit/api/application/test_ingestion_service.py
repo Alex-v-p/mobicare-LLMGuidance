@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from api.application.services.ingestion_service import IngestionService
-from api.clients.inference_client import InferenceClientError
+from api.infrastructure.clients.inference_client import InferenceClientError
 from api.errors import AppError, NotFoundError, ServiceUnavailableError
 from shared.config import Settings
 from shared.contracts.ingestion import ApiIngestionJobStatus, IngestDocumentsRequest, IngestionCollectionDeleteResponse, IngestionJobAcceptedResponse, IngestionJobRecord

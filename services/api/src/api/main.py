@@ -5,12 +5,12 @@ from fastapi import Depends, FastAPI
 from api.auth.dependencies import get_current_user
 from api.dependencies import get_minio_client
 from api.exception_handlers import register_exception_handlers
-from api.routes.auth import router as auth_router
-from api.routes.clinical_configs import router as clinical_configs_router
-from api.routes.documents import router as documents_router
-from api.routes.guidance import router as guidance_router
-from api.routes.health import router as health_router
-from api.routes.ingestion import router as ingestion_router
+from api.presentation.routes.auth import router as auth_router
+from api.presentation.routes.clinical_configs import router as clinical_configs_router
+from api.presentation.routes.documents import router as documents_router
+from api.presentation.routes.guidance import router as guidance_router
+from api.presentation.routes.health import router as health_router
+from api.presentation.routes.ingestion import router as ingestion_router
 from shared.bootstrap.minio import bootstrap_minio_resources_on_startup
 from shared.config import Settings, get_settings
 from shared.observability import configure_logging

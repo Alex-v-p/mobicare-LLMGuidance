@@ -6,7 +6,7 @@ from api.application.validators.clinical_config import (
     normalize_clinical_config_name,
     validate_clinical_config_payload,
 )
-from api.repositories.clinical_config_repository import (
+from api.infrastructure.repositories.clinical_config import (
     ClinicalConfigAlreadyExistsError,
     ClinicalConfigRepository,
     ClinicalConfigRepositoryError,

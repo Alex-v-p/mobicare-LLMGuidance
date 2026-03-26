@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from api.repositories.documents.errors import InvalidDocumentError
-from api.repositories.documents.naming import DocumentNamer
+from api.infrastructure.repositories.documents.errors import InvalidDocumentError
+from api.infrastructure.repositories.documents.naming import DocumentNamer
 
 
 def test_resolve_location_adds_prefix_and_strips_leading_slash():

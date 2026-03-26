@@ -1,4 +1,4 @@
-from inference.pipeline.support import drug_dosing
+from inference.domain.drug_dosing import payload as drug_dosing
 
 
 

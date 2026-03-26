@@ -10,14 +10,14 @@ from inference.domain.guidance.advice_builder import (
     build_rationale_lines,
 )
 from inference.domain.guidance.answer_normalizer import build_unknown_fallback_answer
-from inference.pipeline.support.question_analysis import (
+from inference.domain.guidance.question_analysis import (
     expected_item_count,
     extract_numbered_items,
     is_explicit_question_only_mode,
     is_literal_question_mode,
     select_relevant_context_sentences,
 )
-from inference.pipeline.support.specialty import detected_clusters, infer_specialty_focus, synthesize_clinical_state
+from inference.domain.guidance.specialty import detected_clusters, infer_specialty_focus, synthesize_clinical_state
 from shared.contracts.inference import RetrievedContext
 
 

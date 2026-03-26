@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import traceback
 
-from inference.http.dependencies import (
+from inference.infrastructure.http.dependencies import (
     get_ingestion_job_result_store,
     get_ingestion_job_store,
     get_ingestion_service,

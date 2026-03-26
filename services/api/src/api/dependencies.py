@@ -10,11 +10,11 @@ from api.application.services.document_service import DocumentService
 from api.application.services.guidance_service import GuidanceService
 from api.application.services.health_service import HealthService
 from api.application.services.ingestion_service import IngestionService
-from api.clients.auth_client import AuthClient
-from api.clients.inference_client import InferenceClient
+from api.infrastructure.clients.auth_client import AuthClient
+from api.infrastructure.clients.inference_client import InferenceClient
 from api.infrastructure.minio import create_minio_client
-from api.repositories.clinical_config_repository import ClinicalConfigRepository
-from api.repositories.document_repository import DocumentRepository
+from api.infrastructure.repositories.clinical_config import ClinicalConfigRepository
+from api.infrastructure.repositories.document_repository import DocumentRepository
 from shared.config import Settings, get_settings
 
 

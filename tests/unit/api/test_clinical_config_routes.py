@@ -211,7 +211,7 @@ def test_rollback_returns_restored_version(api_app, api_client):
 
 class ConflictClinicalConfigService:
     def upsert_config(self, config_name, payload, *, expected_etag=None, expected_checksum_sha256=None):
-        from api.repositories.clinical_config_repository import ClinicalConfigOptimisticLockError
+        from api.infrastructure.repositories.clinical_config import ClinicalConfigOptimisticLockError
 
         raise ClinicalConfigOptimisticLockError("etag mismatch")
 

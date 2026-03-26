@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import BinaryIO
 
-from api.repositories.document_repository import DocumentBlob, DocumentRepository
+from api.infrastructure.repositories.document_repository import DocumentBlob, DocumentRepository
 from shared.contracts.documents import DocumentDeleteResponse, DocumentMetadataListResponse, DocumentUploadResponse
 
 

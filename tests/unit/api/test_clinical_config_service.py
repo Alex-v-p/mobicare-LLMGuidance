@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import pytest
 
 from api.application.services.clinical_config_service import ClinicalConfigService
-from api.repositories.clinical_config_repository import InvalidClinicalConfigError
+from api.infrastructure.repositories.clinical_config import InvalidClinicalConfigError
 from shared.contracts.clinical_config import ClinicalConfigMetadata, ClinicalConfigVersionMetadata
 
 

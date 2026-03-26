@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from inference.http.dependencies import (
+from inference.infrastructure.http.dependencies import (
     get_guidance_job_service,
     get_inference_settings,
 )
-from inference.http.main import create_app
+from inference.infrastructure.http.main import create_app
 from shared.config.settings import get_settings
 from shared.contracts.inference import JobRecord
 
@@ -18,7 +18,7 @@ class StubGuidanceJobService:
 
 def test_inference_routes_require_internal_service_token_in_prod(monkeypatch):
     from unittest.mock import MagicMock
-    import inference.http.main as http_main
+    import inference.infrastructure.http.main as http_main
 
     monkeypatch.setenv("APP_ENV", "prod")
     monkeypatch.setenv("JWT_SECRET_KEY", "secret")

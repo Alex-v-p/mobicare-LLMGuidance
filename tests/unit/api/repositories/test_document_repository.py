@@ -5,8 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from api.repositories.document_repository import DocumentRepository
-from api.repositories.documents.errors import DocumentAlreadyExistsError, InvalidDocumentError
+from api.infrastructure.repositories.document_repository import DocumentRepository
+from api.infrastructure.repositories.documents.errors import DocumentAlreadyExistsError, InvalidDocumentError
 
 
 class FakeStorage:

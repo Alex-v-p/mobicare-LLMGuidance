@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from api.application.services.guidance_service import GuidanceService
-from api.clients.inference_client import InferenceClientError
+from api.infrastructure.clients.inference_client import InferenceClientError
 from api.errors import AppError, ServiceUnavailableError
 from shared.config import Settings
 from shared.contracts.inference import ApiGuidanceJobStatus, GuidanceRequest, InferenceRequest, InferenceResponse, JobAcceptedResponse, JobRecord
