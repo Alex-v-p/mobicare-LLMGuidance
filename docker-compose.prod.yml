@@ -1,16 +1,12 @@
 services:
-  api:
-    environment:
-      APP_ENV: "${APP_ENV:-prod}"
+  gateway:
+    volumes:
+      - ./deploy/nginx/prod.conf:/etc/nginx/templates/default.conf.template:ro
+    ports:
+      - "${GATEWAY_PORT:-8000}:80"
 
   inference:
-    environment:
-      APP_ENV: "${APP_ENV:-prod}"
     ports: []
-
-  inference-worker:
-    environment:
-      APP_ENV: "${APP_ENV:-prod}"
 
   redis:
     ports: []

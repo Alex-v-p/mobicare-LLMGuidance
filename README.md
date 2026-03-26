@@ -4,6 +4,7 @@ A multi-service Python project for document ingestion, retrieval, and LLM-based 
 
 ## What is in this repository
 
+- **Gateway reverse proxy**: Nginx front door for local development and production-like deployments
 - **Gateway API**: document management and external-facing HTTP endpoints
 - **Inference HTTP service**: guidance generation and retrieval endpoints
 - **Inference worker**: asynchronous job execution and ingestion orchestration
@@ -18,7 +19,7 @@ services/
   inference/          Inference HTTP service and worker runtime
   shared/             Shared config and utilities
 scripts/              Repository scripts
-deploy/               Dockerfiles for deployable services
+deploy/               Dockerfiles and Nginx reverse-proxy configs
 infra/                Supporting infrastructure assets
 .github/workflows/    CI workflows
 ```
@@ -35,7 +36,6 @@ This repository uses:
 
 When dependencies change in `pyproject.toml`, refresh the lock files intentionally.
 
-
 ```bash
 pip install pip-tools
 pip-compile pyproject.toml -o requirements.lock
@@ -50,6 +50,8 @@ pip install -e ".[dev]"
 Commit both lock files together with the dependency change.
 
 ## Run with Docker Compose
+
+### Development stack
 
 Build and start the stack:
 
@@ -69,6 +71,30 @@ Stop the stack:
 docker compose down
 ```
 
+The public gateway URL remains `http://localhost:8000`, but it now goes through the Nginx reverse proxy instead of binding the API container directly.
+
+### Production-like stack
+
+Run the hardened reverse-proxy layout:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+In this mode, only the Nginx front door is published. Inference, Redis, Ollama, Qdrant, and MinIO stay on the internal Docker network.
+
+### Optional TLS reverse proxy
+
+If you want Nginx to terminate HTTPS too, place `fullchain.pem` and `privkey.pem` in `deploy/nginx/certs/` and run:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.prod.tls.yml up -d --build
+```
+
+Default ports:
+- HTTP redirect helper: `http://localhost:8080`
+- HTTPS gateway: `https://localhost:8443`
+
 ## Pull Ollama models
 
 After the stack is up, pull the required models into the Ollama container:
@@ -82,11 +108,11 @@ If you use a different embedding or chat model in requests, pull that model too.
 
 ## Health endpoints
 
-- API: `http://localhost:8000/health`
-- Inference: `http://localhost:8001/health`
-- Qdrant: `http://localhost:6333`
-- MinIO console: `http://localhost:9001`
-- Ollama: `http://localhost:11434`
+- Gateway (Nginx -> API): `http://localhost:8000/health`
+- Inference direct (dev only): `http://localhost:8001/health`
+- Qdrant direct (dev only): `http://localhost:6333`
+- MinIO console direct (dev only): `http://localhost:9001`
+- Ollama direct (dev only): `http://localhost:11434`
 
 ## Example ingestion requests
 
@@ -216,70 +242,4 @@ Hybrid retrieval request:
     "use_example_response": false
   }
 }
-```
-
-Extended guidance request:
-
-```json
-{
-  "request_id": "case-2026-0020",
-  "question": "What escalation of therapy should be considered for symptomatic HFrEF despite ACE inhibitor and beta blocker therapy?",
-  "patient": {
-    "values": {
-      "age": 72,
-      "diagnosis": "HFrEF",
-      "ejection_fraction": 32
-    }
-  },
-  "options": {
-    "use_retrieval": true,
-    "top_k": 4,
-    "temperature": 0.2,
-    "max_tokens": 256,
-    "retrieval_mode": "hybrid",
-    "llm_model": "qwen2.5:3b-instruct",
-    "embedding_model": "qwen3-embedding:4b",
-    "enable_query_rewriting": true,
-    "enable_response_verification": true,
-    "enable_regeneration": true,
-    "max_regeneration_attempts": 2
-  }
-}
-```
-
-## Running tests and checks
-
-Run tests:
-
-```bash
-pytest
-```
-
-Run Pants lint:
-
-```bash
-pants lint ::
-```
-
-Run Pylint manually:
-
-```bash
-PYTHONPATH=services/api/src:services/inference/src:services/shared/src pylint $(git ls-files '*.py')
-```
-
-Validate Docker Compose:
-
-```bash
-docker compose config
-```
-
-
-
-### Local production-like run
-
-1. Copy `.env.production.example` to `.env` and replace the secrets.
-2. Start with:
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```

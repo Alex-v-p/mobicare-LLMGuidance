@@ -8,9 +8,9 @@ from typing import Any
 
 import streamlit as st
 
-from adapters.auth import build_test_access_token, request_gateway_access_token
 from adapters.gateway import GatewayAPIResponse, GatewayClient
 from adapters.guidance import GuidanceClient
+from utils.gateway_auth import GatewayAuthContext, create_local_access_token, login_for_access_token, resolve_ssl_verify
 
 
 DEFAULT_INGESTION_PAYLOAD = {
@@ -43,15 +43,7 @@ CLINICAL_CONFIG_FILENAMES = {
 
 ROOT = Path(__file__).resolve().parents[3]
 CLINICAL_DEFAULTS_DIR = ROOT / "services" / "inference" / "src" / "inference" / "clinical"
-
-AUTH_TOKEN_STATE_KEY = "endpoint_playground_bearer_token"
-AUTH_MODE_STATE_KEY = "endpoint_playground_auth_mode"
-AUTH_EMAIL_STATE_KEY = "endpoint_playground_auth_email"
-AUTH_PASSWORD_STATE_KEY = "endpoint_playground_auth_password"
-AUTH_SECRET_STATE_KEY = "endpoint_playground_jwt_secret"
-AUTH_ISSUER_STATE_KEY = "endpoint_playground_jwt_issuer"
-AUTH_AUDIENCE_STATE_KEY = "endpoint_playground_jwt_audience"
-AUTH_EXP_MINUTES_STATE_KEY = "endpoint_playground_jwt_exp_minutes"
+DEFAULT_GATEWAY_BASE_URL = os.environ.get("PLAYGROUND_GATEWAY_BASE_URL") or os.environ.get("GATEWAY_BASE_URL") or "http://localhost:8000"
 
 
 @st.cache_data(show_spinner=False)
@@ -123,17 +115,6 @@ def _last_result_state_key(config_name: str) -> str:
     return f"clinical_last_result::{config_name}"
 
 
-def _ensure_auth_state() -> None:
-    st.session_state.setdefault(AUTH_TOKEN_STATE_KEY, os.getenv("PLAYGROUND_GATEWAY_BEARER_TOKEN", ""))
-    st.session_state.setdefault(AUTH_MODE_STATE_KEY, "Generate local JWT (testing)")
-    st.session_state.setdefault(AUTH_EMAIL_STATE_KEY, os.getenv("PLAYGROUND_GATEWAY_AUTH_EMAIL", "playground@mobicare.local"))
-    st.session_state.setdefault(AUTH_PASSWORD_STATE_KEY, "")
-    st.session_state.setdefault(AUTH_SECRET_STATE_KEY, os.getenv("PLAYGROUND_GATEWAY_JWT_SECRET", ""))
-    st.session_state.setdefault(AUTH_ISSUER_STATE_KEY, os.getenv("PLAYGROUND_GATEWAY_JWT_ISSUER", "mobicare-llm-api"))
-    st.session_state.setdefault(AUTH_AUDIENCE_STATE_KEY, os.getenv("PLAYGROUND_GATEWAY_JWT_AUDIENCE", "mobicare-gateway"))
-    st.session_state.setdefault(AUTH_EXP_MINUTES_STATE_KEY, 60)
-
-
 def _ensure_clinical_state(config_name: str) -> None:
     defaults = _load_default_clinical_payloads()
     payload_key = _payload_state_key(config_name)
@@ -187,101 +168,88 @@ def _render_clinical_result(config_name: str) -> None:
     st.json(result["body"])
 
 
-def _token_preview(token: str) -> str:
-    token = token.strip()
-    if len(token) <= 24:
-        return token
-    return f"{token[:12]}...{token[-12:]}"
-
-
-def _render_auth_controls(base_url: str, timeout_seconds: int) -> str | None:
-    _ensure_auth_state()
-
-    with st.expander("Authentication", expanded=True):
-        auth_mode = st.selectbox(
-            "Auth mode",
-            options=[
-                "No auth",
-                "Manual bearer token",
-                "Gateway login",
-                "Generate local JWT (testing)",
-            ],
-            key=AUTH_MODE_STATE_KEY,
-        )
-
-        if auth_mode == "No auth":
-            st.info("Use this only against a dev gateway that has public auth disabled.")
-
-        elif auth_mode == "Manual bearer token":
-            st.text_area(
-                "Bearer token",
-                key=AUTH_TOKEN_STATE_KEY,
-                height=120,
-                help="Paste an existing access token here.",
-            )
-
-        elif auth_mode == "Gateway login":
-            col1, col2 = st.columns(2)
-            col1.text_input("Email", key=AUTH_EMAIL_STATE_KEY)
-            col2.text_input("Password", key=AUTH_PASSWORD_STATE_KEY, type="password")
-            st.caption("This uses POST /auth/token. It only works once your gateway can validate credentials.")
-            if st.button("Fetch token from gateway"):
-                try:
-                    st.session_state[AUTH_TOKEN_STATE_KEY] = request_gateway_access_token(
-                        base_url=base_url,
-                        email=str(st.session_state[AUTH_EMAIL_STATE_KEY]),
-                        password=str(st.session_state[AUTH_PASSWORD_STATE_KEY]),
-                        timeout_seconds=int(timeout_seconds),
-                    )
-                    st.success("Fetched bearer token from gateway.")
-                except Exception as exc:  # noqa: BLE001
-                    st.error(str(exc))
-
-        elif auth_mode == "Generate local JWT (testing)":
-            st.caption(
-                "This is the bridge for testing your production gateway before you have a real auth provider. "
-                "The generated token must match the gateway JWT secret, issuer, and audience."
-            )
-            col1, col2 = st.columns(2)
-            col1.text_input("Email", key=AUTH_EMAIL_STATE_KEY)
-            col2.number_input("Expiry (minutes)", min_value=1, max_value=1440, key=AUTH_EXP_MINUTES_STATE_KEY)
-            st.text_input("JWT secret", key=AUTH_SECRET_STATE_KEY, type="password")
-            issuer_col, audience_col = st.columns(2)
-            issuer_col.text_input("JWT issuer", key=AUTH_ISSUER_STATE_KEY)
-            audience_col.text_input("JWT audience", key=AUTH_AUDIENCE_STATE_KEY)
-            if st.button("Generate local test token"):
-                try:
-                    secret = str(st.session_state[AUTH_SECRET_STATE_KEY]).strip()
-                    if not secret:
-                        raise ValueError("JWT secret must not be empty.")
-                    st.session_state[AUTH_TOKEN_STATE_KEY] = build_test_access_token(
-                        email=str(st.session_state[AUTH_EMAIL_STATE_KEY]).strip(),
-                        secret_key=secret,
-                        issuer=str(st.session_state[AUTH_ISSUER_STATE_KEY]).strip(),
-                        audience=str(st.session_state[AUTH_AUDIENCE_STATE_KEY]).strip(),
-                        exp_minutes=int(st.session_state[AUTH_EXP_MINUTES_STATE_KEY]),
-                    )
-                    st.success("Generated local bearer token.")
-                except Exception as exc:  # noqa: BLE001
-                    st.error(str(exc))
-
-        token = str(st.session_state.get(AUTH_TOKEN_STATE_KEY) or "").strip()
-        if token:
-            st.success(f"Active bearer token: {_token_preview(token)}")
-            if st.button("Clear active token"):
-                st.session_state[AUTH_TOKEN_STATE_KEY] = ""
-                token = ""
-        else:
-            st.warning("No bearer token is active.")
-
-    return token or None
-
-
 def render() -> None:
     st.subheader("Endpoint playground")
-    base_url = st.text_input("Gateway base URL", value=os.getenv("PLAYGROUND_GATEWAY_BASE_URL", "http://localhost:8000"))
+    base_url = st.text_input("Gateway base URL", value=DEFAULT_GATEWAY_BASE_URL)
+    st.caption("This URL should point at the Nginx reverse-proxy front door, not directly at the API container.")
     timeout_seconds = st.number_input("HTTP timeout (seconds)", min_value=5, max_value=3600, value=60, step=5)
-    bearer_token = _render_auth_controls(base_url, int(timeout_seconds))
+    verify_ssl_enabled = st.checkbox("Verify TLS certificates", value=not str(base_url).startswith("https://localhost"))
+    ca_bundle_path = st.text_input(
+        "Custom CA bundle path (optional)",
+        value=os.environ.get("PLAYGROUND_GATEWAY_CA_BUNDLE_PATH", ""),
+        help="Use this for mkcert or other custom roots. When set, requests will verify TLS against this CA bundle.",
+    )
+    verify_ssl = resolve_ssl_verify(verify_ssl_enabled, ca_bundle_path or None)
+
+    auth_mode = st.selectbox(
+        "Authentication",
+        options=["None", "Bearer token", "Gateway login", "Generate local JWT (testing)"],
+        help="Use a generated local JWT or exchange credentials at /auth/token when the gateway is secured.",
+    )
+    auth_token = ""
+    if auth_mode == "Bearer token":
+        auth_token = st.text_input("Bearer token", value=os.environ.get("PLAYGROUND_GATEWAY_AUTH_TOKEN", ""), type="password")
+    elif auth_mode == "Gateway login":
+        login_col1, login_col2 = st.columns(2)
+        with login_col1:
+            login_email = st.text_input("Login email", value=os.environ.get("PLAYGROUND_GATEWAY_AUTH_EMAIL", "tester@example.com"))
+        with login_col2:
+            login_password = st.text_input("Login password", value=os.environ.get("PLAYGROUND_GATEWAY_AUTH_PASSWORD", ""), type="password")
+        if login_email and login_password:
+            try:
+                auth_token, expires_in = login_for_access_token(
+                    base_url=base_url,
+                    email=login_email,
+                    password=login_password,
+                    timeout_seconds=int(timeout_seconds),
+                    verify_ssl=verify_ssl,
+                )
+                label = f"about {max(1, expires_in // 60)} minutes" if expires_in else "the configured expiry"
+                st.caption(f"Fetched gateway token valid for {label}.")
+            except Exception as exc:  # noqa: BLE001
+                st.error(f"Could not fetch gateway token: {exc}")
+                auth_token = ""
+    elif auth_mode == "Generate local JWT (testing)":
+        jwt_col1, jwt_col2 = st.columns(2)
+        with jwt_col1:
+            jwt_email = st.text_input("JWT email", value=os.environ.get("PLAYGROUND_GATEWAY_AUTH_EMAIL", "tester@example.com"))
+            jwt_secret = st.text_input(
+                "JWT secret",
+                value=os.environ.get("PLAYGROUND_GATEWAY_JWT_SECRET", "replace-this-in-real-environments"),
+                type="password",
+            )
+        with jwt_col2:
+            jwt_issuer = st.text_input("JWT issuer", value=os.environ.get("PLAYGROUND_GATEWAY_JWT_ISSUER", "mobicare-llm-api"))
+            jwt_audience = st.text_input("JWT audience", value=os.environ.get("PLAYGROUND_GATEWAY_JWT_AUDIENCE", "mobicare-gateway"))
+            jwt_exp_minutes = st.number_input("JWT expiry (minutes)", min_value=1, max_value=1440, value=60, step=5)
+        try:
+            auth_token, expires_in = create_local_access_token(
+                email=jwt_email,
+                secret_key=jwt_secret,
+                issuer=jwt_issuer,
+                audience=jwt_audience,
+                exp_minutes=int(jwt_exp_minutes),
+            )
+            st.caption(f"Generated local test token valid for {expires_in // 60} minutes.")
+        except Exception as exc:  # noqa: BLE001
+            st.error(f"Could not generate JWT: {exc}")
+            auth_token = ""
+
+    if auth_token:
+        with st.expander("Resolved Authorization header", expanded=False):
+            st.code(f"Bearer {auth_token[:32]}...", language=None)
+
+    if st.button("Test current auth against /auth/example-protected"):
+        try:
+            auth_client = GatewayClient(
+                base_url=base_url,
+                timeout_seconds=int(timeout_seconds),
+                auth_token=auth_token or None,
+                verify_ssl=verify_ssl,
+            )
+            st.json(auth_client.test_authentication().body)
+        except Exception as exc:  # noqa: BLE001
+            st.error(str(exc))
 
     ingest_tab, guidance_tab, configs_tab = st.tabs(["Ingestion", "Guidance", "Clinical configs"])
 
@@ -291,7 +259,12 @@ def render() -> None:
         if st.button("Run ingestion job"):
             try:
                 payload = _parse_json(ingestion_text)
-                client = GatewayClient(base_url=base_url, timeout_seconds=int(timeout_seconds), bearer_token=bearer_token)
+                client = GatewayClient(
+                    base_url=base_url,
+                    timeout_seconds=int(timeout_seconds),
+                    auth_token=auth_token or None,
+                    verify_ssl=verify_ssl,
+                )
                 started = time.perf_counter()
                 if delete_first:
                     st.write(client.delete_ingestion_collection())
@@ -302,23 +275,17 @@ def render() -> None:
             except Exception as exc:  # noqa: BLE001
                 st.error(str(exc))
 
-        if st.button("Delete ingestion collection now"):
-            try:
-                client = GatewayClient(base_url=base_url, timeout_seconds=int(timeout_seconds), bearer_token=bearer_token)
-                started = time.perf_counter()
-                result = client.delete_ingestion_collection()
-                elapsed_ms = (time.perf_counter() - started) * 1000.0
-                st.success(f"Deleted collection in {elapsed_ms:.2f} ms")
-                st.json(result)
-            except Exception as exc:  # noqa: BLE001
-                st.error(str(exc))
-
     with guidance_tab:
         guidance_text = st.text_area("Guidance payload", value=json.dumps(DEFAULT_GUIDANCE_PAYLOAD, indent=2), height=280)
         if st.button("Run guidance job"):
             try:
                 payload = _parse_json(guidance_text)
-                client = GuidanceClient(base_url=base_url, timeout_seconds=int(timeout_seconds), bearer_token=bearer_token)
+                client = GuidanceClient(
+                    base_url=base_url,
+                    timeout_seconds=int(timeout_seconds),
+                    auth_token=auth_token or None,
+                    verify_ssl=verify_ssl,
+                )
                 started = time.perf_counter()
                 result = client.run_guidance_and_wait(payload)
                 elapsed_ms = (time.perf_counter() - started) * 1000.0
@@ -334,7 +301,12 @@ def render() -> None:
             help="These map to the MinIO-backed clinical config endpoints exposed by the gateway API.",
         )
         _ensure_clinical_state(config_name)
-        client = GatewayClient(base_url=base_url, timeout_seconds=int(timeout_seconds), bearer_token=bearer_token)
+        client = GatewayClient(
+            base_url=base_url,
+            timeout_seconds=int(timeout_seconds),
+            auth_token=auth_token or None,
+            verify_ssl=verify_ssl,
+        )
 
         action_col1, action_col2, action_col3 = st.columns(3)
         if action_col1.button("List configs"):

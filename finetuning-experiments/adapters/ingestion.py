@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 from typing import Any
@@ -9,8 +8,20 @@ from adapters.gateway import GatewayClient, GatewayIngestionResult
 class IngestionClient:
     """Thin ingestion adapter that isolates experiment runners from gateway endpoint details."""
 
-    def __init__(self, base_url: str = "http://localhost:8000", timeout_seconds: int = 30) -> None:
-        self._gateway = GatewayClient(base_url=base_url, timeout_seconds=timeout_seconds)
+    def __init__(
+        self,
+        base_url: str = "http://localhost:8000",
+        timeout_seconds: int = 30,
+        *,
+        auth_token: str | None = None,
+        verify_ssl: bool = True,
+    ) -> None:
+        self._gateway = GatewayClient(
+            base_url=base_url,
+            timeout_seconds=timeout_seconds,
+            auth_token=auth_token,
+            verify_ssl=verify_ssl,
+        )
 
     def submit_job(self, payload: dict[str, Any]) -> dict[str, Any]:
         return self._gateway.submit_ingestion_job(payload)
