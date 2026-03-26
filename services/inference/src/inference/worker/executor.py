@@ -6,6 +6,7 @@ from typing import Protocol, TypeVar
 from pydantic import BaseModel
 
 from inference.queue import ClaimableJobStore
+from inference.jobstore.base import JobStateConflictError
 from inference.worker.heartbeat import with_heartbeat
 from shared.observability import get_logger
 
@@ -79,12 +80,24 @@ async def execute_next_job(
                         }
                     )
                 )
-                await store.mark_completed(
-                    record,
-                    result=result,
-                    completed_at=completed_at,
-                    result_object_key=record.result_object_key,
-                )
+                try:
+                    await store.mark_completed(
+                        record,
+                        result=result,
+                        completed_at=completed_at,
+                        result_object_key=record.result_object_key,
+                    )
+                except JobStateConflictError:  # pragma: no cover
+                    logger.warning(
+                        "worker_job_state_conflict",
+                        extra={
+                            "event": "worker_job_state_conflict",
+                            "error_code": "JOB_STATE_CONFLICT",
+                            "job_id": getattr(record, "job_id", None),
+                            "job_kind": job_kind,
+                            "target_status": "completed",
+                        },
+                    )
             except Exception as exc:  # pragma: no cover
                 error = f"{type(exc).__name__}: {exc}"
                 failed_at = utc_now_iso()
@@ -99,12 +112,24 @@ async def execute_next_job(
                         }
                     )
                 )
-                await store.mark_failed(
-                    record,
-                    error=error,
-                    completed_at=failed_at,
-                    result_object_key=record.result_object_key,
-                )
+                try:
+                    await store.mark_failed(
+                        record,
+                        error=error,
+                        completed_at=failed_at,
+                        result_object_key=record.result_object_key,
+                    )
+                except JobStateConflictError:  # pragma: no cover
+                    logger.warning(
+                        "worker_job_state_conflict",
+                        extra={
+                            "event": "worker_job_state_conflict",
+                            "error_code": "JOB_STATE_CONFLICT",
+                            "job_id": getattr(record, "job_id", None),
+                            "job_kind": job_kind,
+                            "target_status": "failed",
+                        },
+                    )
                 logger.exception(
                     "worker_job_execution_failed",
                     extra={

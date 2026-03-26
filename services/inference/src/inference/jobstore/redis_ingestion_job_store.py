@@ -21,7 +21,6 @@ class RedisIngestionJobStore(RedisJobStoreBase[IngestionJobRecord]):
             redis_url=redis_url or resolved_settings.redis_url,
             queue_name=queue_name or resolved_settings.redis_ingestion_job_queue,
             key_prefix="ingestion_job:",
-            key_pattern="ingestion_job:*",
             ttl_seconds=ttl_seconds if ttl_seconds is not None else resolved_settings.job_ttl_seconds,
             lease_seconds=lease_seconds if lease_seconds is not None else resolved_settings.job_lease_seconds,
             settings=resolved_settings,
