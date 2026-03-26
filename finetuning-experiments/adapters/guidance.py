@@ -20,20 +20,40 @@ class GatewayGuidanceResult:
 
 
 class GuidanceClient:
-    def __init__(self, base_url: str = "http://localhost:8000", timeout_seconds: int = 60) -> None:
+    def __init__(
+        self,
+        base_url: str = "http://localhost:8000",
+        timeout_seconds: int = 60,
+        *,
+        auth_token: str | None = None,
+        verify_ssl: bool | str = True,
+    ) -> None:
         self._base_url = base_url.rstrip("/")
         self._timeout_seconds = timeout_seconds
+        self._auth_token = (auth_token or "").strip() or None
+        self._verify_ssl = verify_ssl
 
     def submit_guidance_job(self, payload: dict[str, Any]) -> dict[str, Any]:
         url = f"{self._base_url}/guidance/jobs"
         logger.info("Submitting guidance job to %s", url)
-        response = requests.post(url, json=payload, timeout=self._timeout_seconds)
+        response = requests.post(
+            url,
+            json=payload,
+            headers=self._auth_headers() or None,
+            timeout=self._timeout_seconds,
+            verify=self._verify_ssl,
+        )
         response.raise_for_status()
         return response.json()
 
     def get_guidance_job(self, job_id: str) -> dict[str, Any]:
         url = f"{self._base_url}/guidance/jobs/{job_id}"
-        response = requests.get(url, timeout=self._timeout_seconds)
+        response = requests.get(
+            url,
+            headers=self._auth_headers() or None,
+            timeout=self._timeout_seconds,
+            verify=self._verify_ssl,
+        )
         response.raise_for_status()
         return response.json()
 
@@ -67,3 +87,8 @@ class GuidanceClient:
             if time.monotonic() - start > max_wait_seconds:
                 raise TimeoutError(f"Timed out waiting for guidance job {job_id}")
             time.sleep(poll_interval_seconds)
+
+    def _auth_headers(self) -> dict[str, str]:
+        if not self._auth_token:
+            return {}
+        return {"Authorization": f"Bearer {self._auth_token}"}

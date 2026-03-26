@@ -22,6 +22,7 @@ from scoring.aggregation import summarize_results
 from scoring.normalization import normalize_run_metrics
 from telemetry.stage_recorder import extract_guidance_telemetry
 from utils.datetime import utc_now_iso
+from utils.gateway_auth import GatewayAuthContext, resolve_gateway_auth_token, resolve_ssl_verify
 from utils.environment import collect_environment_snapshot
 from utils.ids import build_run_id
 
@@ -203,7 +204,28 @@ def run_benchmark(config: BenchmarkRunConfig) -> Path:
     try:
         ingestion_stage = run_ingestion_stage(config, cases, run_id=run_id)
         source_mapping_by_case = {item["case_id"]: item for item in ingestion_stage.assignments}
-        guidance_client = GuidanceClient(base_url=config.execution.gateway_url)
+        auth_token = resolve_gateway_auth_token(
+            GatewayAuthContext(
+                base_url=config.execution.gateway_url,
+                auth_mode=config.execution.gateway_auth_mode,
+                auth_token=config.execution.gateway_auth_token,
+                auth_email=config.execution.gateway_auth_email,
+                auth_password=config.execution.gateway_auth_password,
+                jwt_secret=config.execution.gateway_jwt_secret,
+                jwt_issuer=config.execution.gateway_jwt_issuer,
+                jwt_audience=config.execution.gateway_jwt_audience,
+                jwt_exp_minutes=config.execution.gateway_jwt_exp_minutes,
+                verify_ssl=config.execution.gateway_verify_ssl,
+                ca_bundle_path=config.execution.gateway_ca_bundle_path,
+                timeout_seconds=30,
+            )
+        )
+        verify_ssl = resolve_ssl_verify(config.execution.gateway_verify_ssl, config.execution.gateway_ca_bundle_path)
+        guidance_client = GuidanceClient(
+            base_url=config.execution.gateway_url,
+            auth_token=auth_token,
+            verify_ssl=verify_ssl,
+        )
         _run_warmups(cases, config, guidance_client)
 
         per_case_results: list[dict[str, Any]] = []

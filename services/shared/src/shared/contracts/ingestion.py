@@ -70,8 +70,22 @@ class IngestionJobRecord(BaseModel):
     completed_at: Optional[str] = None
     updated_at: str = Field(default_factory=utc_now_iso)
 
+
+class ApiIngestionJobStatus(BaseModel):
+    job_id: str
+    status: IngestionJobState
+    documents_found: int | None = None
+    chunks_created: int | None = None
+    vectors_upserted: int | None = None
+    collection: str | None = None
+    error: Optional[str] = None
+    created_at: Optional[str] = None
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
 class IngestionCollectionDeleteResponse(BaseModel):
     status: str = "deleted"
     collection: str
     existed: bool
-

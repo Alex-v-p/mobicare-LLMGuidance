@@ -26,27 +26,52 @@ class GatewayAPIResponse:
 
 
 class GatewayClient:
-    def __init__(self, base_url: str = "http://localhost:8000", timeout_seconds: int = 30) -> None:
+    def __init__(
+        self,
+        base_url: str = "http://localhost:8000",
+        timeout_seconds: int = 30,
+        *,
+        auth_token: str | None = None,
+        verify_ssl: bool | str = True,
+    ) -> None:
         self._base_url = base_url.rstrip("/")
         self._timeout_seconds = timeout_seconds
+        self._auth_token = (auth_token or "").strip() or None
+        self._verify_ssl = verify_ssl
 
     def submit_ingestion_job(self, payload: dict[str, Any]) -> dict[str, Any]:
         url = f"{self._base_url}/ingestion/jobs"
         logger.info("Submitting ingestion job to %s", url)
-        response = requests.post(url, json=payload, timeout=self._timeout_seconds)
+        response = requests.post(
+            url,
+            json=payload,
+            headers=self._auth_headers() or None,
+            timeout=self._timeout_seconds,
+            verify=self._verify_ssl,
+        )
         response.raise_for_status()
         return response.json()
 
     def get_ingestion_job(self, job_id: str) -> dict[str, Any]:
         url = f"{self._base_url}/ingestion/jobs/{job_id}"
-        response = requests.get(url, timeout=self._timeout_seconds)
+        response = requests.get(
+            url,
+            headers=self._auth_headers() or None,
+            timeout=self._timeout_seconds,
+            verify=self._verify_ssl,
+        )
         response.raise_for_status()
         return response.json()
 
     def delete_ingestion_collection(self) -> dict[str, Any]:
         url = f"{self._base_url}/ingestion/collection"
         logger.info("Deleting ingestion collection via %s", url)
-        response = requests.delete(url, timeout=self._timeout_seconds)
+        response = requests.delete(
+            url,
+            headers=self._auth_headers() or None,
+            timeout=self._timeout_seconds,
+            verify=self._verify_ssl,
+        )
         response.raise_for_status()
         return response.json()
 
@@ -79,6 +104,10 @@ class GatewayClient:
             if time.monotonic() - start > max_wait_seconds:
                 raise TimeoutError(f"Timed out waiting for ingestion job {job_id}")
             time.sleep(poll_interval_seconds)
+
+
+    def test_authentication(self) -> GatewayAPIResponse:
+        return self._request_json("GET", "/auth/example-protected")
 
     def list_clinical_configs(self) -> GatewayAPIResponse:
         return self._request_json("GET", "/clinical-configs")
@@ -164,6 +193,7 @@ class GatewayClient:
             expected_etag=expected_etag,
             expected_checksum_sha256=expected_checksum_sha256,
         )
+        headers.update(self._auth_headers())
         url = f"{self._base_url}{path}"
         logger.info("%s %s", method, url)
         response = requests.request(
@@ -172,6 +202,7 @@ class GatewayClient:
             json=json_body,
             headers=headers or None,
             timeout=self._timeout_seconds,
+            verify=self._verify_ssl,
         )
         response.raise_for_status()
         body = response.json() if response.content else {}
@@ -180,6 +211,11 @@ class GatewayClient:
             body=body,
             headers={key: value for key, value in response.headers.items()},
         )
+
+    def _auth_headers(self) -> dict[str, str]:
+        if not self._auth_token:
+            return {}
+        return {"Authorization": f"Bearer {self._auth_token}"}
 
     @staticmethod
     def _build_concurrency_headers(

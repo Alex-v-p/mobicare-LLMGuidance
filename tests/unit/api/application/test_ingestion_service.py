@@ -4,8 +4,9 @@ import pytest
 
 from api.application.services.ingestion_service import IngestionService
 from api.clients.inference_client import InferenceClientError
-from api.errors import AppError, ServiceUnavailableError
-from shared.contracts.ingestion import IngestDocumentsRequest, IngestionCollectionDeleteResponse, IngestionJobAcceptedResponse, IngestionJobRecord
+from api.errors import AppError, NotFoundError, ServiceUnavailableError
+from shared.config import Settings
+from shared.contracts.ingestion import ApiIngestionJobStatus, IngestDocumentsRequest, IngestionCollectionDeleteResponse, IngestionJobAcceptedResponse, IngestionJobRecord
 
 
 class StubInferenceClient:
@@ -50,13 +51,70 @@ async def test_submit_job_delegates_payload():
 
 
 @pytest.mark.asyncio
-async def test_get_job_status_returns_job_record():
+async def test_get_job_status_returns_api_status():
     record = IngestionJobRecord(status="running")
     service = IngestionService(inference_client=StubInferenceClient(job_record=record))
 
     result = await service.get_job_status(record.job_id)
 
-    assert result == record
+    assert isinstance(result, ApiIngestionJobStatus)
+    assert result.job_id == record.job_id
+    assert result.status == record.status
+
+
+@pytest.mark.asyncio
+async def test_prod_submit_job_uses_safe_ingestion_defaults():
+    payload = IngestDocumentsRequest(
+        options={
+            "cleaning_strategy": "none",
+            "chunking_strategy": "late",
+            "chunking_params": {"chunk_size": 1024, "chunk_overlap": 512},
+            "embedding_model": "custom-model",
+        }
+    )
+    accepted = IngestionJobAcceptedResponse(job_id="ing-1", status_url="http://api/ingestion/jobs/ing-1")
+    client = StubInferenceClient(accepted=accepted)
+    service = IngestionService(
+        inference_client=client,
+        settings=Settings(app_env="prod", jwt_secret_key="secret", internal_service_token="token"),
+    )
+
+    await service.submit_job(payload)
+
+    assert client.submitted_payload is not None
+    assert client.submitted_payload.options.cleaning_strategy == "deep"
+    assert client.submitted_payload.options.chunking_strategy == "naive"
+    assert client.submitted_payload.options.chunking_params == {"chunk_size": 300, "chunk_overlap": 100}
+    assert client.submitted_payload.options.embedding_model is None
+
+
+@pytest.mark.asyncio
+async def test_prod_delete_collection_is_enabled_by_default():
+    delete_response = IngestionCollectionDeleteResponse(collection="guidance_chunks", existed=True)
+    service = IngestionService(
+        inference_client=StubInferenceClient(delete_response=delete_response),
+        settings=Settings(app_env="prod", jwt_secret_key="secret", internal_service_token="token"),
+    )
+
+    result = await service.delete_collection()
+
+    assert result == delete_response
+
+
+@pytest.mark.asyncio
+async def test_prod_delete_collection_can_be_disabled_explicitly():
+    service = IngestionService(
+        inference_client=StubInferenceClient(delete_response=IngestionCollectionDeleteResponse(collection="guidance_chunks", existed=True)),
+        settings=Settings(
+            app_env="prod",
+            jwt_secret_key="secret",
+            internal_service_token="token",
+            ingestion_collection_delete_enabled=False,
+        ),
+    )
+
+    with pytest.raises(NotFoundError):
+        await service.delete_collection()
 
 
 @pytest.mark.asyncio

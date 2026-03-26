@@ -10,6 +10,7 @@ from shared.contracts.error_codes import ErrorCode
 from shared.contracts.inference import InferenceRequest, InferenceResponse, JobAcceptedResponse, JobRecord
 from shared.contracts.ingestion import IngestDocumentsRequest, IngestionCollectionDeleteResponse, IngestionJobAcceptedResponse, IngestionJobRecord
 from shared.observability import REQUEST_ID_HEADER
+from shared.security import INTERNAL_SERVICE_TOKEN_HEADER
 
 
 class InferenceClientError(RuntimeError):
@@ -92,8 +93,11 @@ class InferenceClient:
 
     async def _request(self, client: httpx.AsyncClient, *, method: str, path: str, json: dict[str, Any] | None = None) -> httpx.Response:
         url = f"{self._base_url}{path}"
+        headers: dict[str, str] = {}
+        if self._settings.enable_internal_service_auth:
+            headers[INTERNAL_SERVICE_TOKEN_HEADER] = self._settings.internal_service_token
         try:
-            response = await client.request(method=method, url=url, json=json)
+            response = await client.request(method=method, url=url, json=json, headers=headers or None)
         except httpx.HTTPError as exc:
             code, message = _classify_transport_error(exc)
             raise InferenceClientError(status_code=503, code=code, message=message, details={"reason": type(exc).__name__}) from exc

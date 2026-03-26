@@ -106,6 +106,16 @@ class EnvironmentCaptureConfig:
 @dataclass(slots=True)
 class ExecutionConfig:
     gateway_url: str = "http://localhost:8000"
+    gateway_auth_mode: str = "none"
+    gateway_auth_token: str | None = None
+    gateway_auth_email: str | None = None
+    gateway_auth_password: str | None = None
+    gateway_jwt_secret: str | None = None
+    gateway_jwt_issuer: str = "mobicare-llm-api"
+    gateway_jwt_audience: str = "mobicare-gateway"
+    gateway_jwt_exp_minutes: int = 60
+    gateway_verify_ssl: bool = True
+    gateway_ca_bundle_path: str | None = None
     qdrant_url: str = "http://localhost:6333"
     collection: str = "guidance_chunks"
     batch_size: int = 256

@@ -78,6 +78,9 @@ python -m cli.main build-source-maps \
 ```
 
 Notes:
+- `gateway_url` now points at the **Nginx reverse proxy** front door
+- for a production-like stack with bearer auth, you can also add `--auth-token YOUR_TOKEN`
+- for self-signed HTTPS in local testing, add `--no-verify-ssl`
 - manual source mapping is mainly relevant for the normal paragraph-based benchmark cases
 - biomarker-only observation cases do not rely on paragraph-to-question “best chunk” mappings in the same way
 
@@ -107,6 +110,25 @@ Notes:
 - a merged dataset containing both normal and biomarker-only cases can be run with the same benchmark config
 - normal cases use the standard deterministic scoring and LLM judge flow
 - biomarker-only observation cases still use LLM-based evaluation and general answer-quality metrics, but deterministic paragraph-grounded scoring is skipped where not applicable
+- benchmark configs now support `execution.gateway_auth_mode`, bearer tokens, gateway login, locally generated JWTs, custom CA bundles, and `execution.gateway_verify_ssl`
+
+Example execution block:
+
+```json
+"execution": {
+  "gateway_url": "http://localhost:8000",
+  "gateway_auth_mode": "none",
+  "gateway_auth_token": null,
+  "gateway_auth_email": null,
+  "gateway_auth_password": null,
+  "gateway_jwt_secret": null,
+  "gateway_jwt_issuer": "mobicare-llm-api",
+  "gateway_jwt_audience": "mobicare-gateway",
+  "gateway_jwt_exp_minutes": 60,
+  "gateway_verify_ssl": true,
+  "gateway_ca_bundle_path": null
+}
+```
 
 ---
 
@@ -123,3 +145,4 @@ The dashboard shows:
 - retrieved chunks
 - source match candidates
 - raw endpoint result
+- an endpoint playground that can talk to the reverse-proxied gateway with bearer auth or a locally generated test JWT

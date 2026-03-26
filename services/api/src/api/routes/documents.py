@@ -71,9 +71,10 @@ async def get_document(
     headers = {
         "Content-Disposition": f"inline; filename*=UTF-8''{quote(document.object_name)}",
         "Content-Length": str(document.size_bytes),
-        "X-Document-Bucket": document.bucket,
-        "X-Document-Object-Name": document.object_name,
     }
+    if get_settings().expose_debug_metadata:
+        headers["X-Document-Bucket"] = document.bucket
+        headers["X-Document-Object-Name"] = document.object_name
     if document.etag:
         headers["ETag"] = document.etag
     if document.last_modified is not None:
