@@ -8,7 +8,7 @@ from minio import Minio
 from minio.error import S3Error
 
 from shared.bootstrap.clinical_defaults import build_managed_clinical_object_names, load_clinical_config_default_bytes
-from shared.config import Settings
+from shared.config import SharedServiceSettings
 from shared.observability import get_logger
 
 logger = get_logger(__name__, service="shared")
@@ -16,7 +16,7 @@ logger = get_logger(__name__, service="shared")
 _BUCKET_ALREADY_EXISTS_CODES = {"BucketAlreadyExists", "BucketAlreadyOwnedByYou"}
 
 
-def create_minio_client_from_settings(settings: Settings) -> Minio:
+def create_minio_client_from_settings(settings: SharedServiceSettings) -> Minio:
     try:
         return Minio(
             settings.minio_client_endpoint,
@@ -65,7 +65,7 @@ def _bucket_has_objects(client: Minio, bucket: str) -> bool:
 
 
 
-def bootstrap_minio_resources(*, settings: Settings, client: Minio) -> BootstrapReport:
+def bootstrap_minio_resources(*, settings: SharedServiceSettings, client: Minio) -> BootstrapReport:
     report = BootstrapReport()
 
     for bucket in (settings.minio_documents_bucket, settings.minio_results_bucket):
@@ -93,7 +93,7 @@ def bootstrap_minio_resources(*, settings: Settings, client: Minio) -> Bootstrap
 
 
 
-def bootstrap_minio_resources_on_startup(*, settings: Settings, client: Minio, service: str) -> BootstrapReport:
+def bootstrap_minio_resources_on_startup(*, settings: SharedServiceSettings, client: Minio, service: str) -> BootstrapReport:
     try:
         report = bootstrap_minio_resources(settings=settings, client=client)
     except Exception as exc:

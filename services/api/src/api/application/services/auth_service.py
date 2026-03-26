@@ -3,15 +3,15 @@ from __future__ import annotations
 from api.auth import create_access_token
 from api.infrastructure.clients.auth_client import AuthClient, AuthClientError
 from api.errors import ServiceUnavailableError, UnauthorizedError
-from shared.config import Settings, get_settings
+from shared.config import ApiSettings, get_api_settings
 from shared.contracts.auth import LoginRequest, TokenResponse
 from shared.contracts.error_codes import ErrorCode
 
 
 class AuthService:
-    def __init__(self, auth_client: AuthClient, settings: Settings | None = None) -> None:
+    def __init__(self, auth_client: AuthClient, settings: ApiSettings | None = None) -> None:
         self._auth_client = auth_client
-        self._settings = settings or get_settings()
+        self._settings = settings or get_api_settings()
 
     async def login(self, request: LoginRequest) -> TokenResponse:
         try:

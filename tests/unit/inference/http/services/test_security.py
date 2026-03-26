@@ -2,12 +2,9 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from inference.infrastructure.http.dependencies import (
-    get_guidance_job_service,
-    get_inference_settings,
-)
+from inference.infrastructure.http.dependencies import get_guidance_job_service
 from inference.infrastructure.http.main import create_app
-from shared.config.settings import get_settings
+from shared.config import get_inference_settings
 from shared.contracts.inference import JobRecord
 
 
@@ -21,10 +18,8 @@ def test_inference_routes_require_internal_service_token_in_prod(monkeypatch):
     import inference.infrastructure.http.main as http_main
 
     monkeypatch.setenv("APP_ENV", "prod")
-    monkeypatch.setenv("JWT_SECRET_KEY", "secret")
     monkeypatch.setenv("INTERNAL_SERVICE_TOKEN", "token")
 
-    get_settings.cache_clear()
     get_inference_settings.cache_clear()
 
     try:
@@ -55,5 +50,4 @@ def test_inference_routes_require_internal_service_token_in_prod(monkeypatch):
         assert response.status_code == 401
         assert response.json()["error"]["code"] == "AUTH_TOKEN_INVALID"
     finally:
-        get_settings.cache_clear()
         get_inference_settings.cache_clear()

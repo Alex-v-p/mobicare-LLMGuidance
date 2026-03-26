@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from shared.clients.http import create_async_client
-from shared.config import Settings, get_settings
+from shared.config import InferenceSettings, get_inference_settings
 from shared.contracts.inference import OllamaGenerateResponse
 
 
@@ -11,9 +11,9 @@ class OllamaClient:
         base_url: str | None = None,
         model: str | None = None,
         timeout_s: float | None = None,
-        settings: Settings | None = None,
+        settings: InferenceSettings | None = None,
     ) -> None:
-        self._settings = settings or get_settings()
+        self._settings = settings or get_inference_settings()
         self._base_url = (base_url or self._settings.ollama_url).rstrip("/")
         self._model = model or self._settings.ollama_model
         self._timeout_s = timeout_s if timeout_s is not None else self._settings.ollama_timeout_s

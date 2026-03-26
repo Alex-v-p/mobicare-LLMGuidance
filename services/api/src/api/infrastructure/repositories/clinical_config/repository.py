@@ -17,14 +17,14 @@ from api.infrastructure.repositories.clinical_config.metadata import build_manag
 from api.infrastructure.repositories.clinical_config.models import CurrentConfigState, ManagedClinicalConfig
 from api.infrastructure.repositories.clinical_config.storage import ClinicalConfigStorage
 from api.infrastructure.repositories.clinical_config.versioning import ClinicalConfigVersionStore
-from shared.config import Settings, get_settings
+from shared.config import ApiSettings, get_api_settings
 from shared.contracts.clinical_config import ClinicalConfigMetadata, ClinicalConfigName, ClinicalConfigVersionMetadata
 
 
 class ClinicalConfigRepository:
-    def __init__(self, *, client: Minio, settings: Settings | None = None) -> None:
+    def __init__(self, *, client: Minio, settings: ApiSettings | None = None) -> None:
         self._client = client
-        self._settings = settings or get_settings()
+        self._settings = settings or get_api_settings()
         self._managed = build_managed_configs(self._settings)
         self._storage = ClinicalConfigStorage(client=self._client, settings=self._settings)
         self._versions = ClinicalConfigVersionStore(storage=self._storage, settings=self._settings)

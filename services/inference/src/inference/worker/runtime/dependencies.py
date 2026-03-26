@@ -1,11 +1,7 @@
 from __future__ import annotations
 
 from inference.composition import common
-
-
-def get_inference_settings():
-    return common.get_inference_settings()
-
+from shared.config import get_worker_settings
 
 
 def get_document_store():
@@ -50,5 +46,5 @@ __all__ = [
     "get_ingestion_job_result_store",
     "get_ingestion_job_store",
     "get_ingestion_service",
-    "get_inference_settings",
+    "get_worker_settings",
 ]

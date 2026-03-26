@@ -3,7 +3,7 @@ from __future__ import annotations
 from inference.embeddings.ollama_embeddings import OllamaEmbeddingsClient
 from inference.retrieval.common import payload_to_context, resolve_collection_embedding_model, search_qdrant
 from inference.storage.qdrant_store import QdrantVectorStore
-from shared.config import Settings, get_settings
+from shared.config import InferenceSettings, get_inference_settings
 from shared.contracts.inference import RetrievedContext
 
 
@@ -12,9 +12,9 @@ class DenseRetriever:
         self,
         embedding_client: OllamaEmbeddingsClient | None = None,
         vector_store: QdrantVectorStore | None = None,
-        settings: Settings | None = None,
+        settings: InferenceSettings | None = None,
     ) -> None:
-        self._settings = settings or get_settings()
+        self._settings = settings or get_inference_settings()
         self._embedding_client = embedding_client or OllamaEmbeddingsClient(settings=self._settings)
         self._vector_store = vector_store or QdrantVectorStore(settings=self._settings)
         self._default_top_k = self._settings.retrieval_top_k

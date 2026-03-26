@@ -4,7 +4,7 @@ import json
 from importlib import resources
 from typing import Any
 
-from shared.config import Settings
+from shared.config import SharedServiceSettings
 
 _DEFAULTS_PACKAGE = "shared.resources.clinical_configs"
 MANAGED_CLINICAL_CONFIG_FILENAMES: dict[str, str] = {
@@ -31,7 +31,7 @@ def load_clinical_config_default_payload(config_name: str) -> dict[str, Any]:
 
 
 
-def build_managed_clinical_object_names(settings: Settings) -> dict[str, str]:
+def build_managed_clinical_object_names(settings: SharedServiceSettings) -> dict[str, str]:
     prefix = settings.clinical_config_prefix.strip().strip("/")
 
     def _join(object_name: str) -> str:

@@ -9,7 +9,7 @@ from inference.infrastructure.http.routes.health import router as health_router
 from inference.infrastructure.http.routes.ingestion import router as ingestion_router
 from inference.infrastructure.http.security import require_internal_service_request
 from shared.bootstrap.minio import bootstrap_minio_resources_on_startup
-from shared.config import Settings, get_settings
+from shared.config import InferenceSettings, get_inference_settings
 from shared.observability import configure_logging
 from shared.observability.middleware import MetricsMiddleware, RequestContextMiddleware
 
@@ -17,8 +17,8 @@ from shared.observability.middleware import MetricsMiddleware, RequestContextMid
 SERVICE_NAME = "inference"
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
-    resolved = settings or get_settings()
+def create_app(settings: InferenceSettings | None = None) -> FastAPI:
+    resolved = settings or get_inference_settings()
     configure_logging(SERVICE_NAME)
 
     @asynccontextmanager

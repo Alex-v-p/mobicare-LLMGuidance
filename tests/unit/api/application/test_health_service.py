@@ -3,13 +3,13 @@ from __future__ import annotations
 import pytest
 
 from api.application.services.health_service import HealthService
-from shared.config import Settings
+from shared.config import ApiSettings
 from shared.contracts.health import DependencyStatus
 
 
 @pytest.mark.asyncio
 async def test_http_dependency_urls_use_trimmed_settings():
-    settings = Settings(inference_url="http://inference:8001/", qdrant_url="http://qdrant:6333/", minio_endpoint="http://minio:9000/", ollama_url="http://ollama:11434/")
+    settings = ApiSettings(inference_url="http://inference:8001/", qdrant_url="http://qdrant:6333/", minio_endpoint="http://minio:9000/", ollama_url="http://ollama:11434/")
     service = HealthService(settings=settings)
 
     urls = service._http_dependency_urls()
@@ -24,7 +24,7 @@ async def test_http_dependency_urls_use_trimmed_settings():
 
 @pytest.mark.asyncio
 async def test_report_is_degraded_when_any_dependency_fails(monkeypatch: pytest.MonkeyPatch):
-    settings = Settings(redis_url="redis://redis:6379/0")
+    settings = ApiSettings(redis_url="redis://redis:6379/0")
     service = HealthService(settings=settings)
 
     async def fake_check_all(urls, timeout_s):

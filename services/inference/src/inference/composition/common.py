@@ -26,12 +26,11 @@ from inference.storage.minio_documents import MinioDocumentStore
 from inference.storage.minio_guidance_job_results import MinioGuidanceJobResultStore
 from inference.storage.minio_ingestion_job_results import MinioIngestionJobResultStore
 from inference.storage.qdrant_store import QdrantVectorStore
-from shared.config import Settings, get_settings
+from shared.config import InferenceSettings, get_inference_settings as resolve_inference_settings
 
 
-@lru_cache(maxsize=1)
-def get_inference_settings() -> Settings:
-    return get_settings()
+def get_inference_settings() -> InferenceSettings:
+    return resolve_inference_settings()
 
 
 @lru_cache(maxsize=1)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from shared.config.settings import Settings
+from shared.config import InferenceSettings
 
 from inference.clinical.config_repository import (
     ClinicalConfigRepository,
@@ -57,7 +57,7 @@ class _FakeMinio:
 
 def test_clinical_config_repository_loads_packaged_defaults():
     clear_clinical_config_cache()
-    repo = ClinicalConfigRepository(settings=Settings(clinical_config_source="packaged"))
+    repo = ClinicalConfigRepository(settings=InferenceSettings(clinical_config_source="packaged"))
 
     payload = repo.load_marker_ranges_payload()
 
@@ -68,7 +68,7 @@ def test_clinical_config_repository_loads_packaged_defaults():
 
 def test_clinical_config_repository_loads_minio_override_and_uses_cache():
     clear_clinical_config_cache()
-    settings = Settings(
+    settings = InferenceSettings(
         clinical_config_source="minio",
         clinical_config_bucket="guidance-config",
         clinical_config_prefix="clinical",
@@ -97,7 +97,7 @@ def test_clinical_config_repository_loads_minio_override_and_uses_cache():
 
 def test_clinical_config_repository_bootstraps_minio_defaults_when_bucket_is_empty():
     clear_clinical_config_cache()
-    settings = Settings(
+    settings = InferenceSettings(
         clinical_config_source="minio",
         clinical_config_bucket="guidance-config",
         clinical_config_prefix="clinical",

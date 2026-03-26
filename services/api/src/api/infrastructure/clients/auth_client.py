@@ -5,7 +5,7 @@ from typing import Any
 import httpx
 
 from shared.clients.http import create_async_client
-from shared.config import Settings, get_settings
+from shared.config import ApiSettings, get_api_settings
 from shared.contracts.error_codes import ErrorCode
 
 
@@ -46,8 +46,8 @@ def _extract_boolean(payload: Any) -> bool | None:
 
 
 class AuthClient:
-    def __init__(self, validation_url: str | None = None, timeout_s: float | None = None, settings: Settings | None = None) -> None:
-        self._settings = settings or get_settings()
+    def __init__(self, validation_url: str | None = None, timeout_s: float | None = None, settings: ApiSettings | None = None) -> None:
+        self._settings = settings or get_api_settings()
         self._validation_url = validation_url or self._settings.auth_validation_url
         self._timeout_s = timeout_s if timeout_s is not None else self._settings.auth_validation_timeout_s
 

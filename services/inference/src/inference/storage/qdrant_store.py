@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import NAMESPACE_URL, uuid5
 
-from shared.config import Settings, get_settings
+from shared.config import InferenceSettings, get_inference_settings
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
@@ -28,9 +28,9 @@ class QdrantVectorStore:
         self,
         url: str | None = None,
         collection_name: str | None = None,
-        settings: Settings | None = None,
+        settings: InferenceSettings | None = None,
     ) -> None:
-        self._settings = settings or get_settings()
+        self._settings = settings or get_inference_settings()
         self._url = url or self._settings.qdrant_url
         self._collection = collection_name or self._settings.qdrant_collection
         self._client = QdrantClient(url=self._url)

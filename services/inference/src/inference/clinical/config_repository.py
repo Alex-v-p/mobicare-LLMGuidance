@@ -8,7 +8,7 @@ from typing import Any
 from minio import Minio
 
 from shared.bootstrap import bootstrap_minio_resources, create_minio_client_from_settings, load_clinical_config_default_payload
-from shared.config import Settings, get_settings
+from shared.config import InferenceSettings, get_inference_settings
 from shared.observability import get_logger
 
 
@@ -25,8 +25,8 @@ _CACHE: dict[str, _CacheEntry] = {}
 
 
 class ClinicalConfigRepository:
-    def __init__(self, settings: Settings | None = None, client: Minio | None = None) -> None:
-        self._settings = settings or get_settings()
+    def __init__(self, settings: InferenceSettings | None = None, client: Minio | None = None) -> None:
+        self._settings = settings or get_inference_settings()
         self._client = client
 
     def load_marker_ranges_payload(self) -> dict[str, Any]:
@@ -97,12 +97,12 @@ class ClinicalConfigRepository:
 
 
 
-def load_marker_ranges_payload(settings: Settings | None = None, client: Minio | None = None) -> dict[str, Any]:
+def load_marker_ranges_payload(settings: InferenceSettings | None = None, client: Minio | None = None) -> dict[str, Any]:
     return ClinicalConfigRepository(settings=settings, client=client).load_marker_ranges_payload()
 
 
 
-def load_drug_dosing_catalog_payload(settings: Settings | None = None, client: Minio | None = None) -> dict[str, Any]:
+def load_drug_dosing_catalog_payload(settings: InferenceSettings | None = None, client: Minio | None = None) -> dict[str, Any]:
     return ClinicalConfigRepository(settings=settings, client=client).load_drug_dosing_catalog_payload()
 
 

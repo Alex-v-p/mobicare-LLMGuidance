@@ -6,7 +6,7 @@ from api.application.services.auth_service import AuthService
 from api.infrastructure.clients.auth_client import AuthClientError
 from api.errors import ServiceUnavailableError, UnauthorizedError
 from shared.contracts.auth import LoginRequest
-from shared.config import Settings
+from shared.config import ApiSettings
 
 
 class StubAuthClient:
@@ -26,7 +26,7 @@ class StubAuthClient:
 @pytest.mark.asyncio
 async def test_login_returns_token_response(monkeypatch: pytest.MonkeyPatch):
     request = LoginRequest(email="user@example.com", password="secret")
-    service = AuthService(auth_client=StubAuthClient(is_valid=True), settings=Settings(jwt_secret_key="secret"))
+    service = AuthService(auth_client=StubAuthClient(is_valid=True), settings=ApiSettings(jwt_secret_key="secret"))
 
     monkeypatch.setattr("api.application.services.auth_service.create_access_token", lambda *, email, settings: (f"token-for:{email}", 3600))
 

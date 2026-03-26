@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from minio.error import S3Error
 
 from shared.bootstrap.minio import bootstrap_minio_resources, ensure_minio_bucket
-from shared.config import Settings
+from shared.config import InferenceSettings
 
 
 class FakeMinio:
@@ -57,7 +57,7 @@ def test_ensure_minio_bucket_tolerates_parallel_creation() -> None:
 
 
 def test_bootstrap_minio_resources_creates_buckets_and_seeds_defaults_for_empty_clinical_bucket() -> None:
-    settings = Settings()
+    settings = InferenceSettings()
     client = FakeMinio(existing_buckets={settings.minio_results_bucket})
 
     report = bootstrap_minio_resources(settings=settings, client=client)
@@ -72,7 +72,7 @@ def test_bootstrap_minio_resources_creates_buckets_and_seeds_defaults_for_empty_
 
 
 def test_bootstrap_minio_resources_does_not_reseed_non_empty_clinical_bucket() -> None:
-    settings = Settings()
+    settings = InferenceSettings()
     client = FakeMinio(
         existing_buckets={settings.minio_documents_bucket, settings.minio_results_bucket, settings.clinical_config_bucket},
         clinical_bucket_objects=["clinical/_versions/marker_ranges/20260101.json"],

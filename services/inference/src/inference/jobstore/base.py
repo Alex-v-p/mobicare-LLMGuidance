@@ -7,7 +7,7 @@ from typing import Callable, Generic, Optional, Protocol, TypeVar
 import redis.asyncio as redis
 from pydantic import BaseModel
 
-from shared.config import Settings, get_settings
+from shared.config import InferenceSettings, get_inference_settings
 
 JobRecordT = TypeVar("JobRecordT", bound=BaseModel)
 
@@ -50,9 +50,9 @@ class RedisJobStoreBase(Generic[JobRecordT]):
         key_pattern: str,
         ttl_seconds: int,
         lease_seconds: int,
-        settings: Settings | None = None,
+        settings: InferenceSettings | None = None,
     ) -> None:
-        self._settings = settings or get_settings()
+        self._settings = settings or get_inference_settings()
         self._model_cls = model_cls
         self._redis_url = redis_url
         self._queue_name = queue_name

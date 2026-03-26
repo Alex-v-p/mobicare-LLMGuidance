@@ -10,7 +10,7 @@ from fastapi.responses import Response
 from api.application.services.document_service import DocumentService
 from api.dependencies import get_document_service
 from api.errors import BadRequestError
-from shared.config import get_settings
+from shared.config import get_api_settings
 from shared.contracts.documents import (
     DocumentDeleteResponse,
     DocumentMetadataListResponse,
@@ -40,7 +40,7 @@ async def get_document(
         "Content-Disposition": f"inline; filename*=UTF-8''{quote(document.object_name)}",
         "Content-Length": str(document.size_bytes),
     }
-    if get_settings().expose_debug_metadata:
+    if get_api_settings().expose_debug_metadata:
         headers["X-Document-Bucket"] = document.bucket
         headers["X-Document-Object-Name"] = document.object_name
     if document.etag:
@@ -57,7 +57,7 @@ async def upload_document(
     overwrite: bool = Query(True),
     service: DocumentService = Depends(get_document_service),
 ) -> DocumentUploadResponse:
-    settings = get_settings()
+    settings = get_api_settings()
     filename = (file.filename or "").strip()
     if not filename:
         raise BadRequestError(

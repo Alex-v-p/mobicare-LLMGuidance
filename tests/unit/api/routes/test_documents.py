@@ -3,9 +3,9 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from api.dependencies import get_document_service
-from api.errors import BadRequestError, NotFoundError
+from api.errors import NotFoundError
 from api.main import create_app
-from shared.config import get_settings
+from shared.config import get_api_settings
 
 
 class ClosingUploadService:
@@ -32,9 +32,9 @@ def test_upload_document_rejects_disallowed_extension(monkeypatch):
     app = create_app()
     app.dependency_overrides[get_document_service] = lambda: ClosingUploadService()
 
-    original = get_settings()
+    original = get_api_settings()
     monkeypatch.setattr(
-        "api.presentation.routes.documents.get_settings",
+        "api.presentation.routes.documents.get_api_settings",
         lambda: original.model_copy(update={"document_allowed_extensions_csv": "pdf"}),
     )
 

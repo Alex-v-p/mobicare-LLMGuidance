@@ -11,7 +11,7 @@ from minio.lifecycleconfig import Expiration, LifecycleConfig, Rule
 from pydantic import BaseModel
 
 from shared.bootstrap import create_minio_client_from_settings, ensure_minio_bucket
-from shared.config import Settings, get_settings
+from shared.config import InferenceSettings, get_inference_settings
 from shared.observability import get_logger
 
 JobRecordT = TypeVar("JobRecordT", bound=BaseModel)
@@ -30,10 +30,10 @@ class MinioJobResultStoreBase(Generic[JobRecordT]):
         record_model: type[JobRecordT],
         object_prefix: str,
         rule_id_prefix: str,
-        settings: Settings | None = None,
+        settings: InferenceSettings | None = None,
         client: Minio | None = None,
     ) -> None:
-        self._settings = settings or get_settings()
+        self._settings = settings or get_inference_settings()
         self._record_model = record_model
         self._object_prefix = object_prefix.rstrip("/")
         self._rule_id_prefix = rule_id_prefix

@@ -3,7 +3,7 @@ from __future__ import annotations
 from api.application.error_mapping import map_inference_client_error
 from api.application.ports import InferenceGateway, InferenceGatewayError
 from api.errors import NotFoundError
-from shared.config import Settings, get_settings
+from shared.config import ApiSettings, get_api_settings
 from shared.contracts.error_codes import ErrorCode
 from shared.contracts.ingestion import (
     ApiIngestionJobStatus,
@@ -16,9 +16,9 @@ from shared.contracts.ingestion import (
 
 
 class IngestionService:
-    def __init__(self, inference_client: InferenceGateway, settings: Settings | None = None) -> None:
+    def __init__(self, inference_client: InferenceGateway, settings: ApiSettings | None = None) -> None:
         self._inference_client = inference_client
-        self._settings = settings or get_settings()
+        self._settings = settings or get_api_settings()
 
     async def submit_job(
         self,

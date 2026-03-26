@@ -8,12 +8,12 @@ from api.infrastructure.repositories.clinical_config.errors import ClinicalConfi
 from api.infrastructure.repositories.clinical_config.metadata import build_version_metadata_from_snapshot
 from api.infrastructure.repositories.clinical_config.models import CurrentConfigState, ManagedClinicalConfig
 from api.infrastructure.repositories.clinical_config.storage import ClinicalConfigStorage
-from shared.config import Settings
+from shared.config import ApiSettings
 from shared.contracts.clinical_config import ClinicalConfigMetadata, ClinicalConfigName, ClinicalConfigVersionMetadata
 
 
 class ClinicalConfigVersionStore:
-    def __init__(self, *, storage: ClinicalConfigStorage, settings: Settings) -> None:
+    def __init__(self, *, storage: ClinicalConfigStorage, settings: ApiSettings) -> None:
         self._storage = storage
         self._settings = settings
 

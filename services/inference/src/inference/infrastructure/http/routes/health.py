@@ -7,7 +7,7 @@ from fastapi import APIRouter
 from fastapi.responses import PlainTextResponse
 
 from shared.clients.health import check_all
-from shared.config import get_settings
+from shared.config import get_inference_settings
 from shared.contracts.error_codes import ErrorCode
 from shared.contracts.health import DependencyStatus, HealthReport
 from shared.observability import get_metrics_registry
@@ -17,7 +17,7 @@ metrics = get_metrics_registry()
 
 
 async def _check_redis() -> DependencyStatus:
-    settings = get_settings()
+    settings = get_inference_settings()
     client = redis.from_url(settings.redis_url, decode_responses=True)
     start = perf_counter()
     try:
@@ -39,7 +39,7 @@ async def _check_redis() -> DependencyStatus:
 
 
 async def _report() -> HealthReport:
-    settings = get_settings()
+    settings = get_inference_settings()
     deps = await check_all({
         "qdrant": f"{settings.qdrant_url.rstrip('/')}/readyz",
         "minio": f"{settings.minio_endpoint.rstrip('/')}/minio/health/ready",

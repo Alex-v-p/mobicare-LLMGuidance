@@ -4,11 +4,11 @@ from datetime import UTC, datetime
 from typing import Any
 
 from api.infrastructure.repositories.clinical_config.models import ManagedClinicalConfig
-from shared.config import Settings
+from shared.config import ApiSettings
 from shared.contracts.clinical_config import ClinicalConfigMetadata, ClinicalConfigName, ClinicalConfigVersionMetadata
 
 
-def build_managed_configs(settings: Settings) -> dict[str, ManagedClinicalConfig]:
+def build_managed_configs(settings: ApiSettings) -> dict[str, ManagedClinicalConfig]:
     bucket = settings.clinical_config_bucket
     return {
         "drug_dosing_catalog": ManagedClinicalConfig(

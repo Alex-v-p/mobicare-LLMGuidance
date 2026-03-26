@@ -6,7 +6,7 @@ import httpx
 
 from api.application.ports import InferenceGatewayError
 from shared.clients.http import create_async_client
-from shared.config import Settings, get_settings
+from shared.config import ApiSettings, get_api_settings
 from shared.contracts.error_codes import ErrorCode
 from shared.contracts.inference import InferenceRequest, InferenceResponse, JobAcceptedResponse, JobRecord
 from shared.contracts.ingestion import IngestDocumentsRequest, IngestionCollectionDeleteResponse, IngestionJobAcceptedResponse, IngestionJobRecord
@@ -53,8 +53,8 @@ def _classify_transport_error(exc: httpx.HTTPError) -> tuple[str, str]:
 
 
 class InferenceClient:
-    def __init__(self, base_url: str | None = None, timeout_s: float | None = None, settings: Settings | None = None) -> None:
-        self._settings = settings or get_settings()
+    def __init__(self, base_url: str | None = None, timeout_s: float | None = None, settings: ApiSettings | None = None) -> None:
+        self._settings = settings or get_api_settings()
         self._base_url = (base_url or self._settings.inference_url).rstrip("/")
         self._timeout_s = timeout_s if timeout_s is not None else self._settings.inference_timeout_s
 

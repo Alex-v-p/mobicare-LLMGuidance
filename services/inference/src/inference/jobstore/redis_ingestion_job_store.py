@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from shared.config import Settings, get_settings
+from shared.config import InferenceSettings, get_inference_settings
 from shared.contracts.ingestion import IngestionJobRecord
 
 from inference.jobstore.base import RedisJobStoreBase
@@ -13,9 +13,9 @@ class RedisIngestionJobStore(RedisJobStoreBase[IngestionJobRecord]):
         queue_name: str | None = None,
         ttl_seconds: int | None = None,
         lease_seconds: int | None = None,
-        settings: Settings | None = None,
+        settings: InferenceSettings | None = None,
     ) -> None:
-        resolved_settings = settings or get_settings()
+        resolved_settings = settings or get_inference_settings()
         super().__init__(
             model_cls=IngestionJobRecord,
             redis_url=redis_url or resolved_settings.redis_url,

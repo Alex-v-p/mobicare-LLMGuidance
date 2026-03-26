@@ -12,7 +12,7 @@ from api.presentation.routes.guidance import router as guidance_router
 from api.presentation.routes.health import router as health_router
 from api.presentation.routes.ingestion import router as ingestion_router
 from shared.bootstrap.minio import bootstrap_minio_resources_on_startup
-from shared.config import Settings, get_settings
+from shared.config import ApiSettings, get_api_settings
 from shared.observability import configure_logging
 from shared.observability.middleware import MetricsMiddleware, RequestContextMiddleware
 
@@ -20,8 +20,8 @@ from shared.observability.middleware import MetricsMiddleware, RequestContextMid
 SERVICE_NAME = "Gateway API"
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
-    resolved = settings or get_settings()
+def create_app(settings: ApiSettings | None = None) -> FastAPI:
+    resolved = settings or get_api_settings()
     configure_logging(SERVICE_NAME)
 
     @asynccontextmanager

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from api.application.error_mapping import map_inference_client_error
 from api.application.ports import InferenceGateway, InferenceGatewayError
-from shared.config import Settings, get_settings
+from shared.config import ApiSettings, get_api_settings
 from shared.contracts.inference import (
     ApiGuidanceJobStatus,
     GenerationOptions,
@@ -14,9 +14,9 @@ from shared.contracts.inference import (
 
 
 class GuidanceService:
-    def __init__(self, inference_client: InferenceGateway, settings: Settings | None = None) -> None:
+    def __init__(self, inference_client: InferenceGateway, settings: ApiSettings | None = None) -> None:
         self._inference_client = inference_client
-        self._settings = settings or get_settings()
+        self._settings = settings or get_api_settings()
 
     def _to_inference_request(self, request: GuidanceRequest) -> InferenceRequest:
         request = self._apply_request_policy(request)

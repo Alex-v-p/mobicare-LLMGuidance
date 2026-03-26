@@ -9,11 +9,11 @@ from minio import Minio
 from api.infrastructure.repositories.clinical_config.errors import ClinicalConfigNotFoundError, map_storage_error
 from api.infrastructure.repositories.clinical_config.models import ManagedClinicalConfig
 from shared.bootstrap import bootstrap_minio_resources, ensure_minio_bucket
-from shared.config import Settings
+from shared.config import ApiSettings
 
 
 class ClinicalConfigStorage:
-    def __init__(self, *, client: Minio, settings: Settings) -> None:
+    def __init__(self, *, client: Minio, settings: ApiSettings) -> None:
         self._client = client
         self._settings = settings
 

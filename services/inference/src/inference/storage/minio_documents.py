@@ -9,7 +9,7 @@ from minio import Minio
 from pypdf import PdfReader
 
 from shared.bootstrap import create_minio_client_from_settings, ensure_minio_bucket
-from shared.config import Settings, get_settings
+from shared.config import InferenceSettings, get_inference_settings
 
 
 @dataclass
@@ -21,8 +21,8 @@ class MinioDocument:
 
 
 class MinioDocumentStore:
-    def __init__(self, settings: Settings | None = None) -> None:
-        self._settings = settings or get_settings()
+    def __init__(self, settings: InferenceSettings | None = None) -> None:
+        self._settings = settings or get_inference_settings()
         self._documents_bucket = self._settings.minio_documents_bucket
         self._documents_prefix = self._settings.minio_documents_prefix
         self._client = create_minio_client_from_settings(self._settings)
