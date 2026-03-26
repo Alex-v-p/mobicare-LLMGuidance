@@ -64,7 +64,7 @@ def _question_focus_terms(question: str, retrieved_context: list[RetrievedContex
     return {term for term in terms if term in combined and len(term) > 3}
 
 
-def _expected_item_count(question: str) -> int | None:
+def expected_item_count(question: str) -> int | None:
     lowered = question.lower()
     digit_match = re.search(r"\b([2-9]|10)\b", lowered)
     if digit_match:
@@ -83,6 +83,10 @@ def _expected_item_count(question: str) -> int | None:
         if re.search(rf"\b{word}\b", lowered):
             return value
     return None
+
+
+def _expected_item_count(question: str) -> int | None:
+    return expected_item_count(question)
 
 
 def extract_numbered_items(text: str) -> list[str]:
@@ -129,7 +133,7 @@ def answer_addresses_literal_question(answer: str, question: str, retrieved_cont
     if any(phrase in direct_block for phrase in _GENERIC_NON_ANSWER_PHRASES):
         return False
 
-    expected_count = _expected_item_count(question)
+    expected_count = expected_item_count(question)
     enumerated_items = extract_numbered_items(" ".join(item.snippet for item in retrieved_context))
     direct_lines = [
         line.strip()

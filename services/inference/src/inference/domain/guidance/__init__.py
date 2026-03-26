@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from inference.domain.guidance.advice_builder import (
     build_caution_lines,
     build_direct_answer_lines,
