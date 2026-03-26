@@ -24,6 +24,7 @@ class VectorIndexingService:
             return 0
 
         client = self._embedding_client.with_model(embedding_model)
+        resolved_embedding_model = embedding_model or client.model
 
         all_embeddings: list[list[float]] = []
         batch_size = max(1, self._settings.ollama_embedding_batch_size)
@@ -34,4 +35,8 @@ class VectorIndexingService:
             all_embeddings.extend(batch_embeddings)
 
         self._vector_store.ensure_collection(vector_size=len(all_embeddings[0]))
-        return self._vector_store.upsert_chunks(safe_chunks, all_embeddings)
+        return self._vector_store.upsert_chunks(
+            safe_chunks,
+            all_embeddings,
+            embedding_model=resolved_embedding_model,
+        )

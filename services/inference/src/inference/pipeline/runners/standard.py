@@ -112,6 +112,7 @@ class StandardPipelineRunner:
         )
 
     def _base_metadata(self, request: InferenceRequest) -> dict[str, object]:
+        effective_embedding_model = request.options.embedding_model or self._deps.default_embedding_model
         return {
             "use_retrieval": request.options.use_retrieval,
             "retrieval_top_k": request.options.top_k,
@@ -120,7 +121,7 @@ class StandardPipelineRunner:
             "retrieval_mode": request.options.retrieval_mode,
             "use_graph_augmentation": request.options.use_graph_augmentation,
             "llm_model": request.options.llm_model or self._deps.default_llm_model,
-            "embedding_model": request.options.embedding_model or self._deps.default_embedding_model,
+            "embedding_model": effective_embedding_model,
         }
 
     def _build_initial_warnings(self, request: InferenceRequest, query_plan: QueryPlan) -> list[str]:

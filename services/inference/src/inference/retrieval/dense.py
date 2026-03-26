@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from inference.embeddings.ollama_embeddings import OllamaEmbeddingsClient
-from inference.retrieval.common import payload_to_context, search_qdrant
+from inference.retrieval.common import payload_to_context, resolve_collection_embedding_model, search_qdrant
 from inference.storage.qdrant_store import QdrantVectorStore
 from shared.config import Settings, get_settings
 from shared.contracts.inference import RetrievedContext
@@ -26,7 +26,8 @@ class DenseRetriever:
         embedding_model: str | None = None,
     ) -> list[RetrievedContext]:
         use_limit = limit or self._default_top_k
-        query_vector = await self._embedding_client.with_model(embedding_model).embed(query)
+        resolved_embedding_model = self.resolve_embedding_model(embedding_model)
+        query_vector = await self._embedding_client.with_model(resolved_embedding_model).embed(query)
         hits = search_qdrant(vector_store=self._vector_store, query_vector=query_vector, limit=use_limit)
         results: list[RetrievedContext] = []
         for hit in hits:
@@ -35,3 +36,9 @@ class DenseRetriever:
                 continue
             results.append(payload_to_context(payload))
         return results
+
+    def resolve_embedding_model(self, requested_embedding_model: str | None = None) -> str:
+        return resolve_collection_embedding_model(
+            vector_store=self._vector_store,
+            requested_embedding_model=requested_embedding_model,
+        )

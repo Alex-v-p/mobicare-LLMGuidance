@@ -15,6 +15,9 @@ class FakeDenseRetriever:
 
     _embedding_client = _Emb()
 
+    def resolve_embedding_model(self, requested_embedding_model: str | None = None) -> str:
+        return requested_embedding_model or self._embedding_client.model
+
     async def retrieve(self, query: str, limit: int | None = None, embedding_model: str | None = None):
         return self.items[: limit or len(self.items)]
 
@@ -23,12 +26,18 @@ class FakeDenseRetriever:
 class FakeHybridRetriever:
     items: list[RetrievedContext]
 
+    def resolve_embedding_model(self, requested_embedding_model: str | None = None) -> str:
+        return requested_embedding_model or "fake-embed"
+
     async def retrieve(self, **kwargs):
         from inference.retrieval.hybrid import HybridRetrievalResult
 
         return HybridRetrievalResult(
             items=self.items[: kwargs.get("limit", len(self.items))],
-            metadata={"retrieval_mode": "hybrid"},
+            metadata={
+                "retrieval_mode": "hybrid",
+                "embedding_model": kwargs.get("embedding_model") or "fake-embed",
+            },
         )
 
 

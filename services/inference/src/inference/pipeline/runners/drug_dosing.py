@@ -70,7 +70,10 @@ class DrugDosingPipelineRunner:
         combined: list[RetrievedContext] = list(request.retrieved_context)
         seen = {(item.source_id, item.chunk_id, item.snippet) for item in combined}
         family_contexts: dict[str, list[RetrievedContext]] = {spec["family"]: [] for spec in query_specs}
-        embedding_model = request.options.embedding_model or self._deps.default_embedding_model
+        if request.options.retrieval_mode == "dense":
+            embedding_model = self._resolve_embedding_model(self._deps.retriever, request.options.embedding_model)
+        else:
+            embedding_model = self._resolve_embedding_model(self._deps.hybrid_retriever, request.options.embedding_model)
         per_query_limit = 3
 
         for query_index, spec in enumerate(query_specs, start=1):
@@ -120,8 +123,15 @@ class DrugDosingPipelineRunner:
         overall_limit = max(request.options.top_k, 18)
         combined = combined[:overall_limit]
         return combined, {
+            "embedding_model": embedding_model,
             "retrieval_queries": [entry["query"] for entry in per_query],
             "retrieval_attempt_details": per_query,
             "rag_output_count": len(combined),
             "family_contexts": family_contexts,
         }
+
+    def _resolve_embedding_model(self, retriever: Any, requested_embedding_model: str | None) -> str | None:
+        resolver = getattr(retriever, "resolve_embedding_model", None)
+        if callable(resolver):
+            return resolver(requested_embedding_model)
+        return requested_embedding_model

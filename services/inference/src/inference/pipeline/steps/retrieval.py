@@ -232,8 +232,13 @@ class RetrievalOrchestrator:
             clinical_profile=retrieval_plan.clinical_profile,
             minimum_results=request.options.retrieval_low_context_min_results,
         )
+        effective_embedding_model = next(
+            (item.get("embedding_model") for item in per_query_metadata if item.get("embedding_model")),
+            None,
+        )
         return ranked_contexts[:output_limit], {
             **retrieval_metadata,
+            **({"embedding_model": effective_embedding_model} if effective_embedding_model else {}),
             "rag_output_count": min(len(ranked_contexts), output_limit),
             "retrieval_attempts": len(per_query_metadata),
             "retrieval_attempt_details": per_query_metadata,
@@ -254,16 +259,25 @@ class RetrievalOrchestrator:
         retrieval_query: str,
     ) -> tuple[list[RetrievedContext], dict[str, object]]:
         if request.options.retrieval_mode == "dense":
+            embedding_model = self._resolve_embedding_model(
+                retriever=self._retriever,
+                requested_embedding_model=request.options.embedding_model,
+            )
             retrieved_context = await self._retriever.retrieve(
                 query=retrieval_query,
                 limit=request.options.top_k,
-                embedding_model=request.options.embedding_model,
+                embedding_model=embedding_model,
             )
             return retrieved_context, {
                 "retrieval_mode": "dense",
+                "embedding_model": embedding_model,
                 "returned_items": len(retrieved_context),
             }
 
+        embedding_model = self._resolve_embedding_model(
+            retriever=self._hybrid_retriever,
+            requested_embedding_model=request.options.embedding_model,
+        )
         hybrid_result: HybridRetrievalResult = await self._hybrid_retriever.retrieve(
             query=retrieval_query,
             limit=request.options.top_k,
@@ -271,6 +285,12 @@ class RetrievalOrchestrator:
             sparse_weight=request.options.hybrid_sparse_weight,
             use_graph_augmentation=request.options.use_graph_augmentation,
             graph_max_extra_nodes=request.options.graph_max_extra_nodes,
-            embedding_model=request.options.embedding_model,
+            embedding_model=embedding_model,
         )
         return hybrid_result.items, {**hybrid_result.metadata, "returned_items": len(hybrid_result.items)}
+
+    def _resolve_embedding_model(self, *, retriever: Any, requested_embedding_model: str | None) -> str | None:
+        resolver = getattr(retriever, "resolve_embedding_model", None)
+        if callable(resolver):
+            return resolver(requested_embedding_model)
+        return requested_embedding_model

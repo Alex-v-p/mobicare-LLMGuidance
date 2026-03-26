@@ -31,8 +31,8 @@ class FakeVectorStore:
     def ensure_collection(self, vector_size: int) -> None:
         self.ensure_calls.append(vector_size)
 
-    def upsert_chunks(self, chunks, embeddings):
-        self.upsert_calls.append((chunks, embeddings))
+    def upsert_chunks(self, chunks, embeddings, *, embedding_model=None):
+        self.upsert_calls.append((chunks, embeddings, embedding_model))
         return len(chunks)
 
 
@@ -94,6 +94,7 @@ async def test_vector_indexer_indexes_only_non_empty_chunks():
     assert embedding_client.selected_model == "embed-x"
     assert vector_store.ensure_calls == [1]
     assert len(vector_store.upsert_calls[0][0]) == 1
+    assert vector_store.upsert_calls[0][2] == "embed-x"
     assert embedding_client.embed_many_calls == [["hello"]]
 
 
