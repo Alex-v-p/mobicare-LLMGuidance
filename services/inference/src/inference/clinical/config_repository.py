@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from importlib import resources
 from time import monotonic
 from typing import Any
 
 from minio import Minio
 
+from shared.bootstrap import bootstrap_minio_resources, create_minio_client_from_settings, load_clinical_config_default_payload
 from shared.config import Settings, get_settings
 from shared.observability import get_logger
 
@@ -70,16 +70,12 @@ class ClinicalConfigRepository:
         return payload
 
     def _load_from_package(self, packaged_filename: str) -> dict[str, Any]:
-        with resources.files("inference.clinical").joinpath(packaged_filename).open("r", encoding="utf-8") as handle:
-            return json.load(handle)
+        config_name = packaged_filename.removesuffix(".json")
+        return load_clinical_config_default_payload(config_name)
 
     def _load_from_minio(self, object_name: str) -> dict[str, Any]:
-        client = self._client or Minio(
-            self._settings.minio_client_endpoint,
-            access_key=self._settings.minio_root_user,
-            secret_key=self._settings.minio_root_password,
-            secure=self._settings.minio_secure,
-        )
+        client = self._client or create_minio_client_from_settings(self._settings)
+        bootstrap_minio_resources(settings=self._settings, client=client)
         resolved_name = _join_object_name(self._settings.clinical_config_prefix, object_name)
         response = client.get_object(self._settings.clinical_config_bucket, resolved_name)
         try:

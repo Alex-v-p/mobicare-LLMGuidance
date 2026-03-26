@@ -11,6 +11,7 @@ from minio import Minio
 from minio.error import S3Error
 from urllib3.exceptions import ConnectTimeoutError, MaxRetryError, NewConnectionError
 
+from shared.bootstrap import bootstrap_minio_resources, ensure_minio_bucket
 from shared.config import Settings, get_settings
 from shared.contracts.clinical_config import ClinicalConfigMetadata, ClinicalConfigName, ClinicalConfigVersionMetadata
 from shared.contracts.error_codes import ErrorCode
@@ -72,7 +73,14 @@ class ClinicalConfigRepository:
         self._settings = settings or get_settings()
         self._managed = _build_managed_configs(self._settings)
 
+    def _bootstrap_defaults_if_needed(self) -> None:
+        try:
+            bootstrap_minio_resources(settings=self._settings, client=self._client)
+        except Exception as exc:
+            raise _map_storage_error(exc, self._settings.clinical_config_bucket) from exc
+
     def list_configs(self) -> list[ClinicalConfigMetadata]:
+        self._bootstrap_defaults_if_needed()
         configs: list[ClinicalConfigMetadata] = []
         for config_name in sorted(self._managed):
             managed = self._managed[config_name]
@@ -82,6 +90,7 @@ class ClinicalConfigRepository:
         return configs
 
     def get_payload(self, config_name: ClinicalConfigName) -> tuple[ClinicalConfigMetadata, dict[str, Any]]:
+        self._bootstrap_defaults_if_needed()
         state = self._read_current_state(self._resolve(config_name))
         return state.metadata, state.payload
 
@@ -140,6 +149,7 @@ class ClinicalConfigRepository:
         expected_etag: str | None = None,
         expected_checksum_sha256: str | None = None,
     ) -> tuple[ClinicalConfigMetadata, ClinicalConfigVersionMetadata]:
+        self._bootstrap_defaults_if_needed()
         managed = self._resolve(config_name)
         current = self._read_current_state(managed)
         self._assert_optimistic_lock(
@@ -156,6 +166,7 @@ class ClinicalConfigRepository:
         return _build_metadata(managed, stat=None, checksum_sha256=None), archived_version
 
     def list_versions(self, config_name: ClinicalConfigName) -> list[ClinicalConfigVersionMetadata]:
+        self._bootstrap_defaults_if_needed()
         managed = self._resolve(config_name)
         self._ensure_bucket_exists(create=False)
         versions: list[ClinicalConfigVersionMetadata] = []
@@ -178,6 +189,7 @@ class ClinicalConfigRepository:
         expected_etag: str | None = None,
         expected_checksum_sha256: str | None = None,
     ) -> tuple[ClinicalConfigMetadata, ClinicalConfigVersionMetadata, ClinicalConfigVersionMetadata | None]:
+        self._bootstrap_defaults_if_needed()
         managed = self._resolve(config_name)
         target_snapshot = self._read_version_snapshot(managed, version_id)
         existing = self._try_read_current_state(managed)
@@ -216,14 +228,12 @@ class ClinicalConfigRepository:
     def _ensure_bucket_exists(self, *, create: bool) -> None:
         bucket = self._settings.clinical_config_bucket
         try:
-            exists = self._client.bucket_exists(bucket)
+            if create:
+                ensure_minio_bucket(self._client, bucket)
+                return
+            self._client.bucket_exists(bucket)
         except Exception as exc:
             raise _map_storage_error(exc, bucket) from exc
-        if not exists and create:
-            try:
-                self._client.make_bucket(bucket)
-            except Exception as exc:
-                raise _map_storage_error(exc, bucket) from exc
 
     def _try_stat(self, managed: ManagedClinicalConfig) -> object | None:
         try:

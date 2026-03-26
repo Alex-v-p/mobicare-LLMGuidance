@@ -8,6 +8,7 @@ from typing import Iterable
 from minio import Minio
 from pypdf import PdfReader
 
+from shared.bootstrap import create_minio_client_from_settings, ensure_minio_bucket
 from shared.config import Settings, get_settings
 
 
@@ -24,12 +25,11 @@ class MinioDocumentStore:
         self._settings = settings or get_settings()
         self._documents_bucket = self._settings.minio_documents_bucket
         self._documents_prefix = self._settings.minio_documents_prefix
-        self._client = Minio(
-            self._settings.minio_client_endpoint,
-            access_key=self._settings.minio_root_user,
-            secret_key=self._settings.minio_root_password,
-            secure=self._settings.minio_secure,
-        )
+        self._client = create_minio_client_from_settings(self._settings)
+
+    @property
+    def client(self) -> Minio:
+        return self._client
 
     @property
     def documents_bucket(self) -> str:
@@ -40,8 +40,7 @@ class MinioDocumentStore:
         return self._documents_prefix
 
     def ensure_bucket_exists(self) -> None:
-        if not self._client.bucket_exists(self._documents_bucket):
-            self._client.make_bucket(self._documents_bucket)
+        ensure_minio_bucket(self._client, self._documents_bucket)
 
     def list_documents(self, *, split_pdf_pages: bool = False) -> list[MinioDocument]:
         self.ensure_bucket_exists()

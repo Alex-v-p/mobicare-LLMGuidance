@@ -10,6 +10,7 @@ from minio.commonconfig import ENABLED, Filter
 from minio.lifecycleconfig import Expiration, LifecycleConfig, Rule
 from pydantic import BaseModel
 
+from shared.bootstrap import create_minio_client_from_settings, ensure_minio_bucket
 from shared.config import Settings, get_settings
 from shared.observability import get_logger
 
@@ -38,12 +39,7 @@ class MinioJobResultStoreBase(Generic[JobRecordT]):
         self._rule_id_prefix = rule_id_prefix
         self._bucket = self._settings.minio_results_bucket
         self._retention_days = self._settings.minio_job_retention_days
-        self._client = client or Minio(
-            self._settings.minio_client_endpoint,
-            access_key=self._settings.minio_root_user,
-            secret_key=self._settings.minio_root_password,
-            secure=self._settings.minio_secure,
-        )
+        self._client = client or create_minio_client_from_settings(self._settings)
 
     def _lifecycle_rule(self) -> LifecycleConfig:
         return LifecycleConfig(
@@ -58,8 +54,7 @@ class MinioJobResultStoreBase(Generic[JobRecordT]):
         )
 
     def ensure_bucket(self) -> None:
-        if not self._client.bucket_exists(self._bucket):
-            self._client.make_bucket(self._bucket)
+        ensure_minio_bucket(self._client, self._bucket)
         try:
             self._client.set_bucket_lifecycle(self._bucket, self._lifecycle_rule())
         except Exception as exc:

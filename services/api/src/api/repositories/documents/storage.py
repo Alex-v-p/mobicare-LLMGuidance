@@ -7,7 +7,8 @@ from minio.datatypes import Object
 from minio.helpers import ObjectWriteResult
 from urllib3.response import HTTPResponse
 
-from api.repositories.documents.errors import DocumentNotFoundError, DocumentStorageUnavailableError, map_storage_error
+from api.repositories.documents.errors import DocumentNotFoundError, map_storage_error
+from shared.bootstrap import ensure_minio_bucket
 from api.repositories.documents.models import DocumentLocation
 
 
@@ -19,11 +20,9 @@ class DocumentStorage:
 
     def ensure_bucket_exists(self) -> None:
         try:
-            exists = self._client.bucket_exists(self._documents_bucket)
+            ensure_minio_bucket(self._client, self._documents_bucket)
         except Exception as exc:
             raise map_storage_error(exc, self._documents_bucket) from exc
-        if not exists:
-            raise DocumentStorageUnavailableError(f"Documents bucket '{self._documents_bucket}' does not exist", code="DOCUMENT_BUCKET_MISSING")
 
     def list_objects(self) -> list[Object]:
         self.ensure_bucket_exists()
