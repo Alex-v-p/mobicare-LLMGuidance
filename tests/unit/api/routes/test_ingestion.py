@@ -19,7 +19,7 @@ class StubIngestionService:
 
 
 def test_create_ingestion_job_rewrites_status_url():
-    app = create_app()
+    app = create_app(bootstrap_minio_on_startup=False)
     app.dependency_overrides[get_ingestion_service] = lambda: StubIngestionService()
 
     with TestClient(app) as client:
@@ -30,7 +30,7 @@ def test_create_ingestion_job_rewrites_status_url():
 
 
 def test_delete_collection_route_returns_response():
-    app = create_app()
+    app = create_app(bootstrap_minio_on_startup=False)
     app.dependency_overrides[get_ingestion_service] = lambda: StubIngestionService()
 
     with TestClient(app) as client:

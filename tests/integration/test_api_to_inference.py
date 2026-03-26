@@ -67,6 +67,7 @@ class StubIngestionJobService:
         return await self._store.get(job_id)
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_api_proxies_guidance_and_ingestion_requests(guidance_request, inference_response, ingestion_response, monkeypatch):
     inference_app = create_inference_app()

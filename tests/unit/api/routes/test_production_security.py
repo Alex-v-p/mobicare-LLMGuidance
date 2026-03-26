@@ -12,7 +12,7 @@ def test_guidance_routes_require_bearer_token_in_prod(monkeypatch):
     monkeypatch.setenv("INTERNAL_SERVICE_TOKEN", "token")
     get_api_settings.cache_clear()
     try:
-        app = create_app()
+        app = create_app(bootstrap_minio_on_startup=False)
         with TestClient(app) as client:
             response = client.post("/guidance/jobs", json={"question": "q", "patient": {"values": {}}})
         assert response.status_code == 401

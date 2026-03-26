@@ -20,17 +20,22 @@ from shared.observability.middleware import MetricsMiddleware, RequestContextMid
 SERVICE_NAME = "Gateway API"
 
 
-def create_app(settings: ApiSettings | None = None) -> FastAPI:
+def create_app(
+    settings: ApiSettings | None = None,
+    *,
+    bootstrap_minio_on_startup: bool = True,
+) -> FastAPI:
     resolved = settings or get_api_settings()
     configure_logging(SERVICE_NAME)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
-        bootstrap_minio_resources_on_startup(
-            settings=resolved,
-            client=get_minio_client(),
-            service=SERVICE_NAME,
-        )
+        if bootstrap_minio_on_startup:
+            bootstrap_minio_resources_on_startup(
+                settings=resolved,
+                client=get_minio_client(),
+                service=SERVICE_NAME,
+            )
         yield
 
     app = FastAPI(

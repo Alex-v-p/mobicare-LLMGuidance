@@ -291,7 +291,7 @@ def ingestion_response() -> IngestionResponse:
 @pytest.fixture
 def api_app():
     from api.main import create_app as create_api_app
-    return create_api_app()
+    return create_api_app(bootstrap_minio_on_startup=False)
 
 
 @pytest.fixture

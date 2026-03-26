@@ -14,7 +14,7 @@ class ClosingUploadService:
 
 
 def test_get_document_returns_expected_headers(stub_document_service):
-    app = create_app()
+    app = create_app(bootstrap_minio_on_startup=False)
     app.dependency_overrides[get_document_service] = lambda: stub_document_service
 
     with TestClient(app) as client:
@@ -29,7 +29,7 @@ def test_get_document_returns_expected_headers(stub_document_service):
 
 
 def test_upload_document_rejects_disallowed_extension(monkeypatch):
-    app = create_app()
+    app = create_app(bootstrap_minio_on_startup=False)
     app.dependency_overrides[get_document_service] = lambda: ClosingUploadService()
 
     original = get_api_settings()
@@ -55,7 +55,7 @@ class MissingDocumentService:
 
 
 def test_get_document_maps_missing_document_to_not_found():
-    app = create_app()
+    app = create_app(bootstrap_minio_on_startup=False)
     app.dependency_overrides[get_document_service] = lambda: MissingDocumentService()
 
     with TestClient(app) as client:

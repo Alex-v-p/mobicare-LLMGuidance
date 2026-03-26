@@ -11,7 +11,7 @@ from inference.worker.handlers import guidance_handler
 from shared.contracts.inference import ApiGuidanceJobStatus
 from tests.support.fakes import DummyAsyncClientContext, InMemoryGuidanceJobStore, InMemoryJobResultStore, RecordingNotifier, StaticGuidancePipeline
 
-
+@pytest.mark.e2e
 @pytest.mark.asyncio
 async def test_async_guidance_job_flow_end_to_end(guidance_request, inference_response, monkeypatch):
     store = InMemoryGuidanceJobStore()
