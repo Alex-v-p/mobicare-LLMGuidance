@@ -1,20 +1,24 @@
 from __future__ import annotations
 
-from typing import BinaryIO
+from typing import TYPE_CHECKING, BinaryIO
 
 from api.application.error_mapping import map_document_error
-from api.infrastructure.repositories.document_repository import DocumentBlob, DocumentRepository
-from api.infrastructure.repositories.documents import (
+from api.application.ports import (
     DocumentAlreadyExistsError,
+    DocumentNotFoundError,
+    DocumentRepositoryError,
+    DocumentRepositoryPort,
     DocumentStorageUnavailableError,
     InvalidDocumentError,
 )
-from api.infrastructure.repositories.document_repository import DocumentNotFoundError, DocumentRepositoryError
 from shared.contracts.documents import DocumentDeleteResponse, DocumentMetadataListResponse, DocumentUploadResponse
+
+if TYPE_CHECKING:
+    from api.infrastructure.repositories.documents.models import DocumentBlob
 
 
 class DocumentService:
-    def __init__(self, repository: DocumentRepository) -> None:
+    def __init__(self, repository: DocumentRepositoryPort) -> None:
         self._repository = repository
 
     def list_metadata(self, *, offset: int = 0, limit: int = 100) -> DocumentMetadataListResponse:

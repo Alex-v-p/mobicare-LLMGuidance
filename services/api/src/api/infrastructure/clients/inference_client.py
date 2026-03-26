@@ -4,6 +4,7 @@ from typing import Any
 
 import httpx
 
+from api.application.ports import InferenceGatewayError
 from shared.clients.http import create_async_client
 from shared.config import Settings, get_settings
 from shared.contracts.error_codes import ErrorCode
@@ -13,13 +14,9 @@ from shared.observability import REQUEST_ID_HEADER
 from shared.security import INTERNAL_SERVICE_TOKEN_HEADER
 
 
-class InferenceClientError(RuntimeError):
+class InferenceClientError(InferenceGatewayError):
     def __init__(self, *, status_code: int, code: str, message: str, details: dict[str, Any] | None = None) -> None:
-        super().__init__(message)
-        self.status_code = status_code
-        self.code = code
-        self.message = message
-        self.details = details or {}
+        super().__init__(status_code=status_code, code=code, message=message, details=details)
 
 
 def _extract_error_payload(response: httpx.Response) -> tuple[str, str, dict[str, Any]]:

@@ -3,8 +3,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from inference.application.ports import ModelSelectableTextGenerationClient, TextGenerationClient
 from inference.clinical import ClinicalProfile
-from inference.infrastructure.http.clients.ollama_client import OllamaClient
 from inference.domain.guidance import (
     build_deterministic_answer,
     collect_answer_issues,
@@ -21,10 +21,10 @@ from inference.application.pipelines.steps.contracts import ContextAssessment
 from shared.contracts.inference import InferenceRequest, RetrievedContext, VerificationResult
 
 class AnswerGenerator:
-    def __init__(self, ollama_client: OllamaClient) -> None:
+    def __init__(self, ollama_client: ModelSelectableTextGenerationClient) -> None:
         self._ollama_client = ollama_client
 
-    def _get_llm_client(self, request: InferenceRequest) -> OllamaClient:
+    def _get_llm_client(self, request: InferenceRequest) -> TextGenerationClient:
         return self._ollama_client.with_model(request.options.llm_model)
 
     async def generate(
@@ -95,10 +95,10 @@ class AnswerGenerator:
 
 
 class ResponseVerifier:
-    def __init__(self, ollama_client: OllamaClient | None) -> None:
+    def __init__(self, ollama_client: ModelSelectableTextGenerationClient | None) -> None:
         self._ollama_client = ollama_client
 
-    def _get_llm_client(self, request: InferenceRequest) -> OllamaClient:
+    def _get_llm_client(self, request: InferenceRequest) -> TextGenerationClient:
         if self._ollama_client is None:
             raise RuntimeError("Response verification requested without an Ollama client.")
         return self._ollama_client.with_model(request.options.llm_model)

@@ -4,6 +4,7 @@ from typing import BinaryIO
 
 from minio import Minio
 
+from api.application.ports import DocumentRepositoryPort
 from api.infrastructure.repositories.documents import (
     DocumentAlreadyExistsError,
     DocumentBlob,
@@ -17,7 +18,7 @@ from api.infrastructure.repositories.documents import (
 from shared.contracts.documents import DocumentDeleteResponse, DocumentMetadata
 
 
-class DocumentRepository:
+class DocumentRepository(DocumentRepositoryPort):
     def __init__(
         self,
         *,

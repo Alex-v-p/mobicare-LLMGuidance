@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from inference.infrastructure.http.clients.ollama_client import OllamaClient
 from inference.application.pipelines.steps import (
     AnswerGenerator,
     ExampleResponseBuilder,

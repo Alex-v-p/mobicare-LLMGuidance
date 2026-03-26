@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from inference.application.ports import ModelSelectableTextGenerationClient
 from inference.infrastructure.http.clients.ollama_client import OllamaClient
 from inference.application.pipelines.guidance_pipeline import GuidancePipeline
 from inference.application.pipelines.runners import (
@@ -27,7 +28,7 @@ def build_guidance_pipeline(
     *,
     retriever: DenseRetriever | None = None,
     hybrid_retriever: HybridRetriever | None = None,
-    ollama_client: OllamaClient | None = None,
+    ollama_client: ModelSelectableTextGenerationClient | None = None,
     query_planner: QueryPlanner | None = None,
     query_rewriter: QueryRewriter | None = None,
     retrieval_orchestrator: RetrievalOrchestrator | None = None,
@@ -54,7 +55,7 @@ def build_pipeline_runner_registry(
     *,
     retriever: DenseRetriever | None = None,
     hybrid_retriever: HybridRetriever | None = None,
-    ollama_client: OllamaClient | None = None,
+    ollama_client: ModelSelectableTextGenerationClient | None = None,
     query_planner: QueryPlanner | None = None,
     query_rewriter: QueryRewriter | None = None,
     retrieval_orchestrator: RetrievalOrchestrator | None = None,

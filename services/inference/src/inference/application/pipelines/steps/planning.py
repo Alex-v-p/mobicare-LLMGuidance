@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 
 from inference.clinical import ClinicalProfile, build_clinical_profile, build_question_from_patient_data
-from inference.infrastructure.http.clients.ollama_client import OllamaClient
+from inference.application.ports import ModelSelectableTextGenerationClient, TextGenerationClient
 from inference.domain.guidance import detected_clusters, extract_terms, infer_specialty_focus, prioritized_clusters
 from inference.application.pipelines.prompts.multistep import build_query_rewrite_prompt
 from inference.application.pipelines.steps.contracts import QueryPlan, QueryRewriteResult
@@ -177,10 +177,10 @@ class QueryPlanner:
 
 
 class QueryRewriter:
-    def __init__(self, ollama_client: OllamaClient) -> None:
+    def __init__(self, ollama_client: ModelSelectableTextGenerationClient) -> None:
         self._ollama_client = ollama_client
 
-    def _get_llm_client(self, request: InferenceRequest) -> OllamaClient:
+    def _get_llm_client(self, request: InferenceRequest) -> TextGenerationClient:
         return self._ollama_client.with_model(request.options.llm_model)
 
     async def rewrite(self, request: InferenceRequest, query: str, specialty_focus: str | None = None) -> QueryRewriteResult:

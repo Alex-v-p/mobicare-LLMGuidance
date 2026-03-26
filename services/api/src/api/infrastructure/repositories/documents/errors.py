@@ -3,32 +3,37 @@ from __future__ import annotations
 from minio.error import S3Error
 from urllib3.exceptions import ConnectTimeoutError, MaxRetryError, NewConnectionError
 
+from api.application.ports.document_repository import (
+    DocumentAlreadyExistsError as DocumentAlreadyExistsPortError,
+    DocumentNotFoundError as DocumentNotFoundPortError,
+    DocumentRepositoryError as DocumentRepositoryPortError,
+    DocumentStorageUnavailableError as DocumentStorageUnavailablePortError,
+    InvalidDocumentError as InvalidDocumentPortError,
+)
 from shared.contracts.error_codes import ErrorCode
 
 
-class DocumentRepositoryError(RuntimeError):
+class DocumentRepositoryError(DocumentRepositoryPortError):
     def __init__(self, message: str, *, code: str = ErrorCode.DOCUMENT_REPOSITORY_ERROR) -> None:
-        super().__init__(message)
-        self.code = code
-        self.message = message
+        super().__init__(message, code=code)
 
 
-class DocumentNotFoundError(DocumentRepositoryError):
+class DocumentNotFoundError(DocumentNotFoundPortError):
     def __init__(self, message: str) -> None:
         super().__init__(message, code=ErrorCode.DOCUMENT_NOT_FOUND)
 
 
-class DocumentStorageUnavailableError(DocumentRepositoryError):
+class DocumentStorageUnavailableError(DocumentStorageUnavailablePortError):
     def __init__(self, message: str, *, code: str = ErrorCode.DOCUMENT_STORAGE_UNAVAILABLE) -> None:
         super().__init__(message, code=code)
 
 
-class InvalidDocumentError(DocumentRepositoryError):
+class InvalidDocumentError(InvalidDocumentPortError):
     def __init__(self, message: str) -> None:
         super().__init__(message, code=ErrorCode.DOCUMENT_UPLOAD_INVALID)
 
 
-class DocumentAlreadyExistsError(DocumentRepositoryError):
+class DocumentAlreadyExistsError(DocumentAlreadyExistsPortError):
     def __init__(self, message: str) -> None:
         super().__init__(message, code=ErrorCode.CONFLICT)
 

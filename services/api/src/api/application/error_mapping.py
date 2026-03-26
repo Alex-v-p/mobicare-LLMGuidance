@@ -1,7 +1,14 @@
 from __future__ import annotations
 
+from api.application.ports import (
+    DocumentAlreadyExistsError,
+    DocumentNotFoundError,
+    DocumentRepositoryError,
+    DocumentStorageUnavailableError,
+    InferenceGatewayError,
+    InvalidDocumentError,
+)
 from api.errors import AppError, BadRequestError, ConflictError, NotFoundError, ServiceUnavailableError
-from api.infrastructure.clients.inference_client import InferenceClientError
 from api.infrastructure.repositories.clinical_config import (
     ClinicalConfigAlreadyExistsError,
     ClinicalConfigNotFoundError,
@@ -10,12 +17,6 @@ from api.infrastructure.repositories.clinical_config import (
     ClinicalConfigVersionNotFoundError,
     InvalidClinicalConfigError,
     UnknownClinicalConfigError,
-)
-from api.infrastructure.repositories.document_repository import DocumentNotFoundError, DocumentRepositoryError
-from api.infrastructure.repositories.documents import (
-    DocumentAlreadyExistsError,
-    DocumentStorageUnavailableError,
-    InvalidDocumentError,
 )
 
 _DOCUMENT_NOT_FOUND_MESSAGE = "The requested document was not found."
@@ -26,7 +27,7 @@ def _context_details(**kwargs: str | None) -> dict[str, str]:
     return {key: value for key, value in kwargs.items() if value is not None}
 
 
-def map_inference_client_error(exc: InferenceClientError) -> AppError:
+def map_inference_client_error(exc: InferenceGatewayError) -> AppError:
     if exc.status_code >= 500:
         return ServiceUnavailableError(
             code=exc.code,
