@@ -47,3 +47,22 @@ def test_upload_document_rejects_disallowed_extension(monkeypatch):
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "DOCUMENT_UPLOAD_INVALID"
     assert response.json()["error"]["details"]["extension"] == "txt"
+
+
+class MissingDocumentService:
+    def get_document(self, object_name: str):
+        from api.repositories.documents import DocumentNotFoundError
+
+        raise DocumentNotFoundError("missing")
+
+
+def test_get_document_maps_missing_document_to_not_found():
+    app = create_app()
+    app.dependency_overrides[get_document_service] = lambda: MissingDocumentService()
+
+    with TestClient(app) as client:
+        response = client.get("/documents/missing.pdf")
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "DOCUMENT_NOT_FOUND"
+    assert response.json()["error"]["details"]["object_name"] == "missing.pdf"

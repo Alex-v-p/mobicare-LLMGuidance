@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from api.application.services.inference_error_mapping import map_inference_client_error
 from api.clients.inference_client import InferenceClient, InferenceClientError
-from api.errors import AppError, NotFoundError, ServiceUnavailableError
+from api.errors import NotFoundError
 from shared.config import Settings, get_settings
 from shared.contracts.error_codes import ErrorCode
 from shared.contracts.ingestion import (
@@ -26,13 +27,13 @@ class IngestionService:
         try:
             return await self._inference_client.submit_ingestion_job(self._apply_request_policy(payload))
         except InferenceClientError as exc:
-            raise self._map_inference_error(exc) from exc
+            raise map_inference_client_error(exc) from exc
 
     async def get_job_status(self, job_id: str) -> ApiIngestionJobStatus:
         try:
             record = await self._inference_client.get_ingestion_job_status(job_id)
         except InferenceClientError as exc:
-            raise self._map_inference_error(exc) from exc
+            raise map_inference_client_error(exc) from exc
         return self._to_api_job_status(record)
 
     async def delete_collection(self) -> IngestionCollectionDeleteResponse:
@@ -44,7 +45,7 @@ class IngestionService:
         try:
             return await self._inference_client.delete_ingestion_collection()
         except InferenceClientError as exc:
-            raise self._map_inference_error(exc) from exc
+            raise map_inference_client_error(exc) from exc
 
     def _apply_request_policy(self, payload: IngestDocumentsRequest) -> IngestDocumentsRequest:
         if self._settings.allow_runtime_option_overrides:
@@ -104,16 +105,3 @@ class IngestionService:
             error=record.error,
         )
 
-    def _map_inference_error(self, exc: InferenceClientError) -> AppError:
-        if exc.status_code >= 500:
-            return ServiceUnavailableError(
-                code=exc.code,
-                message=exc.message,
-                details=exc.details,
-            )
-        return AppError(
-            code=exc.code,
-            message=exc.message,
-            status_code=exc.status_code,
-            details=exc.details,
-        )
