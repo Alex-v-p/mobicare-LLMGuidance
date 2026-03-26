@@ -45,7 +45,7 @@ async def get_clinical_config(
     service: ClinicalConfigService = Depends(get_clinical_config_service),
 ) -> ClinicalConfigReadResponse:
     try:
-        result = service.get_config(config_name)  # type: ignore[arg-type]
+        result = service.get_config(config_name)
         _apply_concurrency_headers(response, etag=result.config.etag, checksum_sha256=result.config.checksum_sha256)
         return result
     except (ClinicalConfigNotFoundError, UnknownClinicalConfigError) as exc:
@@ -60,7 +60,7 @@ async def list_clinical_config_versions(
     service: ClinicalConfigService = Depends(get_clinical_config_service),
 ) -> ClinicalConfigVersionListResponse:
     try:
-        return service.list_versions(config_name)  # type: ignore[arg-type]
+        return service.list_versions(config_name)
     except (ClinicalConfigNotFoundError, ClinicalConfigVersionNotFoundError, UnknownClinicalConfigError) as exc:
         raise NotFoundError(code=exc.code, message=exc.message, details={"config_name": config_name}) from exc
     except ClinicalConfigRepositoryError as exc:
@@ -82,7 +82,7 @@ async def create_clinical_config(
             request.payload,
             expected_etag=if_match,
             expected_checksum_sha256=x_content_sha256,
-        )  # type: ignore[arg-type]
+        )
         _apply_concurrency_headers(response, etag=result.config.etag, checksum_sha256=result.config.checksum_sha256)
         return result
     except InvalidClinicalConfigError as exc:
@@ -110,7 +110,7 @@ async def upsert_clinical_config(
             request.payload,
             expected_etag=if_match,
             expected_checksum_sha256=x_content_sha256,
-        )  # type: ignore[arg-type]
+        )
         _apply_concurrency_headers(response, etag=result.config.etag, checksum_sha256=result.config.checksum_sha256)
         return result
     except InvalidClinicalConfigError as exc:
@@ -138,7 +138,7 @@ async def rollback_clinical_config(
             request.version_id,
             expected_etag=if_match,
             expected_checksum_sha256=x_content_sha256,
-        )  # type: ignore[arg-type]
+        )
         _apply_concurrency_headers(response, etag=result.config.etag, checksum_sha256=result.config.checksum_sha256)
         return result
     except (ClinicalConfigNotFoundError, ClinicalConfigVersionNotFoundError, UnknownClinicalConfigError) as exc:
@@ -161,7 +161,7 @@ async def delete_clinical_config(
             config_name,
             expected_etag=if_match,
             expected_checksum_sha256=x_content_sha256,
-        )  # type: ignore[arg-type]
+        )
     except (ClinicalConfigNotFoundError, UnknownClinicalConfigError) as exc:
         raise NotFoundError(code=exc.code, message=exc.message, details={"config_name": config_name}) from exc
     except ClinicalConfigOptimisticLockError as exc:
