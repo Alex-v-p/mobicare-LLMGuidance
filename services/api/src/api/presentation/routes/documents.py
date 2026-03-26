@@ -10,12 +10,6 @@ from fastapi.responses import Response
 from api.application.services.document_service import DocumentService
 from api.dependencies import get_document_service
 from api.errors import BadRequestError
-from api.presentation.routes.error_mapping import (
-    document_delete_errors,
-    document_list_errors,
-    document_lookup_errors,
-    document_upload_errors,
-)
 from shared.config import get_settings
 from shared.contracts.documents import (
     DocumentDeleteResponse,
@@ -32,8 +26,7 @@ async def list_documents(
     limit: int = Query(100, ge=1, le=500),
     service: DocumentService = Depends(get_document_service),
 ) -> DocumentMetadataListResponse:
-    with document_list_errors():
-        return service.list_metadata(offset=offset, limit=limit)
+    return service.list_metadata(offset=offset, limit=limit)
 
 
 @router.get("/documents/{object_name:path}")
@@ -41,8 +34,7 @@ async def get_document(
     object_name: str,
     service: DocumentService = Depends(get_document_service),
 ) -> Response:
-    with document_lookup_errors(object_name=object_name):
-        document = service.get_document(object_name)
+    document = service.get_document(object_name)
 
     headers = {
         "Content-Disposition": f"inline; filename*=UTF-8''{quote(document.object_name)}",
@@ -77,15 +69,14 @@ async def upload_document(
     _validate_upload(filename=filename, size_bytes=size_bytes, content_type=file.content_type, settings=settings)
 
     try:
-        with document_upload_errors(filename=filename):
-            return service.upload_document(
-                filename=filename,
-                content_stream=file.file,
-                size_bytes=size_bytes,
-                content_type=file.content_type,
-                object_name=filename,
-                overwrite=overwrite,
-            )
+        return service.upload_document(
+            filename=filename,
+            content_stream=file.file,
+            size_bytes=size_bytes,
+            content_type=file.content_type,
+            object_name=filename,
+            overwrite=overwrite,
+        )
     finally:
         await file.close()
 
@@ -95,8 +86,7 @@ async def delete_document(
     object_name: str,
     service: DocumentService = Depends(get_document_service),
 ) -> DocumentDeleteResponse:
-    with document_delete_errors(object_name=object_name):
-        return service.delete_document(object_name)
+    return service.delete_document(object_name)
 
 
 def _get_upload_size(file: UploadFile) -> int:

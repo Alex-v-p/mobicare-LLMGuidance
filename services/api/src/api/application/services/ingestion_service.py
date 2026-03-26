@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from api.application.services.inference_error_mapping import map_inference_client_error
+from api.application.error_mapping import map_inference_client_error
 from api.infrastructure.clients.inference_client import InferenceClient, InferenceClientError
 from api.errors import NotFoundError
 from shared.config import Settings, get_settings

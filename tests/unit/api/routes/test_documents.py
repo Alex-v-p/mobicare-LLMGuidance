@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from api.dependencies import get_document_service
-from api.errors import BadRequestError
+from api.errors import BadRequestError, NotFoundError
 from api.main import create_app
 from shared.config import get_settings
 
@@ -51,9 +51,7 @@ def test_upload_document_rejects_disallowed_extension(monkeypatch):
 
 class MissingDocumentService:
     def get_document(self, object_name: str):
-        from api.infrastructure.repositories.documents import DocumentNotFoundError
-
-        raise DocumentNotFoundError("missing")
+        raise NotFoundError(code="DOCUMENT_NOT_FOUND", message="missing", details={"object_name": object_name})
 
 
 def test_get_document_maps_missing_document_to_not_found():

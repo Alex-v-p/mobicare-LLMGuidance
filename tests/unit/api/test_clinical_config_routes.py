@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from api.dependencies import get_clinical_config_service
+from api.errors import ConflictError
 from shared.contracts.clinical_config import (
     ClinicalConfigDeleteResponse,
     ClinicalConfigListResponse,
@@ -211,9 +212,11 @@ def test_rollback_returns_restored_version(api_app, api_client):
 
 class ConflictClinicalConfigService:
     def upsert_config(self, config_name, payload, *, expected_etag=None, expected_checksum_sha256=None):
-        from api.infrastructure.repositories.clinical_config import ClinicalConfigOptimisticLockError
-
-        raise ClinicalConfigOptimisticLockError("etag mismatch")
+        raise ConflictError(
+            code="CLINICAL_CONFIG_OPTIMISTIC_LOCK_FAILED",
+            message="etag mismatch",
+            details={"config_name": config_name},
+        )
 
 
 def test_upsert_clinical_config_maps_optimistic_lock_to_conflict(api_app, api_client):

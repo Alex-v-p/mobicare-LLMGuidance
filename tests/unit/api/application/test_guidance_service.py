@@ -153,7 +153,7 @@ async def test_get_job_status_maps_non_5xx_to_app_error():
 
 
 def test_map_inference_client_error_promotes_5xx_to_service_unavailable():
-    from api.application.services.inference_error_mapping import map_inference_client_error
+    from api.application.error_mapping import map_inference_client_error
 
     exc = InferenceClientError(status_code=503, code="UPSTREAM_DOWN", message="down", details={"reason": "boom"})
 
