@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from inference.pipeline.generate_guidance import GuidancePipeline
+from inference.pipeline.factory import build_guidance_pipeline
 from shared.contracts.inference import GenerationOptions, InferenceRequest, OllamaGenerateResponse, RetrievedContext
 
 
@@ -64,7 +64,7 @@ async def test_guidance_pipeline_infers_task_from_patient_data_only_and_normaliz
             chunk_id="c1",
         )
     ]
-    pipeline = GuidancePipeline(
+    pipeline = build_guidance_pipeline(
         retriever=FakeDenseRetriever(retrieved),
         hybrid_retriever=FakeHybridRetriever(retrieved),
         ollama_client=FakeOllamaClient([
@@ -104,7 +104,7 @@ async def test_guidance_pipeline_falls_back_to_deterministic_answer_on_contradic
             chunk_id="c1",
         )
     ]
-    pipeline = GuidancePipeline(
+    pipeline = build_guidance_pipeline(
         retriever=FakeDenseRetriever(retrieved),
         hybrid_retriever=FakeHybridRetriever(retrieved),
         ollama_client=FakeOllamaClient([
@@ -140,7 +140,7 @@ async def test_guidance_pipeline_returns_minimal_unknown_fallback_for_generic_pa
             chunk_id="c1",
         )
     ]
-    pipeline = GuidancePipeline(
+    pipeline = build_guidance_pipeline(
         retriever=FakeDenseRetriever(retrieved),
         hybrid_retriever=FakeHybridRetriever(retrieved),
         ollama_client=FakeOllamaClient([
@@ -170,7 +170,7 @@ async def test_guidance_pipeline_surfaces_heart_failure_specialty_focus_metadata
             chunk_id="c1",
         )
     ]
-    pipeline = GuidancePipeline(
+    pipeline = build_guidance_pipeline(
         retriever=FakeDenseRetriever(retrieved),
         hybrid_retriever=FakeHybridRetriever(retrieved),
         ollama_client=FakeOllamaClient([
@@ -200,7 +200,7 @@ async def test_guidance_pipeline_does_not_force_deterministic_fallback_only_beca
             chunk_id="c1",
         )
     ]
-    pipeline = GuidancePipeline(
+    pipeline = build_guidance_pipeline(
         retriever=FakeDenseRetriever(retrieved),
         hybrid_retriever=FakeHybridRetriever(retrieved),
         ollama_client=FakeOllamaClient([
@@ -241,7 +241,7 @@ async def test_guidance_pipeline_replaces_generic_non_answer_for_literal_context
             chunk_id="c1",
         )
     ]
-    pipeline = GuidancePipeline(
+    pipeline = build_guidance_pipeline(
         retriever=FakeDenseRetriever(retrieved),
         hybrid_retriever=FakeHybridRetriever(retrieved),
         ollama_client=FakeOllamaClient([
@@ -275,7 +275,7 @@ async def test_guidance_pipeline_replaces_generic_non_answer_for_explicit_questi
             chunk_id="c1",
         )
     ]
-    pipeline = GuidancePipeline(
+    pipeline = build_guidance_pipeline(
         retriever=FakeDenseRetriever(retrieved),
         hybrid_retriever=FakeHybridRetriever(retrieved),
         ollama_client=FakeOllamaClient([

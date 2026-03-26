@@ -15,6 +15,7 @@ from inference.jobstore.base import ReadWriteJobStore
 from inference.jobstore.redis_guidance_job_store import RedisGuidanceJobStore
 from inference.jobstore.redis_ingestion_job_store import RedisIngestionJobStore
 from inference.pipeline.steps import AnswerGenerator, ExampleResponseBuilder, QueryPlanner, QueryRewriter, RetrievalOrchestrator, ResponseVerifier
+from inference.pipeline.factory import build_guidance_pipeline
 from inference.pipeline.generate_guidance import GuidancePipeline
 from inference.retrieval.dense import DenseRetriever
 from inference.retrieval.hybrid import HybridRetriever
@@ -113,7 +114,7 @@ def get_ollama_client() -> OllamaClient:
 
 @lru_cache(maxsize=1)
 def get_guidance_pipeline() -> GuidancePipeline:
-    return GuidancePipeline(
+    return build_guidance_pipeline(
         retriever=get_dense_retriever(),
         hybrid_retriever=get_hybrid_retriever(),
         ollama_client=get_ollama_client(),
