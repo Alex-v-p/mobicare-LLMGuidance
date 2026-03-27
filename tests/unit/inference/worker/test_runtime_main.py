@@ -24,8 +24,13 @@ async def test_run_worker_loop_prioritizes_ingestion_before_guidance(monkeypatch
             return None
 
     monkeypatch.setattr(runtime_main, "get_document_store", lambda: DummyStore())
+    class DummyRetrievalState:
+        async def refresh_from_vector_store(self):
+            return None
+
     monkeypatch.setattr(runtime_main, "get_guidance_job_result_store", lambda: DummyResultStore())
     monkeypatch.setattr(runtime_main, "get_ingestion_job_result_store", lambda: DummyResultStore())
+    monkeypatch.setattr(runtime_main, "get_retrieval_state_controller", lambda: DummyRetrievalState())
 
     async def fake_handle_ingestion_jobs(*, worker_id: str, heartbeat_interval_s: int) -> bool:
         calls.append("ingestion")

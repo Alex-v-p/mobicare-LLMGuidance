@@ -6,6 +6,7 @@ from inference.worker.runtime.dependencies import (
     get_guidance_job_result_store,
     get_guidance_job_store,
     get_guidance_pipeline,
+    get_retrieval_state_controller,
 )
 from inference.worker.heartbeat import with_heartbeat
 from shared.contracts.inference import JobRecord, utc_now_iso
@@ -24,6 +25,9 @@ async def _notify_callback(record: JobRecord) -> None:
 
 
 async def handle_guidance_jobs(worker_id: str, heartbeat_interval_s: int) -> bool:
+    if not await get_retrieval_state_controller().is_guidance_ready():
+        return False
+
     return await execute_next_job(
         store=get_guidance_job_store(),
         result_store=get_guidance_job_result_store(),

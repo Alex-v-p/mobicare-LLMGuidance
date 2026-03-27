@@ -46,6 +46,9 @@ WithHeartbeat = Callable[..., Awaitable[None]]
 PostProcessHook = Callable[[RecordT], Awaitable[None]]
 RunRequest = Callable[[RequestT], Awaitable[ResultT]]
 TimestampFactory = Callable[[], str]
+BeforeRunHook = Callable[[RecordT], Awaitable[None]]
+SuccessHook = Callable[[RecordT, ResultT], Awaitable[None]]
+FailureHook = Callable[[RecordT, str], Awaitable[None]]
 
 
 async def execute_next_job(
@@ -58,6 +61,9 @@ async def execute_next_job(
     utc_now_iso: TimestampFactory,
     run_with_heartbeat: WithHeartbeat = with_heartbeat,
     post_process: PostProcessHook | None = None,
+    before_run: BeforeRunHook | None = None,
+    after_success: SuccessHook | None = None,
+    after_failure: FailureHook | None = None,
     job_kind: str = "job",
 ) -> bool:
     try:
@@ -67,6 +73,8 @@ async def execute_next_job(
 
         async def process() -> None:
             try:
+                if before_run is not None:
+                    await before_run(record)
                 result = await run_request(getattr(record, "request"))
                 completed_at = utc_now_iso()
                 record.result_object_key = result_store.put_job_result(
@@ -98,6 +106,19 @@ async def execute_next_job(
                             "target_status": "completed",
                         },
                     )
+                if after_success is not None:
+                    try:
+                        await after_success(record, result)
+                    except Exception:  # pragma: no cover
+                        logger.exception(
+                            "worker_job_success_hook_failed",
+                            extra={
+                                "event": "worker_job_success_hook_failed",
+                                "error_code": "JOB_SUCCESS_HOOK_FAILED",
+                                "job_id": getattr(record, "job_id", None),
+                                "job_kind": job_kind,
+                            },
+                        )
             except Exception as exc:  # pragma: no cover
                 error = f"{type(exc).__name__}: {exc}"
                 failed_at = utc_now_iso()
@@ -130,6 +151,19 @@ async def execute_next_job(
                             "target_status": "failed",
                         },
                     )
+                if after_failure is not None:
+                    try:
+                        await after_failure(record, error)
+                    except Exception:  # pragma: no cover
+                        logger.exception(
+                            "worker_job_failure_hook_failed",
+                            extra={
+                                "event": "worker_job_failure_hook_failed",
+                                "error_code": "JOB_FAILURE_HOOK_FAILED",
+                                "job_id": getattr(record, "job_id", None),
+                                "job_kind": job_kind,
+                            },
+                        )
                 logger.exception(
                     "worker_job_execution_failed",
                     extra={

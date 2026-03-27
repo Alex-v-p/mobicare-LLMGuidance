@@ -374,6 +374,21 @@ class RedisJobStoreBase(Generic[JobRecordT]):
         payload = await client.get(self._job_key(job_id))
         return self._deserialize(payload)
 
+    async def find_first_by_statuses(self, statuses: set[str]) -> Optional[JobRecordT]:
+        client = await self._client()
+        cursor = 0
+        pattern = self._job_key("*")
+        while True:
+            cursor, keys = await client.scan(cursor=cursor, match=pattern, count=100)
+            for key in keys:
+                payload = await client.get(key)
+                record = self._deserialize(payload)
+                if record is not None and getattr(record, "status", None) in statuses:
+                    return record
+            if cursor == 0:
+                break
+        return None
+
     async def update(self, record: JobRecordT) -> None:
         self._set_updated_at(record)
         await self._sync_record(record)

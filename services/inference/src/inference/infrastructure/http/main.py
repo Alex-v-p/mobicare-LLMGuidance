@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 
-from inference.infrastructure.http.dependencies import get_document_store, get_guidance_job_result_store, get_ingestion_job_result_store
+from inference.infrastructure.http.dependencies import get_document_store, get_guidance_job_result_store, get_ingestion_job_result_store, get_retrieval_state_controller
 from inference.infrastructure.http.exceptions import register_exception_handlers
 from inference.infrastructure.http.routes.guidance import router as guidance_router
 from inference.infrastructure.http.routes.health import router as health_router
@@ -30,7 +30,11 @@ def create_app(settings: InferenceSettings | None = None) -> FastAPI:
         )
         get_guidance_job_result_store().ensure_bucket()
         get_ingestion_job_result_store().ensure_bucket()
-        yield
+        await get_retrieval_state_controller().refresh_from_vector_store()
+        try:
+            yield
+        finally:
+            await get_retrieval_state_controller().close()
 
     app = FastAPI(
         title="mobicare-llm inference",

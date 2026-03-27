@@ -26,6 +26,7 @@ from inference.storage.minio_documents import MinioDocumentStore
 from inference.storage.minio_guidance_job_results import MinioGuidanceJobResultStore
 from inference.storage.minio_ingestion_job_results import MinioIngestionJobResultStore
 from inference.storage.qdrant_store import QdrantVectorStore
+from inference.control.retrieval_state import RetrievalStateController
 from shared.config import InferenceSettings, get_inference_settings as resolve_inference_settings
 
 
@@ -127,6 +128,15 @@ def get_guidance_pipeline() -> GuidancePipeline:
 def get_document_preparer() -> DocumentPreparationService:
     return DocumentPreparationService()
 
+
+
+
+@lru_cache(maxsize=1)
+def get_retrieval_state_controller() -> RetrievalStateController:
+    return RetrievalStateController(
+        settings=get_inference_settings(),
+        vector_store=get_vector_store(),
+    )
 
 @lru_cache(maxsize=1)
 def get_vector_indexer() -> VectorIndexingService:

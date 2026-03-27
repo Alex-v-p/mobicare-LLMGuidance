@@ -11,12 +11,16 @@ from inference.composition.common import (
     get_ingestion_job_store,
     get_ingestion_service,
     get_inference_settings,
+    get_retrieval_state_controller,
     get_vector_store,
 )
 
 
 def get_guidance_request_service() -> GuidanceRequestService:
-    return GuidanceRequestService(pipeline=get_guidance_pipeline())
+    return GuidanceRequestService(
+        pipeline=get_guidance_pipeline(),
+        retrieval_state=get_retrieval_state_controller(),
+    )
 
 
 
@@ -24,6 +28,7 @@ def get_guidance_job_service() -> GuidanceJobService:
     return GuidanceJobService(
         store_factory=get_guidance_job_store,
         result_store=get_guidance_job_result_store(),
+        retrieval_state=get_retrieval_state_controller(),
     )
 
 
@@ -32,6 +37,7 @@ def get_ingestion_request_service() -> IngestionRequestService:
     return IngestionRequestService(
         ingestion_service=get_ingestion_service(),
         vector_store=get_vector_store(),
+        retrieval_state=get_retrieval_state_controller(),
     )
 
 
@@ -40,6 +46,7 @@ def get_ingestion_job_service() -> IngestionJobService:
     return IngestionJobService(
         store_factory=get_ingestion_job_store,
         result_store=get_ingestion_job_result_store(),
+        retrieval_state=get_retrieval_state_controller(),
     )
 
 
@@ -56,5 +63,6 @@ __all__ = [
     "get_ingestion_request_service",
     "get_ingestion_service",
     "get_inference_settings",
+    "get_retrieval_state_controller",
     "get_vector_store",
 ]

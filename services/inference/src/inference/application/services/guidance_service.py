@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from inference.control.retrieval_state import RetrievalStateController
 from inference.infrastructure.http.exceptions import NotFoundError
 from inference.jobstore.base import ReadWriteJobStore, managed_store
 from inference.application.pipelines.guidance_pipeline import GuidancePipeline
@@ -14,10 +15,13 @@ logger = get_logger(__name__, service="inference")
 
 
 class GuidanceRequestService:
-    def __init__(self, pipeline: GuidancePipeline) -> None:
+    def __init__(self, pipeline: GuidancePipeline, retrieval_state: RetrievalStateController | None = None) -> None:
         self._pipeline = pipeline
+        self._retrieval_state = retrieval_state
 
     async def generate(self, request: InferenceRequest) -> InferenceResponse:
+        if self._retrieval_state is not None:
+            await self._retrieval_state.ensure_guidance_ready()
         return await self._pipeline.run(request)
 
 
@@ -27,11 +31,15 @@ class GuidanceJobService:
         *,
         store_factory: Callable[[], ReadWriteJobStore[JobRecord]],
         result_store: JobResultStore[JobRecord],
+        retrieval_state: RetrievalStateController | None = None,
     ) -> None:
         self._store_factory = store_factory
         self._result_store = result_store
+        self._retrieval_state = retrieval_state
 
     async def create(self, request: InferenceRequest) -> JobRecord:
+        if self._retrieval_state is not None:
+            await self._retrieval_state.ensure_guidance_ready()
         record = JobRecord(request_id=request.request_id, status="queued", request=request)
         async with managed_store(self._store_factory) as store:
             await store.create(record)

@@ -38,7 +38,12 @@ def get_ingestion_job_result_store():
     return common.get_ingestion_job_result_store()
 
 
+def get_retrieval_state_controller():
+    return common.get_retrieval_state_controller()
+
+
 __all__ = [
+    "get_retrieval_state_controller",
     "get_document_store",
     "get_guidance_job_result_store",
     "get_guidance_job_store",

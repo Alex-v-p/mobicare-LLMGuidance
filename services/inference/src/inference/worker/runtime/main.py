@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from uuid import uuid4
 
-from inference.worker.runtime.dependencies import get_document_store, get_guidance_job_result_store, get_ingestion_job_result_store, get_worker_settings
+from inference.worker.runtime.dependencies import get_document_store, get_guidance_job_result_store, get_ingestion_job_result_store, get_retrieval_state_controller, get_worker_settings
 from inference.worker.handlers import handle_guidance_jobs, handle_ingestion_jobs
 from shared.bootstrap.minio import bootstrap_minio_resources_on_startup
 
@@ -17,6 +17,7 @@ async def run_worker_loop() -> None:
     )
     get_guidance_job_result_store().ensure_bucket()
     get_ingestion_job_result_store().ensure_bucket()
+    await get_retrieval_state_controller().refresh_from_vector_store()
     worker_id = settings.worker_id or f"worker-{uuid4()}"
     heartbeat_interval_s = settings.job_heartbeat_interval_seconds
 
