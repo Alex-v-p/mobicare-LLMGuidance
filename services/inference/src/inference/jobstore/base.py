@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 import json
+from math import ceil
 from time import monotonic
 from typing import Any, Callable, Generic, Optional, Protocol, TypeVar, get_args, get_origin
 
@@ -448,8 +449,14 @@ class RedisJobStoreBase(Generic[JobRecordT]):
         await self.requeue_stale_running_jobs()
         deadline = monotonic() + max(timeout_s, 0)
         while True:
-            remaining = max(0, int(deadline - monotonic())) if timeout_s > 0 else timeout_s
-            popped = await client.blpop(self._queue_name, timeout=remaining)
+            if timeout_s > 0:
+                remaining = deadline - monotonic()
+                if remaining <= 0:
+                    return None
+                block_timeout = max(1, ceil(remaining))
+            else:
+                block_timeout = timeout_s
+            popped = await client.blpop(self._queue_name, timeout=block_timeout)
             if popped is None:
                 return None
 

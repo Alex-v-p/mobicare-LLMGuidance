@@ -41,6 +41,21 @@ class FakeHybridRetriever:
         )
 
 
+
+
+class StartupSensitiveRetriever:
+    class _Emb:
+        model = "startup-safe-embed"
+
+    _embedding_client = _Emb()
+
+    def resolve_embedding_model(self, requested_embedding_model: str | None = None) -> str:
+        raise AssertionError("Pipeline construction should not resolve the collection embedding model")
+
+    async def retrieve(self, query: str, limit: int | None = None, embedding_model: str | None = None):
+        return []
+
+
 class FakeOllamaClient:
     def __init__(self, responses: list[str]) -> None:
         self.responses = responses
@@ -52,6 +67,18 @@ class FakeOllamaClient:
     async def generate(self, prompt: str, temperature: float, max_tokens: int):
         text = self.responses.pop(0)
         return OllamaGenerateResponse(model=self.model, response=text)
+
+
+
+
+def test_build_guidance_pipeline_does_not_resolve_collection_embedding_model_at_startup():
+    pipeline = build_guidance_pipeline(
+        retriever=StartupSensitiveRetriever(),
+        hybrid_retriever=StartupSensitiveRetriever(),
+        ollama_client=FakeOllamaClient(["unused"]),
+    )
+
+    assert pipeline is not None
 
 
 @pytest.mark.asyncio

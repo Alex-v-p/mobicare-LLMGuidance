@@ -37,6 +37,9 @@ class DenseRetriever:
             results.append(payload_to_context(payload))
         return results
 
+    def get_default_embedding_model(self) -> str:
+        return self._embedding_client.model
+
     def resolve_embedding_model(self, requested_embedding_model: str | None = None) -> str:
         return resolve_collection_embedding_model(
             vector_store=self._vector_store,

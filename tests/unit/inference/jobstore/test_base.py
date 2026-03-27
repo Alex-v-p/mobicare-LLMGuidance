@@ -20,6 +20,7 @@ class FakeRedis:
     def __init__(self) -> None:
         self.values: dict[str, object] = {}
         self.queue: deque[str] = deque()
+        self.blpop_timeouts: list[int] = []
 
     async def set(self, key, value, ex=None, nx=False):
         if nx and key in self.values:
@@ -36,6 +37,7 @@ class FakeRedis:
         return value if isinstance(value, str) else None
 
     async def blpop(self, queue_name, timeout=0):
+        self.blpop_timeouts.append(timeout)
         if not self.queue:
             return None
         return queue_name, self.queue.popleft()
@@ -199,3 +201,15 @@ async def test_mark_completed_rejects_worker_ownership_conflict():
             completed_at="2026-03-26T20:00:00+00:00",
             result_object_key="jobs/result.json",
         )
+
+
+@pytest.mark.asyncio
+async def test_claim_next_uses_nonzero_blpop_timeout_for_positive_wait(monkeypatch):
+    store = FakeJobStore()
+    monotonic_values = iter([100.0, 100.01])
+    monkeypatch.setattr("inference.jobstore.base.monotonic", lambda: next(monotonic_values))
+
+    claimed = await store.claim_next(worker_id="worker-1", timeout_s=1)
+
+    assert claimed is None
+    assert store.fake_client.blpop_timeouts == [1]

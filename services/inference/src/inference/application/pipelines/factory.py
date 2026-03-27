@@ -95,10 +95,20 @@ def build_pipeline_runner_registry(
 
 def _resolve_default_embedding_model(*retrievers: Any) -> str:
     for retriever in retrievers:
-        resolver = getattr(retriever, "resolve_embedding_model", None)
-        if not callable(resolver):
-            continue
-        resolved = resolver(None)
+        default_model_resolver = getattr(retriever, "get_default_embedding_model", None)
+        if callable(default_model_resolver):
+            resolved = default_model_resolver()
+            if resolved:
+                return str(resolved)
+
+        embedding_client = getattr(retriever, "_embedding_client", None)
+        resolved = getattr(embedding_client, "model", None)
         if resolved:
             return str(resolved)
+
+        settings = getattr(retriever, "_settings", None)
+        resolved = getattr(settings, "ollama_embedding_model", None)
+        if resolved:
+            return str(resolved)
+
     raise ValueError("Unable to resolve a default embedding model for guidance pipeline construction")
