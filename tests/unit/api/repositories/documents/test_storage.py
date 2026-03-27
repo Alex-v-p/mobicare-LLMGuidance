@@ -4,9 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from api.repositories.documents.errors import DocumentStorageUnavailableError
-from api.repositories.documents.models import DocumentLocation
-from api.repositories.documents.storage import DocumentStorage
+from api.infrastructure.repositories.documents.models import DocumentLocation
+from api.infrastructure.repositories.documents.storage import DocumentStorage
 from minio.error import S3Error
 
 
@@ -40,6 +39,7 @@ def make_s3_error(code: str, message: str = "message", resource: str = "/docs/x.
 class FakeMinio:
     def __init__(self, *, bucket_exists: bool = True) -> None:
         self._bucket_exists = bucket_exists
+        self.created_buckets: list[str] = []
         self.objects = [
             SimpleNamespace(object_name="guidelines/a.pdf", is_dir=False),
             SimpleNamespace(object_name="guidelines/dir/", is_dir=True),
@@ -48,6 +48,10 @@ class FakeMinio:
 
     def bucket_exists(self, bucket: str) -> bool:
         return self._bucket_exists
+
+    def make_bucket(self, bucket: str) -> None:
+        self.created_buckets.append(bucket)
+        self._bucket_exists = True
 
     def list_objects(self, bucket: str, prefix=None, recursive=True):
         return iter(self.objects)
@@ -67,13 +71,13 @@ class FakeMinio:
         return None
 
 
-def test_ensure_bucket_exists_raises_when_bucket_missing():
-    storage = DocumentStorage(client=FakeMinio(bucket_exists=False), documents_bucket="docs")
+def test_ensure_bucket_exists_creates_missing_bucket():
+    client = FakeMinio(bucket_exists=False)
+    storage = DocumentStorage(client=client, documents_bucket="docs")
 
-    with pytest.raises(DocumentStorageUnavailableError) as exc:
-        storage.ensure_bucket_exists()
+    storage.ensure_bucket_exists()
 
-    assert exc.value.code == "DOCUMENT_BUCKET_MISSING"
+    assert client.created_buckets == ["docs"]
 
 
 def test_list_objects_filters_directories():

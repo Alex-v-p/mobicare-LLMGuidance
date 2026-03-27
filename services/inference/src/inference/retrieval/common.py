@@ -4,10 +4,18 @@ from typing import Any
 
 from shared.contracts.inference import RetrievedContext
 
-from inference.storage.qdrant_store import MissingCollectionError, QdrantVectorStore
+from inference.storage.qdrant_store import (
+    MissingCollectionEmbeddingModelError,
+    MissingCollectionError,
+    QdrantVectorStore,
+)
 
 
 class RetrievalCollectionNotReadyError(RuntimeError):
+    pass
+
+
+class RetrievalEmbeddingModelError(RuntimeError):
     pass
 
 
@@ -33,6 +41,28 @@ def search_qdrant(
         return vector_store.search(query_vector=query_vector, limit=limit)
     except MissingCollectionError as exc:
         raise RetrievalCollectionNotReadyError(str(exc)) from exc
+
+
+def resolve_collection_embedding_model(
+    *,
+    vector_store: QdrantVectorStore,
+    requested_embedding_model: str | None,
+) -> str:
+    ensure_collection_ready(vector_store)
+    try:
+        stored_embedding_model = vector_store.get_collection_embedding_model()
+    except MissingCollectionError as exc:
+        raise RetrievalCollectionNotReadyError(str(exc)) from exc
+    except MissingCollectionEmbeddingModelError as exc:
+        raise RetrievalEmbeddingModelError(str(exc)) from exc
+
+    if requested_embedding_model and requested_embedding_model != stored_embedding_model:
+        raise RetrievalEmbeddingModelError(
+            f"Guidance request asked for embedding model '{requested_embedding_model}', but "
+            f"collection '{vector_store.collection_name}' was ingested with '{stored_embedding_model}'. "
+            "Remove the request override or re-ingest the collection with the requested embedding model."
+        )
+    return stored_embedding_model
 
 
 def payload_identity(payload: dict[str, Any]) -> str:

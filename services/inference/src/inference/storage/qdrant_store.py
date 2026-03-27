@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import NAMESPACE_URL, uuid5
 
-from shared.config import Settings, get_settings
+from shared.config import InferenceSettings, get_inference_settings
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
@@ -12,6 +12,10 @@ from inference.indexing.models import TextChunk
 
 
 class MissingCollectionError(RuntimeError):
+    pass
+
+
+class MissingCollectionEmbeddingModelError(RuntimeError):
     pass
 
 
@@ -24,9 +28,9 @@ class QdrantVectorStore:
         self,
         url: str | None = None,
         collection_name: str | None = None,
-        settings: Settings | None = None,
+        settings: InferenceSettings | None = None,
     ) -> None:
-        self._settings = settings or get_settings()
+        self._settings = settings or get_inference_settings()
         self._url = url or self._settings.qdrant_url
         self._collection = collection_name or self._settings.qdrant_collection
         self._client = QdrantClient(url=self._url)
@@ -72,7 +76,13 @@ class QdrantVectorStore:
         self._client.delete_collection(collection_name=self._collection)
         return True
 
-    def upsert_chunks(self, chunks: list[TextChunk], embeddings: list[list[float]]) -> int:
+    def upsert_chunks(
+        self,
+        chunks: list[TextChunk],
+        embeddings: list[list[float]],
+        *,
+        embedding_model: str | None = None,
+    ) -> int:
         points: list[PointStruct] = []
         for chunk, embedding in zip(chunks, embeddings):
             point_id = stable_point_id(chunk.chunk_id)
@@ -89,12 +99,40 @@ class QdrantVectorStore:
                 "page_number": chunk.metadata.get("page_number"),
                 **chunk_metadata,
             }
+            if embedding_model:
+                payload["embedding_model"] = embedding_model
             points.append(PointStruct(id=point_id, vector=embedding, payload=payload))
         if not points:
             return 0
         self.ensure_collection(vector_size=len(embeddings[0]))
         self._client.upsert(collection_name=self._collection, points=points)
         return len(points)
+
+    def get_collection_embedding_model(self) -> str:
+        if not self.collection_exists():
+            raise MissingCollectionError(
+                f"Qdrant collection '{self._collection}' does not exist yet. Run document ingestion first."
+            )
+
+        points, _ = self._client.scroll(
+            collection_name=self._collection,
+            limit=1,
+            with_payload=True,
+            with_vectors=False,
+        )
+        if not points:
+            raise MissingCollectionError(
+                f"Qdrant collection '{self._collection}' is empty. Run document ingestion first."
+            )
+
+        payload = dict(points[0].payload or {})
+        embedding_model = payload.get("embedding_model")
+        if not embedding_model:
+            raise MissingCollectionEmbeddingModelError(
+                f"Qdrant collection '{self._collection}' does not record the embedding model used during ingestion. "
+                "Re-ingest the documents to enable model-safe retrieval."
+            )
+        return str(embedding_model)
 
 
     def get_all_payloads(self, batch_size: int = 256) -> list[dict[str, Any]]:

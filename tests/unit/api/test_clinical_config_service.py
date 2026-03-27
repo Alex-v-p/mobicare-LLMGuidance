@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import pytest
 
 from api.application.services.clinical_config_service import ClinicalConfigService
-from api.repositories.clinical_config_repository import InvalidClinicalConfigError
+from api.errors import BadRequestError
 from shared.contracts.clinical_config import ClinicalConfigMetadata, ClinicalConfigVersionMetadata
 
 
@@ -101,12 +101,12 @@ def service() -> ClinicalConfigService:
 
 
 def test_drug_dosing_catalog_requires_expected_top_level_keys(service: ClinicalConfigService):
-    with pytest.raises(InvalidClinicalConfigError):
+    with pytest.raises(BadRequestError):
         service.upsert_config("drug_dosing_catalog", {"families": {}})
 
 
 def test_marker_ranges_reject_non_object_definition(service: ClinicalConfigService):
-    with pytest.raises(InvalidClinicalConfigError):
+    with pytest.raises(BadRequestError):
         service.upsert_config("marker_ranges", {"potassium": []})
 
 

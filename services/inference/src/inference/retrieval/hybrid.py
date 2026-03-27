@@ -8,6 +8,7 @@ from inference.retrieval.common import (
     ensure_collection_ready,
     payload_identity,
     payload_to_context,
+    resolve_collection_embedding_model,
     search_qdrant,
 )
 from inference.retrieval.graph import ChunkGraphAugmenter
@@ -54,7 +55,8 @@ class HybridRetriever:
                 f"Qdrant collection '{self._vector_store.collection_name}' is empty. Run document ingestion first."
             )
 
-        query_vector = await self._embedding_client.with_model(embedding_model).embed(query)
+        resolved_embedding_model = self.resolve_embedding_model(embedding_model)
+        query_vector = await self._embedding_client.with_model(resolved_embedding_model).embed(query)
         dense_limit = max(limit * 4, 10)
         dense_hits = search_qdrant(vector_store=self._vector_store, query_vector=query_vector, limit=dense_limit)
         sparse_hits = self._sparse_retriever.search(query=query, documents=corpus_payloads, limit=dense_limit)
@@ -86,8 +88,18 @@ class HybridRetriever:
                 "sparse_candidates": len(sparse_hits),
                 "hybrid_dense_weight": dense_weight,
                 "hybrid_sparse_weight": sparse_weight,
+                "embedding_model": resolved_embedding_model,
                 **graph_metadata,
             },
+        )
+
+    def get_default_embedding_model(self) -> str:
+        return self._embedding_client.model
+
+    def resolve_embedding_model(self, requested_embedding_model: str | None = None) -> str:
+        return resolve_collection_embedding_model(
+            vector_store=self._vector_store,
+            requested_embedding_model=requested_embedding_model,
         )
 
     def _get_corpus_payloads(self) -> list[dict[str, Any]]:

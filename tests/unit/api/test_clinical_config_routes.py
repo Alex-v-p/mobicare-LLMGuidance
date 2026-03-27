@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from api.dependencies import get_clinical_config_service
+from api.errors import ConflictError
 from shared.contracts.clinical_config import (
     ClinicalConfigDeleteResponse,
     ClinicalConfigListResponse,
@@ -207,3 +208,26 @@ def test_rollback_returns_restored_version(api_app, api_client):
     assert response.json()["status"] == "rolled_back"
     assert response.json()["restored_from_version"]["version_id"] == "20260325T095959000000Z"
     assert response.headers["etag"] == "etag-rollback"
+
+
+class ConflictClinicalConfigService:
+    def upsert_config(self, config_name, payload, *, expected_etag=None, expected_checksum_sha256=None):
+        raise ConflictError(
+            code="CLINICAL_CONFIG_OPTIMISTIC_LOCK_FAILED",
+            message="etag mismatch",
+            details={"config_name": config_name},
+        )
+
+
+def test_upsert_clinical_config_maps_optimistic_lock_to_conflict(api_app, api_client):
+    api_app.dependency_overrides[get_clinical_config_service] = lambda: ConflictClinicalConfigService()
+
+    response = api_client.put(
+        "/clinical-configs/marker_ranges",
+        json={"payload": {"potassium": {"label": "Potassium", "bands": [{"low": 3.5, "high": 5.0}]}}},
+        headers={"If-Match": "etag-old"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "CLINICAL_CONFIG_OPTIMISTIC_LOCK_FAILED"
+    assert response.json()["error"]["details"]["config_name"] == "marker_ranges"

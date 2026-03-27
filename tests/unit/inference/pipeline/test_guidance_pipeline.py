@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from inference.pipeline.generate_guidance import GuidancePipeline
+from inference.application.pipelines.factory import build_guidance_pipeline
 from shared.contracts.inference import GenerationOptions, InferenceRequest, OllamaGenerateResponse, RetrievedContext
 
 
@@ -15,6 +15,9 @@ class FakeDenseRetriever:
 
     _embedding_client = _Emb()
 
+    def resolve_embedding_model(self, requested_embedding_model: str | None = None) -> str:
+        return requested_embedding_model or self._embedding_client.model
+
     async def retrieve(self, query: str, limit: int | None = None, embedding_model: str | None = None):
         return self.items[: limit or len(self.items)]
 
@@ -23,13 +26,34 @@ class FakeDenseRetriever:
 class FakeHybridRetriever:
     items: list[RetrievedContext]
 
+    def resolve_embedding_model(self, requested_embedding_model: str | None = None) -> str:
+        return requested_embedding_model or "fake-embed"
+
     async def retrieve(self, **kwargs):
         from inference.retrieval.hybrid import HybridRetrievalResult
 
         return HybridRetrievalResult(
             items=self.items[: kwargs.get("limit", len(self.items))],
-            metadata={"retrieval_mode": "hybrid"},
+            metadata={
+                "retrieval_mode": "hybrid",
+                "embedding_model": kwargs.get("embedding_model") or "fake-embed",
+            },
         )
+
+
+
+
+class StartupSensitiveRetriever:
+    class _Emb:
+        model = "startup-safe-embed"
+
+    _embedding_client = _Emb()
+
+    def resolve_embedding_model(self, requested_embedding_model: str | None = None) -> str:
+        raise AssertionError("Pipeline construction should not resolve the collection embedding model")
+
+    async def retrieve(self, query: str, limit: int | None = None, embedding_model: str | None = None):
+        return []
 
 
 class FakeOllamaClient:
@@ -45,6 +69,18 @@ class FakeOllamaClient:
         return OllamaGenerateResponse(model=self.model, response=text)
 
 
+
+
+def test_build_guidance_pipeline_does_not_resolve_collection_embedding_model_at_startup():
+    pipeline = build_guidance_pipeline(
+        retriever=StartupSensitiveRetriever(),
+        hybrid_retriever=StartupSensitiveRetriever(),
+        ollama_client=FakeOllamaClient(["unused"]),
+    )
+
+    assert pipeline is not None
+
+
 @pytest.mark.asyncio
 async def test_guidance_pipeline_infers_task_from_patient_data_only_and_normalizes_source_talk():
     retrieved = [
@@ -55,7 +91,7 @@ async def test_guidance_pipeline_infers_task_from_patient_data_only_and_normaliz
             chunk_id="c1",
         )
     ]
-    pipeline = GuidancePipeline(
+    pipeline = build_guidance_pipeline(
         retriever=FakeDenseRetriever(retrieved),
         hybrid_retriever=FakeHybridRetriever(retrieved),
         ollama_client=FakeOllamaClient([
@@ -95,7 +131,7 @@ async def test_guidance_pipeline_falls_back_to_deterministic_answer_on_contradic
             chunk_id="c1",
         )
     ]
-    pipeline = GuidancePipeline(
+    pipeline = build_guidance_pipeline(
         retriever=FakeDenseRetriever(retrieved),
         hybrid_retriever=FakeHybridRetriever(retrieved),
         ollama_client=FakeOllamaClient([
@@ -131,7 +167,7 @@ async def test_guidance_pipeline_returns_minimal_unknown_fallback_for_generic_pa
             chunk_id="c1",
         )
     ]
-    pipeline = GuidancePipeline(
+    pipeline = build_guidance_pipeline(
         retriever=FakeDenseRetriever(retrieved),
         hybrid_retriever=FakeHybridRetriever(retrieved),
         ollama_client=FakeOllamaClient([
@@ -161,7 +197,7 @@ async def test_guidance_pipeline_surfaces_heart_failure_specialty_focus_metadata
             chunk_id="c1",
         )
     ]
-    pipeline = GuidancePipeline(
+    pipeline = build_guidance_pipeline(
         retriever=FakeDenseRetriever(retrieved),
         hybrid_retriever=FakeHybridRetriever(retrieved),
         ollama_client=FakeOllamaClient([
@@ -191,7 +227,7 @@ async def test_guidance_pipeline_does_not_force_deterministic_fallback_only_beca
             chunk_id="c1",
         )
     ]
-    pipeline = GuidancePipeline(
+    pipeline = build_guidance_pipeline(
         retriever=FakeDenseRetriever(retrieved),
         hybrid_retriever=FakeHybridRetriever(retrieved),
         ollama_client=FakeOllamaClient([
@@ -232,7 +268,7 @@ async def test_guidance_pipeline_replaces_generic_non_answer_for_literal_context
             chunk_id="c1",
         )
     ]
-    pipeline = GuidancePipeline(
+    pipeline = build_guidance_pipeline(
         retriever=FakeDenseRetriever(retrieved),
         hybrid_retriever=FakeHybridRetriever(retrieved),
         ollama_client=FakeOllamaClient([
@@ -266,7 +302,7 @@ async def test_guidance_pipeline_replaces_generic_non_answer_for_explicit_questi
             chunk_id="c1",
         )
     ]
-    pipeline = GuidancePipeline(
+    pipeline = build_guidance_pipeline(
         retriever=FakeDenseRetriever(retrieved),
         hybrid_retriever=FakeHybridRetriever(retrieved),
         ollama_client=FakeOllamaClient([

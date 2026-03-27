@@ -3,9 +3,9 @@ from __future__ import annotations
 import pytest
 
 from api.application.services.guidance_service import GuidanceService
-from api.clients.inference_client import InferenceClientError
+from api.infrastructure.clients.inference_client import InferenceClientError
 from api.errors import AppError, ServiceUnavailableError
-from shared.config import Settings
+from shared.config import ApiSettings
 from shared.contracts.inference import ApiGuidanceJobStatus, GuidanceRequest, InferenceRequest, InferenceResponse, JobAcceptedResponse, JobRecord
 
 
@@ -71,7 +71,7 @@ async def test_prod_submit_job_uses_safe_guidance_defaults(guidance_request: Gui
     client = StubInferenceClient(accepted=accepted)
     service = GuidanceService(
         inference_client=client,
-        settings=Settings(app_env="prod", jwt_secret_key="secret", internal_service_token="token"),
+        settings=ApiSettings(app_env="prod", jwt_secret_key="secret", internal_service_token="token"),
     )
 
     await service.submit_job(prod_request)
@@ -116,7 +116,7 @@ async def test_prod_status_hides_debug_metadata(guidance_request: GuidanceReques
     )
     service = GuidanceService(
         inference_client=StubInferenceClient(record=record),
-        settings=Settings(app_env="prod", jwt_secret_key="secret", internal_service_token="token"),
+        settings=ApiSettings(app_env="prod", jwt_secret_key="secret", internal_service_token="token"),
     )
 
     result = await service.get_job_status(record.job_id)
@@ -149,3 +149,15 @@ async def test_get_job_status_maps_non_5xx_to_app_error():
 
     assert exc.value.status_code == 404
     assert exc.value.code == "NOT_FOUND"
+
+
+
+def test_map_inference_client_error_promotes_5xx_to_service_unavailable():
+    from api.application.error_mapping import map_inference_client_error
+
+    exc = InferenceClientError(status_code=503, code="UPSTREAM_DOWN", message="down", details={"reason": "boom"})
+
+    mapped = map_inference_client_error(exc)
+
+    assert isinstance(mapped, ServiceUnavailableError)
+    assert mapped.code == "UPSTREAM_DOWN"

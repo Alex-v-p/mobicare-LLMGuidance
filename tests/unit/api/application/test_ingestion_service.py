@@ -3,9 +3,9 @@ from __future__ import annotations
 import pytest
 
 from api.application.services.ingestion_service import IngestionService
-from api.clients.inference_client import InferenceClientError
+from api.infrastructure.clients.inference_client import InferenceClientError
 from api.errors import AppError, NotFoundError, ServiceUnavailableError
-from shared.config import Settings
+from shared.config import ApiSettings
 from shared.contracts.ingestion import ApiIngestionJobStatus, IngestDocumentsRequest, IngestionCollectionDeleteResponse, IngestionJobAcceptedResponse, IngestionJobRecord
 
 
@@ -76,7 +76,7 @@ async def test_prod_submit_job_uses_safe_ingestion_defaults():
     client = StubInferenceClient(accepted=accepted)
     service = IngestionService(
         inference_client=client,
-        settings=Settings(app_env="prod", jwt_secret_key="secret", internal_service_token="token"),
+        settings=ApiSettings(app_env="prod", jwt_secret_key="secret", internal_service_token="token"),
     )
 
     await service.submit_job(payload)
@@ -93,7 +93,7 @@ async def test_prod_delete_collection_is_enabled_by_default():
     delete_response = IngestionCollectionDeleteResponse(collection="guidance_chunks", existed=True)
     service = IngestionService(
         inference_client=StubInferenceClient(delete_response=delete_response),
-        settings=Settings(app_env="prod", jwt_secret_key="secret", internal_service_token="token"),
+        settings=ApiSettings(app_env="prod", jwt_secret_key="secret", internal_service_token="token"),
     )
 
     result = await service.delete_collection()
@@ -105,7 +105,7 @@ async def test_prod_delete_collection_is_enabled_by_default():
 async def test_prod_delete_collection_can_be_disabled_explicitly():
     service = IngestionService(
         inference_client=StubInferenceClient(delete_response=IngestionCollectionDeleteResponse(collection="guidance_chunks", existed=True)),
-        settings=Settings(
+        settings=ApiSettings(
             app_env="prod",
             jwt_secret_key="secret",
             internal_service_token="token",

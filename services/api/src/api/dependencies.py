@@ -10,17 +10,16 @@ from api.application.services.document_service import DocumentService
 from api.application.services.guidance_service import GuidanceService
 from api.application.services.health_service import HealthService
 from api.application.services.ingestion_service import IngestionService
-from api.clients.auth_client import AuthClient
-from api.clients.inference_client import InferenceClient
+from api.infrastructure.clients.auth_client import AuthClient
+from api.infrastructure.clients.inference_client import InferenceClient
 from api.infrastructure.minio import create_minio_client
-from api.repositories.clinical_config_repository import ClinicalConfigRepository
-from api.repositories.document_repository import DocumentRepository
-from shared.config import Settings, get_settings
+from api.infrastructure.repositories.clinical_config import ClinicalConfigRepository
+from api.infrastructure.repositories.document_repository import DocumentRepository
+from shared.config import ApiSettings, get_api_settings as resolve_api_settings
 
 
-@lru_cache(maxsize=1)
-def get_api_settings() -> Settings:
-    return get_settings()
+def get_api_settings() -> ApiSettings:
+    return resolve_api_settings()
 
 
 @lru_cache(maxsize=1)
@@ -36,8 +35,6 @@ def get_document_repository() -> DocumentRepository:
         documents_bucket=settings.minio_documents_bucket,
         documents_prefix=settings.minio_documents_prefix,
     )
-
-
 
 
 @lru_cache(maxsize=1)

@@ -1,6 +1,9 @@
+import pytest
 from unittest.mock import Mock
 
 from api.application.services.document_service import DocumentService
+from api.errors import NotFoundError, ServiceUnavailableError
+from api.infrastructure.repositories.document_repository import DocumentNotFoundError, DocumentRepositoryError
 from shared.contracts.documents import DocumentDeleteResponse, DocumentMetadata
 
 
@@ -40,3 +43,26 @@ def test_delete_document_delegates_to_repository():
 
     repository.delete_document.assert_called_once_with("guidelines/doc-1.pdf")
     assert response.status == "deleted"
+
+
+def test_get_document_maps_repository_not_found_to_app_error():
+    repository = Mock()
+    repository.get_document.side_effect = DocumentNotFoundError("missing")
+    service = DocumentService(repository=repository)
+
+    with pytest.raises(NotFoundError) as exc:
+        service.get_document("guidelines/missing.pdf")
+
+    assert exc.value.code == "DOCUMENT_NOT_FOUND"
+    assert exc.value.details == {"object_name": "guidelines/missing.pdf"}
+
+
+def test_list_metadata_maps_repository_failures_to_service_unavailable():
+    repository = Mock()
+    repository.list_documents.side_effect = DocumentRepositoryError("boom")
+    service = DocumentService(repository=repository)
+
+    with pytest.raises(ServiceUnavailableError) as exc:
+        service.list_metadata()
+
+    assert exc.value.message == "boom"

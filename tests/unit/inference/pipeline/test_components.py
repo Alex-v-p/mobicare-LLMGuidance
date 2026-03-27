@@ -1,6 +1,6 @@
 from inference.clinical import build_clinical_profile, build_question_from_patient_data
-from inference.pipeline.steps import ChunkRelevanceRanker, ContextJudge, QueryPlan, QueryPlanner, ResponseVerifier, RetrievalOrchestrator
-from inference.pipeline.support import build_caution_lines, build_deterministic_answer, infer_specialty_focus
+from inference.application.pipelines.steps import ChunkRelevanceRanker, ContextJudge, QueryPlan, QueryPlanner, ResponseVerifier, RetrievalOrchestrator
+from inference.domain.guidance import build_caution_lines, build_deterministic_answer, infer_specialty_focus
 from shared.contracts.inference import GenerationOptions, InferenceRequest, RetrievedContext
 
 

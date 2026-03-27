@@ -7,6 +7,14 @@ from shared.contracts.inference import InferenceRequest, InferenceResponse, JobR
 from tests.support.fakes import InMemoryGuidanceJobStore, InMemoryJobResultStore, RecordingNotifier, StaticGuidancePipeline
 
 
+class StaticRetrievalState:
+    def __init__(self, ready: bool) -> None:
+        self.ready = ready
+
+    async def is_guidance_ready(self) -> bool:
+        return self.ready
+
+
 @pytest.mark.asyncio
 async def test_handle_guidance_jobs_completes_and_updates_callback(monkeypatch, inference_response):
     store = InMemoryGuidanceJobStore()
@@ -27,6 +35,7 @@ async def test_handle_guidance_jobs_completes_and_updates_callback(monkeypatch, 
     monkeypatch.setattr(guidance_handler, "CallbackNotifier", lambda: notifier)
     monkeypatch.setattr(guidance_handler, "with_heartbeat", lambda **kwargs: kwargs["operation"]())
     monkeypatch.setattr(guidance_handler, "utc_now_iso", lambda: "2026-03-16T10:15:00+00:00")
+    monkeypatch.setattr(guidance_handler, "get_retrieval_state_controller", lambda: StaticRetrievalState(True))
 
     handled = await guidance_handler.handle_guidance_jobs(worker_id="worker-1", heartbeat_interval_s=5)
 
@@ -39,3 +48,15 @@ async def test_handle_guidance_jobs_completes_and_updates_callback(monkeypatch, 
     assert stored.callback_last_status == "200"
     assert stored.result_object_key in result_store.records
     assert notifier.calls[0]["callback_headers"] == {"X-Test": "1"}
+
+
+@pytest.mark.asyncio
+async def test_handle_guidance_jobs_skips_when_retrieval_not_ready(monkeypatch):
+    store = InMemoryGuidanceJobStore()
+    monkeypatch.setattr(guidance_handler, "get_retrieval_state_controller", lambda: StaticRetrievalState(False))
+    monkeypatch.setattr(guidance_handler, "get_guidance_job_store", lambda: store)
+
+    handled = await guidance_handler.handle_guidance_jobs(worker_id="worker-1", heartbeat_interval_s=5)
+
+    assert handled is False
+    assert store.queue == store.queue

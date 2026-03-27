@@ -3,7 +3,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from api.clients.auth_client import AuthClient, AuthClientError, _classify_transport_error, _extract_boolean
+from api.infrastructure.clients.auth_client import AuthClient, AuthClientError, _classify_transport_error, _extract_boolean
 from tests.support.fakes import DummyAsyncClientContext
 
 
@@ -22,7 +22,7 @@ async def test_validate_credentials_returns_false_for_401(monkeypatch: pytest.Mo
         return httpx.Response(401)
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    monkeypatch.setattr("api.clients.auth_client.create_async_client", lambda timeout_s: DummyAsyncClientContext(client))
+    monkeypatch.setattr("api.infrastructure.clients.auth_client.create_async_client", lambda timeout_s: DummyAsyncClientContext(client))
 
     result = await AuthClient(validation_url="http://auth/validate").validate_credentials(email="user@example.com", password="bad")
 
@@ -35,7 +35,7 @@ async def test_validate_credentials_returns_boolean_payload(monkeypatch: pytest.
         return httpx.Response(200, json={"authenticated": True})
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    monkeypatch.setattr("api.clients.auth_client.create_async_client", lambda timeout_s: DummyAsyncClientContext(client))
+    monkeypatch.setattr("api.infrastructure.clients.auth_client.create_async_client", lambda timeout_s: DummyAsyncClientContext(client))
 
     result = await AuthClient(validation_url="http://auth/validate").validate_credentials(email="user@example.com", password="secret")
 
@@ -51,7 +51,7 @@ async def test_validate_credentials_maps_http_errors(monkeypatch: pytest.MonkeyP
         async def aclose(self):
             return None
 
-    monkeypatch.setattr("api.clients.auth_client.create_async_client", lambda timeout_s: DummyAsyncClientContext(TimeoutClient()))
+    monkeypatch.setattr("api.infrastructure.clients.auth_client.create_async_client", lambda timeout_s: DummyAsyncClientContext(TimeoutClient()))
 
     with pytest.raises(AuthClientError) as exc:
         await AuthClient(validation_url="http://auth/validate").validate_credentials(email="user@example.com", password="secret")
