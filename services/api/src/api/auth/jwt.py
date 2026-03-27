@@ -7,7 +7,7 @@ import json
 import time
 from typing import Any
 
-from shared.config import Settings, get_settings
+from shared.config import ApiSettings, get_api_settings
 from shared.contracts.auth import AuthenticatedUser
 from shared.contracts.error_codes import ErrorCode
 
@@ -32,8 +32,8 @@ def _json_dumps(value: dict[str, Any]) -> bytes:
     return json.dumps(value, separators=(",", ":"), sort_keys=True).encode("utf-8")
 
 
-def create_access_token(*, email: str, settings: Settings | None = None) -> tuple[str, int]:
-    resolved = settings or get_settings()
+def create_access_token(*, email: str, settings: ApiSettings | None = None) -> tuple[str, int]:
+    resolved = settings or get_api_settings()
     now = int(time.time())
     expires_in = resolved.jwt_access_token_exp_minutes * 60
     payload = {
@@ -53,8 +53,8 @@ def create_access_token(*, email: str, settings: Settings | None = None) -> tupl
     return token, expires_in
 
 
-def decode_access_token(token: str, settings: Settings | None = None) -> AuthenticatedUser:
-    resolved = settings or get_settings()
+def decode_access_token(token: str, settings: ApiSettings | None = None) -> AuthenticatedUser:
+    resolved = settings or get_api_settings()
     parts = token.split(".")
     if len(parts) != 3:
         raise JwtValidationError(code=ErrorCode.AUTH_TOKEN_INVALID, message="Token format is invalid.")

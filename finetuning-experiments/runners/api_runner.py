@@ -15,6 +15,7 @@ from configs.schema import BenchmarkRunConfig
 from datasets.schema import BenchmarkCase
 from scoring.latency import summarize_latencies, summarize_stage_latencies
 from telemetry.stage_recorder import extract_guidance_telemetry, extract_ingestion_telemetry
+from utils.gateway_auth import GatewayAuthContext, resolve_gateway_auth_token, resolve_ssl_verify
 
 logger = logging.getLogger(__name__)
 
@@ -176,9 +177,21 @@ def run_api_stage(config: BenchmarkRunConfig, cases: list[BenchmarkCase]) -> dic
         return {}
 
     selected_cases = _choose_cases(cases, config)
-    gateway_client = IngestionClient(base_url=config.execution.gateway_url)
-    guidance_client = GuidanceClient(base_url=config.execution.gateway_url)
-    metrics_client = MetricsClient(base_url=config.execution.gateway_url)
+    gateway_client = IngestionClient(
+        base_url=config.execution.gateway_url,
+        auth_token=config.execution.gateway_auth_token,
+        verify_ssl=config.execution.gateway_verify_ssl,
+    )
+    guidance_client = GuidanceClient(
+        base_url=config.execution.gateway_url,
+        auth_token=config.execution.gateway_auth_token,
+        verify_ssl=config.execution.gateway_verify_ssl,
+    )
+    metrics_client = MetricsClient(
+        base_url=config.execution.gateway_url,
+        auth_token=config.execution.gateway_auth_token,
+        verify_ssl=config.execution.gateway_verify_ssl,
+    )
     guidance_attempts: list[dict[str, Any]] = []
     ingestion_attempts: list[dict[str, Any]] = []
 

@@ -5,7 +5,7 @@ import json
 import httpx
 import pytest
 
-from api.clients.inference_client import (
+from api.infrastructure.clients.inference_client import (
     InferenceClient,
     InferenceClientError,
     _classify_transport_error,
@@ -38,7 +38,7 @@ async def test_generate_guidance_success(monkeypatch: pytest.MonkeyPatch):
         return httpx.Response(200, json=payload)
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    monkeypatch.setattr("api.clients.inference_client.create_async_client", lambda timeout_s: DummyAsyncClientContext(client))
+    monkeypatch.setattr("api.infrastructure.clients.inference_client.create_async_client", lambda timeout_s: DummyAsyncClientContext(client))
 
     result = await InferenceClient(base_url="http://inference.test").generate_guidance(InferenceRequest(request_id="req-1", question="What now?"))
 
@@ -52,7 +52,7 @@ async def test_request_error_includes_upstream_request_id(monkeypatch: pytest.Mo
         return httpx.Response(503, json={"error": {"code": "UPSTREAM_DOWN", "message": "Nope", "details": {"x": 1}}}, headers={"X-Request-ID": "upstream-123"})
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    monkeypatch.setattr("api.clients.inference_client.create_async_client", lambda timeout_s: DummyAsyncClientContext(client))
+    monkeypatch.setattr("api.infrastructure.clients.inference_client.create_async_client", lambda timeout_s: DummyAsyncClientContext(client))
 
     with pytest.raises(InferenceClientError) as exc:
         await InferenceClient(base_url="http://inference.test").get_guidance_job_status("job-1")

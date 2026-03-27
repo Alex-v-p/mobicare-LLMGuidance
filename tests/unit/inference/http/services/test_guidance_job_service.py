@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from inference.http.exceptions import NotFoundError
-from inference.http.services.guidance_service import GuidanceJobService
+from inference.infrastructure.http.exceptions import NotFoundError
+from inference.application.services.guidance_service import GuidanceJobService
 from shared.contracts.inference import InferenceRequest, InferenceResponse, JobRecord
 from tests.support.fakes import InMemoryGuidanceJobStore, InMemoryJobResultStore
 

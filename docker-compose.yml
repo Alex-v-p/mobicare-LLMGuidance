@@ -1,4 +1,24 @@
 services:
+  gateway:
+    image: nginx:1.27-alpine
+    environment:
+      NGINX_SERVER_NAME: "${NGINX_SERVER_NAME:-localhost}"
+      NGINX_HTTPS_PORT: "${GATEWAY_HTTPS_PORT:-8443}"
+      DOLLAR: "$"
+    depends_on:
+      api:
+        condition: service_healthy
+    volumes:
+      - ./deploy/nginx/dev.conf:/etc/nginx/templates/default.conf.template:ro
+    ports:
+      - "${GATEWAY_PORT:-8000}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
   api:
     build:
       context: .
@@ -16,8 +36,8 @@ services:
       OLLAMA_URL: "${OLLAMA_URL:-http://ollama:${OLLAMA_PORT:-11434}}"
       OLLAMA_EMBEDDING_MODEL: "${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}"
       REDIS_URL: "${REDIS_URL:-redis://redis:6379/0}"
-    ports:
-      - "${API_PORT:-8000}:8000"
+    expose:
+      - "8000"
     depends_on:
       inference:
         condition: service_healthy
@@ -56,6 +76,8 @@ services:
       JOB_TTL_SECONDS: "${JOB_TTL_SECONDS:-604800}"
       MINIO_RESULTS_BUCKET: "${MINIO_RESULTS_BUCKET:-guidance-job-results}"
       MINIO_JOB_RETENTION_DAYS: "${MINIO_JOB_RETENTION_DAYS:-7}"
+    expose:
+      - "8001"
     ports:
       - "${INFERENCE_PORT:-8001}:8001"
     depends_on:

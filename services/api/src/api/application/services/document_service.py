@@ -1,17 +1,31 @@
 from __future__ import annotations
 
-from typing import BinaryIO
+from typing import TYPE_CHECKING, BinaryIO
 
-from api.repositories.document_repository import DocumentBlob, DocumentRepository
+from api.application.error_mapping import map_document_error
+from api.application.ports import (
+    DocumentAlreadyExistsError,
+    DocumentNotFoundError,
+    DocumentRepositoryError,
+    DocumentRepositoryPort,
+    DocumentStorageUnavailableError,
+    InvalidDocumentError,
+)
 from shared.contracts.documents import DocumentDeleteResponse, DocumentMetadataListResponse, DocumentUploadResponse
+
+if TYPE_CHECKING:
+    from api.infrastructure.repositories.documents.models import DocumentBlob
 
 
 class DocumentService:
-    def __init__(self, repository: DocumentRepository) -> None:
+    def __init__(self, repository: DocumentRepositoryPort) -> None:
         self._repository = repository
 
     def list_metadata(self, *, offset: int = 0, limit: int = 100) -> DocumentMetadataListResponse:
-        documents, total_count = self._repository.list_documents(offset=offset, limit=limit)
+        try:
+            documents, total_count = self._repository.list_documents(offset=offset, limit=limit)
+        except (DocumentStorageUnavailableError, DocumentRepositoryError) as exc:
+            raise map_document_error(exc) from exc
         return DocumentMetadataListResponse(
             documents=documents,
             count=len(documents),
@@ -22,7 +36,10 @@ class DocumentService:
         )
 
     def get_document(self, object_name: str) -> DocumentBlob:
-        return self._repository.get_document(object_name)
+        try:
+            return self._repository.get_document(object_name)
+        except (DocumentNotFoundError, DocumentStorageUnavailableError, DocumentRepositoryError) as exc:
+            raise map_document_error(exc, object_name=object_name) from exc
 
     def upload_document(
         self,
@@ -34,15 +51,21 @@ class DocumentService:
         object_name: str | None = None,
         overwrite: bool = True,
     ) -> DocumentUploadResponse:
-        document = self._repository.upload_document(
-            filename=filename,
-            content_stream=content_stream,
-            size_bytes=size_bytes,
-            content_type=content_type,
-            object_name=object_name,
-            overwrite=overwrite,
-        )
+        try:
+            document = self._repository.upload_document(
+                filename=filename,
+                content_stream=content_stream,
+                size_bytes=size_bytes,
+                content_type=content_type,
+                object_name=object_name,
+                overwrite=overwrite,
+            )
+        except (InvalidDocumentError, DocumentAlreadyExistsError, DocumentStorageUnavailableError, DocumentRepositoryError) as exc:
+            raise map_document_error(exc, filename=filename) from exc
         return DocumentUploadResponse(document=document)
 
     def delete_document(self, object_name: str) -> DocumentDeleteResponse:
-        return self._repository.delete_document(object_name)
+        try:
+            return self._repository.delete_document(object_name)
+        except (DocumentNotFoundError, DocumentStorageUnavailableError, DocumentRepositoryError) as exc:
+            raise map_document_error(exc, object_name=object_name) from exc

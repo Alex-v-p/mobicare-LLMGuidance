@@ -1,0 +1,21 @@
+services:
+  gateway:
+    volumes:
+      - ./deploy/nginx/prod.conf:/etc/nginx/templates/default.conf.template:ro
+    ports:
+      - "${GATEWAY_PORT:-8000}:80"
+
+  inference:
+    ports: []
+
+  redis:
+    ports: []
+
+  ollama:
+    ports: []
+
+  qdrant:
+    ports: []
+
+  minio:
+    ports: []

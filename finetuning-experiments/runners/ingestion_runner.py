@@ -16,6 +16,7 @@ from source_mapping.llm_labeler import LLMLabelerConfig, OptionalLLMLabeler
 from source_mapping.matcher import SourceMatcher
 from telemetry.stage_recorder import extract_ingestion_telemetry
 from scoring.ingestion import summarize_ingestion_payloads
+from utils.gateway_auth import GatewayAuthContext, resolve_gateway_auth_token, resolve_ssl_verify
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +150,28 @@ def run_ingestion_stage(config: BenchmarkRunConfig, cases: list[BenchmarkCase], 
             cache={"fingerprint": fingerprint, "status": "reused", "source_run_id": cached.run_id},
         )
 
-    client = IngestionClient(base_url=config.execution.gateway_url)
+    auth_token = resolve_gateway_auth_token(
+        GatewayAuthContext(
+            base_url=config.execution.gateway_url,
+            auth_mode=config.execution.gateway_auth_mode,
+            auth_token=config.execution.gateway_auth_token,
+            auth_email=config.execution.gateway_auth_email,
+            auth_password=config.execution.gateway_auth_password,
+            jwt_secret=config.execution.gateway_jwt_secret,
+            jwt_issuer=config.execution.gateway_jwt_issuer,
+            jwt_audience=config.execution.gateway_jwt_audience,
+            jwt_exp_minutes=config.execution.gateway_jwt_exp_minutes,
+            verify_ssl=config.execution.gateway_verify_ssl,
+            ca_bundle_path=config.execution.gateway_ca_bundle_path,
+            timeout_seconds=30,
+        )
+    )
+    verify_ssl = resolve_ssl_verify(config.execution.gateway_verify_ssl, config.execution.gateway_ca_bundle_path)
+    client = IngestionClient(
+        base_url=config.execution.gateway_url,
+        auth_token=auth_token,
+        verify_ssl=verify_ssl,
+    )
     if config.ingestion.delete_collection_first:
         try:
             delete_result = client.delete_collection()

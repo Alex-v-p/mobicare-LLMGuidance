@@ -20,7 +20,7 @@ class StubGuidanceService:
 
 
 def test_create_guidance_job_returns_accepted_response(guidance_request):
-    app = create_app()
+    app = create_app(bootstrap_minio_on_startup=False)
     app.dependency_overrides[get_guidance_service] = lambda: StubGuidanceService()
 
     with TestClient(app) as client:
@@ -33,7 +33,7 @@ def test_create_guidance_job_returns_accepted_response(guidance_request):
 
 
 def test_get_guidance_job_status_returns_payload():
-    app = create_app()
+    app = create_app(bootstrap_minio_on_startup=False)
     app.dependency_overrides[get_guidance_service] = lambda: StubGuidanceService()
 
     with TestClient(app) as client:

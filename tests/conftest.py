@@ -214,7 +214,7 @@ class StubDocumentService:
         )
 
     def get_document(self, object_name: str):
-        from api.repositories.documents.models import DocumentBlob
+        from api.infrastructure.repositories.documents.models import DocumentBlob
 
         return DocumentBlob(
             object_name=object_name,
@@ -291,7 +291,7 @@ def ingestion_response() -> IngestionResponse:
 @pytest.fixture
 def api_app():
     from api.main import create_app as create_api_app
-    return create_api_app()
+    return create_api_app(bootstrap_minio_on_startup=False)
 
 
 @pytest.fixture

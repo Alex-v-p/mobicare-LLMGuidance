@@ -13,7 +13,7 @@ class StubHealthService:
 
 
 def test_health_route_returns_report():
-    app = create_app()
+    app = create_app(bootstrap_minio_on_startup=False)
     app.dependency_overrides[get_health_service] = lambda: StubHealthService()
 
     with TestClient(app) as client:
@@ -25,7 +25,7 @@ def test_health_route_returns_report():
 
 
 def test_metrics_route_returns_text_payload():
-    app = create_app()
+    app = create_app(bootstrap_minio_on_startup=False)
 
     with TestClient(app) as client:
         response = client.get("/metrics")

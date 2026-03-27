@@ -5,15 +5,15 @@ from time import perf_counter
 import redis.asyncio as redis
 
 from shared.clients.health import check_all
-from shared.config import Settings, get_settings
+from shared.config import ApiSettings, get_api_settings
 from shared.contracts.error_codes import ErrorCode
 from shared.contracts.health import DependencyStatus, HealthReport
 from shared.observability.metrics import get_metrics_registry
 
 
 class HealthService:
-    def __init__(self, timeout_s: float | None = None, settings: Settings | None = None) -> None:
-        self._settings = settings or get_settings()
+    def __init__(self, timeout_s: float | None = None, settings: ApiSettings | None = None) -> None:
+        self._settings = settings or get_api_settings()
         self._timeout_s = timeout_s if timeout_s is not None else self._settings.healthcheck_timeout_s
         self._metrics = get_metrics_registry()
 

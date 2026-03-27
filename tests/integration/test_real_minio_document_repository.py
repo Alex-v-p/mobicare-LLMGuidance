@@ -5,7 +5,7 @@ import io
 import pytest
 from minio import Minio
 
-from api.repositories.document_repository import DocumentRepository
+from api.infrastructure.repositories.document_repository import DocumentRepository
 from tests.support.docker import (
     managed_container,
     reserve_tcp_port,

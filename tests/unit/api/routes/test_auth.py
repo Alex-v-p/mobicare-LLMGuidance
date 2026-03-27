@@ -14,7 +14,7 @@ class StubAuthService:
 
 
 def test_auth_token_route_returns_token():
-    app = create_app()
+    app = create_app(bootstrap_minio_on_startup=False)
     app.dependency_overrides[get_auth_service] = lambda: StubAuthService()
 
     with TestClient(app) as client:
@@ -25,7 +25,7 @@ def test_auth_token_route_returns_token():
 
 
 def test_protected_route_returns_current_user():
-    app = create_app()
+    app = create_app(bootstrap_minio_on_startup=False)
     app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(sub="user@example.com", email="user@example.com", iss="issuer", aud="aud", iat=1, exp=9999999999)
 
     with TestClient(app) as client:

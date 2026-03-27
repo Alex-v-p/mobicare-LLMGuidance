@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from urllib3.exceptions import ConnectTimeoutError, MaxRetryError, NewConnectionError
 
-from api.repositories.documents.errors import (
+from api.infrastructure.repositories.documents.errors import (
     DocumentNotFoundError,
     DocumentStorageUnavailableError,
     map_storage_error,

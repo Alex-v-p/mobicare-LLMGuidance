@@ -3,7 +3,7 @@ from __future__ import annotations
 from inference.indexing.ingestion_service import IngestionService
 from inference.indexing.models import TextChunk
 from inference.indexing.vector_indexer import VectorIndexingService
-from shared.config import Settings
+from shared.config import InferenceSettings
 from shared.contracts.ingestion import IngestDocumentsRequest
 
 
@@ -31,8 +31,8 @@ class FakeVectorStore:
     def ensure_collection(self, vector_size: int) -> None:
         self.ensure_calls.append(vector_size)
 
-    def upsert_chunks(self, chunks, embeddings):
-        self.upsert_calls.append((chunks, embeddings))
+    def upsert_chunks(self, chunks, embeddings, *, embedding_model=None):
+        self.upsert_calls.append((chunks, embeddings, embedding_model))
         return len(chunks)
 
 
@@ -81,7 +81,7 @@ class FakeIndexer:
 async def test_vector_indexer_indexes_only_non_empty_chunks():
     embedding_client = FakeEmbeddingClient()
     vector_store = FakeVectorStore()
-    settings = Settings(ollama_embedding_batch_size=1)
+    settings = InferenceSettings(ollama_embedding_batch_size=1)
     service = VectorIndexingService(embedding_client=embedding_client, vector_store=vector_store, settings=settings)
     chunks = [
         TextChunk(chunk_id="1", source_id="a", title="A", text="hello", metadata={}),
@@ -94,6 +94,7 @@ async def test_vector_indexer_indexes_only_non_empty_chunks():
     assert embedding_client.selected_model == "embed-x"
     assert vector_store.ensure_calls == [1]
     assert len(vector_store.upsert_calls[0][0]) == 1
+    assert vector_store.upsert_calls[0][2] == "embed-x"
     assert embedding_client.embed_many_calls == [["hello"]]
 
 
@@ -134,7 +135,7 @@ async def test_ingestion_service_orchestrates_loader_preparer_and_indexer():
 async def test_vector_indexer_respects_embedding_batch_size_setting():
     embedding_client = FakeEmbeddingClient()
     vector_store = FakeVectorStore()
-    settings = Settings(ollama_embedding_batch_size=2)
+    settings = InferenceSettings(ollama_embedding_batch_size=2)
     service = VectorIndexingService(
         embedding_client=embedding_client,
         vector_store=vector_store,

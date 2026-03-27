@@ -4,13 +4,13 @@ import httpx
 import pytest
 
 from api.main import create_app as create_api_app
-from inference.http.dependencies import (
+from inference.infrastructure.http.dependencies import (
     get_guidance_job_service,
     get_guidance_request_service,
     get_ingestion_job_service,
     get_ingestion_request_service,
 )
-from inference.http.main import create_app as create_inference_app
+from inference.infrastructure.http.main import create_app as create_inference_app
 from shared.contracts.inference import JobRecord
 from shared.contracts.ingestion import IngestionCollectionDeleteResponse, IngestionJobRecord
 from tests.support.fakes import (
@@ -67,6 +67,7 @@ class StubIngestionJobService:
         return await self._store.get(job_id)
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_api_proxies_guidance_and_ingestion_requests(guidance_request, inference_response, ingestion_response, monkeypatch):
     inference_app = create_inference_app()
@@ -83,7 +84,7 @@ async def test_api_proxies_guidance_and_ingestion_requests(guidance_request, inf
     inference_app.dependency_overrides[get_ingestion_job_service] = lambda: StubIngestionJobService(ingestion_store)
 
     monkeypatch.setattr(
-        "api.clients.inference_client.create_async_client",
+        "api.infrastructure.clients.inference_client.create_async_client",
         lambda timeout_s: DummyAsyncClientContext(
             httpx.AsyncClient(
                 transport=httpx.ASGITransport(app=inference_app),

@@ -32,6 +32,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-enriched-dataset", default=None, help="Deprecated. Ignored on purpose.")
     parser.add_argument("--gateway-url", default="http://localhost:8000")
     parser.add_argument("--qdrant-url", default="http://localhost:6333")
+    parser.add_argument("--auth-token", default=None, help="Optional bearer token for the gateway reverse-proxy.")
+    parser.add_argument(
+        "--verify-ssl",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Verify TLS certificates when the gateway URL uses HTTPS.",
+    )
     parser.add_argument("--collection", default="guidance_chunks")
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--run-ingestion", action="store_true")
@@ -83,7 +90,7 @@ def _build_cases(raw_dataset: dict[str, Any]) -> list[BenchmarkCase]:
 def _maybe_run_ingestion(args: argparse.Namespace) -> dict[str, Any] | None:
     if not args.run_ingestion:
         return None
-    client = GatewayClient(base_url=args.gateway_url)
+    client = GatewayClient(base_url=args.gateway_url, auth_token=args.auth_token, verify_ssl=args.verify_ssl)
     if args.delete_collection_first:
         delete_result = client.delete_ingestion_collection()
         logger.info(
