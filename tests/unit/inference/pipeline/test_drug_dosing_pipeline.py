@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from inference.pipeline.generate_guidance import GuidancePipeline
+from inference.application.pipelines.factory import build_guidance_pipeline
 from inference.retrieval.hybrid import HybridRetrievalResult
 from shared.contracts.inference import GenerationOptions, InferenceRequest, OllamaGenerateResponse, RetrievedContext
 
@@ -94,12 +94,18 @@ class FakeDenseRetriever:
 
     _embedding_client = _Emb()
 
+    def resolve_embedding_model(self, requested_embedding_model: str | None = None) -> str:
+        return requested_embedding_model or self._embedding_client.model
+
     async def retrieve(self, query: str, limit: int | None = None, embedding_model: str | None = None):
         return _contexts_for_query(query)[: limit or 2]
 
 
 @dataclass
 class FakeHybridRetriever:
+    def resolve_embedding_model(self, requested_embedding_model: str | None = None) -> str:
+        return requested_embedding_model or "fake-embed"
+
     async def retrieve(self, **kwargs):
         query = kwargs["query"]
         items = _contexts_for_query(query)[: kwargs.get("limit", 2)]
@@ -111,6 +117,7 @@ class FakeHybridRetriever:
                 "sparse_candidates": len(items),
                 "hybrid_dense_weight": kwargs.get("dense_weight", 0.65),
                 "hybrid_sparse_weight": kwargs.get("sparse_weight", 0.35),
+                "embedding_model": kwargs.get("embedding_model") or "fake-embed",
                 "graph_augmented": False,
                 "graph_nodes_added": 0,
                 "graph_edges_used": [],
@@ -148,7 +155,7 @@ def _contexts_for_query(query: str) -> list[RetrievedContext]:
 
 @pytest.mark.asyncio
 async def test_grounded_drug_dosing_pipeline_returns_retrieved_context_and_grounded_answer():
-    pipeline = GuidancePipeline(retriever=FakeDenseRetriever(), hybrid_retriever=FakeHybridRetriever(), ollama_client=FakeOllamaClient())
+    pipeline = build_guidance_pipeline(retriever=FakeDenseRetriever(), hybrid_retriever=FakeHybridRetriever(), ollama_client=FakeOllamaClient())
 
     response = await pipeline.run(
         InferenceRequest(
@@ -185,7 +192,7 @@ async def test_grounded_drug_dosing_pipeline_returns_retrieved_context_and_groun
 
 @pytest.mark.asyncio
 async def test_grounded_drug_dosing_pipeline_blocks_unsafe_recommendations_from_retrieved_thresholds():
-    pipeline = GuidancePipeline(retriever=FakeDenseRetriever(), hybrid_retriever=FakeHybridRetriever(), ollama_client=FakeOllamaClient())
+    pipeline = build_guidance_pipeline(retriever=FakeDenseRetriever(), hybrid_retriever=FakeHybridRetriever(), ollama_client=FakeOllamaClient())
 
     response = await pipeline.run(
         InferenceRequest(
@@ -216,7 +223,7 @@ async def test_grounded_drug_dosing_pipeline_blocks_unsafe_recommendations_from_
 
 @pytest.mark.asyncio
 async def test_grounded_drug_dosing_pipeline_uses_evidence_backed_default_agents_when_unspecified():
-    pipeline = GuidancePipeline(retriever=FakeDenseRetriever(), hybrid_retriever=FakeHybridRetriever(), ollama_client=FakeOllamaClient())
+    pipeline = build_guidance_pipeline(retriever=FakeDenseRetriever(), hybrid_retriever=FakeHybridRetriever(), ollama_client=FakeOllamaClient())
 
     response = await pipeline.run(
         InferenceRequest(
@@ -245,7 +252,7 @@ async def test_grounded_drug_dosing_pipeline_uses_evidence_backed_default_agents
 
 @pytest.mark.asyncio
 async def test_grounded_drug_dosing_pipeline_uses_family_specific_contexts_for_evidence_mapping():
-    pipeline = GuidancePipeline(retriever=FakeDenseRetriever(), hybrid_retriever=FakeHybridRetriever(), ollama_client=FakeOllamaClient())
+    pipeline = build_guidance_pipeline(retriever=FakeDenseRetriever(), hybrid_retriever=FakeHybridRetriever(), ollama_client=FakeOllamaClient())
 
     response = await pipeline.run(
         InferenceRequest(
@@ -275,7 +282,7 @@ async def test_grounded_drug_dosing_pipeline_uses_family_specific_contexts_for_e
 
 @pytest.mark.asyncio
 async def test_grounded_drug_dosing_pipeline_includes_evidence_and_short_answer_for_sample_case():
-    pipeline = GuidancePipeline(retriever=FakeDenseRetriever(), hybrid_retriever=FakeHybridRetriever(), ollama_client=FakeOllamaClient())
+    pipeline = build_guidance_pipeline(retriever=FakeDenseRetriever(), hybrid_retriever=FakeHybridRetriever(), ollama_client=FakeOllamaClient())
 
     response = await pipeline.run(
         InferenceRequest(

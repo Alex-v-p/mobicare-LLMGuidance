@@ -4,13 +4,13 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from shared.config import Settings, get_settings
+from shared.config import InferenceSettings, get_inference_settings
 from shared.contracts.inference import JobRecord, utc_now_iso
 
 
 class FileJobStore:
-    def __init__(self, root_dir: str | None = None, settings: Settings | None = None) -> None:
-        self._settings = settings or get_settings()
+    def __init__(self, root_dir: str | None = None, settings: InferenceSettings | None = None) -> None:
+        self._settings = settings or get_inference_settings()
         self._root = Path(root_dir or self._settings.jobs_dir)
         self._queued = self._root / "queued"
         self._running = self._root / "running"

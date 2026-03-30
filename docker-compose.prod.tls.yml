@@ -1,0 +1,8 @@
+services:
+  gateway:
+    volumes:
+      - ./deploy/nginx/tls.conf:/etc/nginx/templates/default.conf.template:ro
+      - ./deploy/nginx/certs:/etc/nginx/certs:ro
+    ports:
+      - "${GATEWAY_HTTP_PORT:-8080}:80"
+      - "${GATEWAY_HTTPS_PORT:-8443}:443"

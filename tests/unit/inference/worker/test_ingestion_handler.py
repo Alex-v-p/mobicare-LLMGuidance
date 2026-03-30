@@ -58,6 +58,21 @@ class InMemoryIngestionJobStore:
         self.records[record.job_id] = record.model_copy(deep=True)
 
 
+class StaticRetrievalState:
+    def __init__(self) -> None:
+        self.states: list[tuple[str, str]] = []
+
+    async def mark_ingesting(self, *, job_id: str):
+        self.states.append(("ingesting", job_id))
+
+    async def mark_ready(self, *, collection: str, embedding_model: str | None = None):
+        suffix = embedding_model or ""
+        self.states.append(("ready", f"{collection}:{suffix}"))
+
+    async def mark_failed(self, message: str):
+        self.states.append(("failed", message))
+
+
 class StaticIngestionService:
     def __init__(self, response=None, error=None):
         self.response = response
@@ -91,7 +106,9 @@ async def test_handle_ingestion_jobs_completes_and_persists_result(monkeypatch):
 
     monkeypatch.setattr("inference.worker.handlers.ingestion_handler.get_ingestion_job_store", lambda: store)
     monkeypatch.setattr("inference.worker.handlers.ingestion_handler.get_ingestion_service", lambda: service)
+    retrieval_state = StaticRetrievalState()
     monkeypatch.setattr("inference.worker.handlers.ingestion_handler.get_ingestion_job_result_store", lambda: results)
+    monkeypatch.setattr("inference.worker.handlers.ingestion_handler.get_retrieval_state_controller", lambda: retrieval_state)
 
     processed = await handle_ingestion_jobs(worker_id="worker-1", heartbeat_interval_s=1)
     updated = await store.get(record.job_id)
@@ -100,6 +117,7 @@ async def test_handle_ingestion_jobs_completes_and_persists_result(monkeypatch):
     assert updated.status == "completed"
     assert updated.result_object_key is not None
     assert store.closed is True
+    assert retrieval_state.states == [("ingesting", record.job_id), ("ready", "guidance:embed")]
 
 
 async def test_handle_ingestion_jobs_marks_failed_when_service_raises(monkeypatch):
@@ -111,7 +129,9 @@ async def test_handle_ingestion_jobs_marks_failed_when_service_raises(monkeypatc
 
     monkeypatch.setattr("inference.worker.handlers.ingestion_handler.get_ingestion_job_store", lambda: store)
     monkeypatch.setattr("inference.worker.handlers.ingestion_handler.get_ingestion_service", lambda: service)
+    retrieval_state = StaticRetrievalState()
     monkeypatch.setattr("inference.worker.handlers.ingestion_handler.get_ingestion_job_result_store", lambda: results)
+    monkeypatch.setattr("inference.worker.handlers.ingestion_handler.get_retrieval_state_controller", lambda: retrieval_state)
 
     processed = await handle_ingestion_jobs(worker_id="worker-1", heartbeat_interval_s=1)
     updated = await store.get(record.job_id)
@@ -120,3 +140,5 @@ async def test_handle_ingestion_jobs_marks_failed_when_service_raises(monkeypatc
     assert updated.status == "failed"
     assert "RuntimeError: boom" in updated.error
     assert updated.result_object_key is not None
+    assert retrieval_state.states[0] == ("ingesting", record.job_id)
+    assert retrieval_state.states[1][0] == "failed"

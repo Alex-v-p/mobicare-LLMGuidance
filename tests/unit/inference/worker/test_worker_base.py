@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from inference.worker.handlers.base import cancel_heartbeat, heartbeat_loop, with_heartbeat
+from inference.worker.heartbeat import cancel_heartbeat, heartbeat_loop, with_heartbeat
 
 
 class HeartbeatStore:

@@ -5,20 +5,21 @@ from functools import lru_cache
 from minio import Minio
 
 from api.application.services.auth_service import AuthService
+from api.application.services.clinical_config_service import ClinicalConfigService
 from api.application.services.document_service import DocumentService
 from api.application.services.guidance_service import GuidanceService
 from api.application.services.health_service import HealthService
 from api.application.services.ingestion_service import IngestionService
-from api.clients.auth_client import AuthClient
-from api.clients.inference_client import InferenceClient
+from api.infrastructure.clients.auth_client import AuthClient
+from api.infrastructure.clients.inference_client import InferenceClient
 from api.infrastructure.minio import create_minio_client
-from api.repositories.document_repository import DocumentRepository
-from shared.config import Settings, get_settings
+from api.infrastructure.repositories.clinical_config import ClinicalConfigRepository
+from api.infrastructure.repositories.document_repository import DocumentRepository
+from shared.config import ApiSettings, get_api_settings as resolve_api_settings
 
 
-@lru_cache(maxsize=1)
-def get_api_settings() -> Settings:
-    return get_settings()
+def get_api_settings() -> ApiSettings:
+    return resolve_api_settings()
 
 
 @lru_cache(maxsize=1)
@@ -34,8 +35,6 @@ def get_document_repository() -> DocumentRepository:
         documents_bucket=settings.minio_documents_bucket,
         documents_prefix=settings.minio_documents_prefix,
     )
-
-
 
 
 @lru_cache(maxsize=1)
@@ -62,12 +61,23 @@ def get_document_service() -> DocumentService:
     return DocumentService(repository=get_document_repository())
 
 
+@lru_cache(maxsize=1)
+def get_clinical_config_repository() -> ClinicalConfigRepository:
+    return ClinicalConfigRepository(client=get_minio_client(), settings=get_api_settings())
+
+
+def get_clinical_config_service() -> ClinicalConfigService:
+    return ClinicalConfigService(repository=get_clinical_config_repository())
+
+
 def get_guidance_service() -> GuidanceService:
-    return GuidanceService(inference_client=get_inference_client())
+    settings = get_api_settings()
+    return GuidanceService(inference_client=get_inference_client(), settings=settings)
 
 
 def get_ingestion_service() -> IngestionService:
-    return IngestionService(inference_client=get_inference_client())
+    settings = get_api_settings()
+    return IngestionService(inference_client=get_inference_client(), settings=settings)
 
 
 def get_health_service() -> HealthService:

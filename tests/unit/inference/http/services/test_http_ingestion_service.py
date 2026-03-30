@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from inference.http.exceptions import NotFoundError
-from inference.http.services.ingestion_service import IngestionJobService, IngestionRequestService
+from inference.infrastructure.http.exceptions import NotFoundError
+from inference.application.services.ingestion_service import IngestionJobService, IngestionRequestService
 from shared.contracts.ingestion import IngestDocumentsRequest, IngestionJobRecord, IngestionResponse
 from tests.support.fakes import InMemoryIngestionJobStore, InMemoryJobResultStore
 

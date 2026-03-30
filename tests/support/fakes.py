@@ -113,6 +113,12 @@ class InMemoryIngestionJobStore:
         record = self.records.get(job_id)
         return record.model_copy(deep=True) if record is not None else None
 
+    async def find_first_by_statuses(self, statuses: set[str]) -> IngestionJobRecord | None:
+        for record in self.records.values():
+            if record.status in statuses:
+                return record.model_copy(deep=True)
+        return None
+
     async def update(self, record: IngestionJobRecord) -> None:
         self.records[record.job_id] = record.model_copy(deep=True)
 

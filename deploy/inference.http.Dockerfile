@@ -25,4 +25,4 @@ RUN pip install --no-cache-dir \
     "pypdf>=5,<6"
 
 EXPOSE 8001
-CMD ["uvicorn", "inference.http.main:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["uvicorn", "inference.infrastructure.http.main:app", "--host", "0.0.0.0", "--port", "8001"]

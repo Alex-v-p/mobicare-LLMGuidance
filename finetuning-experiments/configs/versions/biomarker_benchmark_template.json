@@ -4,7 +4,9 @@
   "dataset_version": "benchmark_biomarker_v1",
   "ingestion": {
     "enabled": true,
-    "document_paths": ["./dataset_generation/docs/HF_GuidLine_Christof_ehab368_Suppl.pdf"],
+    "document_paths": [
+      "./dataset_generation/docs/HF_GuidLine_Christof_ehab368_Suppl.pdf"
+    ],
     "chunking_strategy": "basic",
     "chunk_size": 300,
     "chunk_overlap": 100,
@@ -28,8 +30,19 @@
     "embedding_model": "nomic-embed-text"
   },
   "execution": {
+    "gateway_url": "http://localhost:8000",
+    "gateway_auth_mode": "none",
     "warmup_cases": 1,
     "poll_interval_seconds": 2,
-    "max_wait_seconds": 600
+    "max_wait_seconds": 600,
+    "gateway_auth_token": null,
+    "gateway_auth_email": null,
+    "gateway_auth_password": null,
+    "gateway_jwt_secret": null,
+    "gateway_jwt_issuer": "mobicare-llm-api",
+    "gateway_jwt_audience": "mobicare-gateway",
+    "gateway_jwt_exp_minutes": 60,
+    "gateway_verify_ssl": true,
+    "gateway_ca_bundle_path": null
   }
 }

@@ -7,6 +7,7 @@ from .schema import BenchmarkRunConfig
 _ALLOWED_RETRIEVAL_MODES = {"dense", "sparse", "hybrid"}
 _ALLOWED_PERCENTILE_POLICIES = {"all", "success_only"}
 _ALLOWED_OUTLIER_POLICIES = {"keep_all", "exclude_failures"}
+_ALLOWED_GATEWAY_AUTH_MODES = {"none", "bearer", "gateway_login", "local_jwt"}
 
 
 
@@ -65,6 +66,18 @@ def validate_run_config(config: BenchmarkRunConfig) -> None:
         errors.append("execution.warmup_cases cannot be negative.")
     if not config.execution.output_dir:
         errors.append("execution.output_dir is required.")
+    if config.execution.gateway_auth_mode not in _ALLOWED_GATEWAY_AUTH_MODES:
+        errors.append(f"execution.gateway_auth_mode must be one of {sorted(_ALLOWED_GATEWAY_AUTH_MODES)}.")
+    if config.execution.gateway_auth_mode == "bearer" and not (config.execution.gateway_auth_token or "").strip():
+        errors.append("execution.gateway_auth_token is required when gateway_auth_mode='bearer'.")
+    if config.execution.gateway_auth_mode in {"gateway_login", "local_jwt"} and not (config.execution.gateway_auth_email or "").strip():
+        errors.append("execution.gateway_auth_email is required when gateway_auth_mode uses a generated or login-based token.")
+    if config.execution.gateway_auth_mode == "gateway_login" and not (config.execution.gateway_auth_password or ""):
+        errors.append("execution.gateway_auth_password is required when gateway_auth_mode='gateway_login'.")
+    if config.execution.gateway_auth_mode == "local_jwt" and not (config.execution.gateway_jwt_secret or "").strip():
+        errors.append("execution.gateway_jwt_secret is required when gateway_auth_mode='local_jwt'.")
+    if config.execution.gateway_jwt_exp_minutes <= 0:
+        errors.append("execution.gateway_jwt_exp_minutes must be positive.")
 
     rubric = config.evaluation.deterministic_rubric
     rubric_weights = [
