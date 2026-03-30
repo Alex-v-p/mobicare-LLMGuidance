@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inference-worker
+  namespace: llmguidance
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: inference-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: inference-worker
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: inference-worker
+          image: mobicare-llm/inference-worker:local
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: llmguidance-config
+            - secretRef:
+                name: llmguidance-secrets
+          startupProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "grep -aq 'inference.worker.runtime.main' /proc/1/cmdline"
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 18
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "grep -aq 'inference.worker.runtime.main' /proc/1/cmdline"
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3

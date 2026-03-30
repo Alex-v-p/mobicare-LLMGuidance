@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import asyncio
+from functools import partial
+
 from inference.embeddings.ollama_embeddings import OllamaEmbeddingsClient
 from inference.indexing.models import TextChunk
 from inference.storage.qdrant_store import QdrantVectorStore
@@ -25,18 +28,28 @@ class VectorIndexingService:
 
         client = self._embedding_client.with_model(embedding_model)
         resolved_embedding_model = embedding_model or client.model
-
-        all_embeddings: list[list[float]] = []
         batch_size = max(1, self._settings.ollama_embedding_batch_size)
+
+        indexed = 0
+        collection_ready = False
 
         for i in range(0, len(safe_chunks), batch_size):
             batch = safe_chunks[i:i + batch_size]
             batch_embeddings = await client.embed_many([chunk.text for chunk in batch])
-            all_embeddings.extend(batch_embeddings)
+            if not batch_embeddings:
+                continue
 
-        self._vector_store.ensure_collection(vector_size=len(all_embeddings[0]))
-        return self._vector_store.upsert_chunks(
-            safe_chunks,
-            all_embeddings,
-            embedding_model=resolved_embedding_model,
-        )
+            if not collection_ready:
+                await asyncio.to_thread(self._vector_store.ensure_collection, len(batch_embeddings[0]))
+                collection_ready = True
+
+            indexed += await asyncio.to_thread(
+                partial(
+                    self._vector_store.upsert_chunks,
+                    batch,
+                    batch_embeddings,
+                    embedding_model=resolved_embedding_model,
+                )
+            )
+
+        return indexed

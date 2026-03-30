@@ -1,0 +1,57 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: inference-bootstrap-minio
+  namespace: llmguidance
+spec:
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: bootstrap-minio
+          image: mobicare-llm/inference-http:local
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: llmguidance-config
+            - secretRef:
+                name: llmguidance-secrets
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              until curl -fsS http://minio:9000/minio/health/ready >/dev/null; do
+                echo "waiting for minio"
+                sleep 2
+              done
+              python -m inference.bootstrap_minio
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ollama-pull-models
+  namespace: llmguidance
+spec:
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: ollama-pull-models
+          image: curlimages/curl:8.10.1
+          envFrom:
+            - configMapRef:
+                name: llmguidance-config
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              until curl -fsS http://ollama:11434/api/tags >/dev/null; do
+                echo "waiting for ollama"
+                sleep 2
+              done
+              curl -fsS http://ollama:11434/api/pull -d "{\"name\":\"${OLLAMA_MODEL}\",\"stream\":false}"
+              curl -fsS http://ollama:11434/api/pull -d "{\"name\":\"${OLLAMA_EMBEDDING_MODEL}\",\"stream\":false}"
