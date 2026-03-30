@@ -12,24 +12,25 @@ class StubGuidanceService:
         return JobAcceptedResponse(
             job_id="job-123",
             request_id=request.request_id,
-            status_url="http://testserver/guidance/jobs/job-123",
+            status_url="http://upstream/guidance/jobs/job-123",
         )
 
     async def get_job_status(self, job_id: str):
         return ApiGuidanceJobStatus(job_id=job_id, request_id="req-123", status="completed", answer="ok", model="model")
 
 
-def test_create_guidance_job_returns_accepted_response(guidance_request):
+def test_create_guidance_job_rewrites_status_url():
     app = create_app(bootstrap_minio_on_startup=False)
     app.dependency_overrides[get_guidance_service] = lambda: StubGuidanceService()
 
     with TestClient(app) as client:
-        response = client.post("/guidance/jobs", json=guidance_request.model_dump(mode="json"))
+        response = client.post("/guidance/jobs", json={"request_id": "req-123", "patient": {"values": {}}, "options": {}})
 
     assert response.status_code == 200
     payload = response.json()
     assert payload["job_id"] == "job-123"
-    assert payload["request_id"] == guidance_request.request_id
+    assert payload["request_id"] == "req-123"
+    assert payload["status_url"] == "http://testserver/guidance/jobs/job-123"
 
 
 def test_get_guidance_job_status_returns_payload():

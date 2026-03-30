@@ -11,6 +11,20 @@ from shared.observability import get_metrics_registry
 router = APIRouter(tags=["health"])
 
 
+def _liveness_report() -> HealthReport:
+    return HealthReport(status="ok", deps={})
+
+
+@router.get("/live", response_model=HealthReport)
+async def get_live() -> HealthReport:
+    return _liveness_report()
+
+
+@router.get("/ready", response_model=HealthReport)
+async def get_ready(service: HealthService = Depends(get_health_service)) -> HealthReport:
+    return await service.report()
+
+
 @router.get("/health", response_model=HealthReport)
 async def get_health(service: HealthService = Depends(get_health_service)) -> HealthReport:
     return await service.report()

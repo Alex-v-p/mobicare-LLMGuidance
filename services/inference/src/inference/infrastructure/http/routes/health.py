@@ -38,7 +38,7 @@ async def _check_redis() -> DependencyStatus:
         await client.aclose()
 
 
-async def _report() -> HealthReport:
+async def _readiness_report() -> HealthReport:
     settings = get_inference_settings()
     deps = await check_all({
         "qdrant": f"{settings.qdrant_url.rstrip('/')}/readyz",
@@ -50,14 +50,23 @@ async def _report() -> HealthReport:
     return HealthReport(status="ok" if overall_ok else "degraded", deps=deps)
 
 
-@router.get("/health", response_model=HealthReport)
-async def health() -> HealthReport:
-    return await _report()
+def _liveness_report() -> HealthReport:
+    return HealthReport(status="ok", deps={})
+
+
+@router.get("/live", response_model=HealthReport)
+async def live() -> HealthReport:
+    return _liveness_report()
 
 
 @router.get("/ready", response_model=HealthReport)
 async def ready() -> HealthReport:
-    return await _report()
+    return await _readiness_report()
+
+
+@router.get("/health", response_model=HealthReport)
+async def health() -> HealthReport:
+    return await _readiness_report()
 
 
 @router.get("/metrics", response_class=PlainTextResponse)
