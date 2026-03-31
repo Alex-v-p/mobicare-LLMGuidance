@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: llmguidance
+resources:
+  - ../../base
+  - config/app-config.yaml
+  - networking/ingress.yaml
+images:
+  - name: mobicare-llm/api
+    newTag: 1.0.0
+  - name: mobicare-llm/inference-http
+    newTag: 1.0.0
+  - name: mobicare-llm/inference-worker
+    newTag: 1.0.0
+  - name: redis
+    newTag: 7.4-alpine
+  - name: qdrant/qdrant
+    newTag: v1.16.1
+  - name: minio/minio
+    newTag: RELEASE.2025-09-07T16-13-09Z
+  - name: ollama/ollama
+    newTag: 0.19.0

@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: inference
+spec:
+  selector:
+    app.kubernetes.io/name: inference
+  ports:
+    - name: http
+      port: 8001
+      targetPort: 8001

@@ -1,23 +1,10 @@
-apiVersion: v1
-kind: Service
-metadata:
-  name: inference
-  namespace: llmguidance
-spec:
-  selector:
-    app.kubernetes.io/name: inference
-  ports:
-    - name: http
-      port: 8001
-      targetPort: 8001
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: inference
-  namespace: llmguidance
 spec:
   replicas: 1
+  revisionHistoryLimit: 2
   selector:
     matchLabels:
       app.kubernetes.io/name: inference
@@ -25,10 +12,16 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: inference
+        app.kubernetes.io/component: inference
+        app.kubernetes.io/part-of: llmguidance
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: inference
-          image: mobicare-llm/inference-http:local
+          image: mobicare-llm/inference-http
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8001
@@ -38,6 +31,13 @@ spec:
                 name: llmguidance-config
             - secretRef:
                 name: llmguidance-secrets
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 2Gi
           startupProbe:
             httpGet:
               path: /ready
@@ -56,3 +56,8 @@ spec:
               port: 8001
             initialDelaySeconds: 10
             periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL

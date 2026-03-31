@@ -2,9 +2,8 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: llmguidance-config
-  namespace: llmguidance
 data:
-  APP_ENV: "dev"
+  APP_ENV: "prod"
   API_PORT: "8000"
   INFERENCE_PORT: "8001"
   INFERENCE_URL: "http://inference:8001"
@@ -36,7 +35,7 @@ data:
   DOCUMENT_UPLOAD_MAX_BYTES: "52428800"
   DOCUMENT_ALLOWED_EXTENSIONS_CSV: ""
   DOCUMENT_ALLOWED_CONTENT_TYPES_CSV: ""
-  AUTH_VALIDATION_URL: "http://auth-provider.local/validate"
+  AUTH_VALIDATION_URL: "https://auth.example.com/validate"
   AUTH_VALIDATION_TIMEOUT_S: "10"
   JWT_ACCESS_TOKEN_EXP_MINUTES: "60"
   JWT_ISSUER: "mobicare-llm-api"

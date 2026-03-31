@@ -8,9 +8,9 @@ $ErrorActionPreference = 'Stop'
 $RootDir = Split-Path -Parent $PSScriptRoot
 $Namespace = 'llmguidance'
 $AppImages = @(
-    @{ Dockerfile = 'deploy/api.Dockerfile'; Image = 'mobicare-llm/api:local' },
-    @{ Dockerfile = 'deploy/inference.http.Dockerfile'; Image = 'mobicare-llm/inference-http:local' },
-    @{ Dockerfile = 'deploy/inference.worker.Dockerfile'; Image = 'mobicare-llm/inference-worker:local' }
+@{ Dockerfile = 'deploy/api.Dockerfile'; Image = 'mobicare-llm/api:1.0.0' },
+@{ Dockerfile = 'deploy/inference.http.Dockerfile'; Image = 'mobicare-llm/inference-http:1.0.0' },
+@{ Dockerfile = 'deploy/inference.worker.Dockerfile'; Image = 'mobicare-llm/inference-worker:1.0.0' }
 )
 
 Set-Location $RootDir
@@ -59,7 +59,7 @@ function Wait-Infra {
 
 function Rebootstrap {
     kubectl delete job inference-bootstrap-minio ollama-pull-models -n $Namespace --ignore-not-found
-    kubectl apply -f deploy/kubernetes/bootstrap-jobs.yaml
+    kubectl apply -k deploy/kubernetes/overlays/production/bootstrap
     kubectl wait --for=condition=complete job/inference-bootstrap-minio -n $Namespace --timeout=10m
     kubectl wait --for=condition=complete job/ollama-pull-models -n $Namespace --timeout=20m
 }

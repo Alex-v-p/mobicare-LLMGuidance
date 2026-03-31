@@ -1,3 +1,8 @@
+deploy/kubernetes/overlays/production/secrets/secret.env
+deploy/kubernetes/overlays/production/secrets/tls/*.pem
+deploy/kubernetes/overlays/production/secrets/tls/*.key
+deploy/kubernetes/overlays/production/secrets/tls/*.crt
+
 # Pants workspace files
 /.pants.d
 /dist/

@@ -1,28 +1,11 @@
-apiVersion: v1
-kind: Service
-metadata:
-  name: qdrant
-  namespace: llmguidance
-spec:
-  clusterIP: None
-  selector:
-    app.kubernetes.io/name: qdrant
-  ports:
-    - name: http
-      port: 6333
-      targetPort: 6333
-    - name: grpc
-      port: 6334
-      targetPort: 6334
----
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: qdrant
-  namespace: llmguidance
 spec:
   serviceName: qdrant
   replicas: 1
+  revisionHistoryLimit: 2
   selector:
     matchLabels:
       app.kubernetes.io/name: qdrant
@@ -30,15 +13,30 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: qdrant
+        app.kubernetes.io/component: qdrant
+        app.kubernetes.io/part-of: llmguidance
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 30
       containers:
         - name: qdrant
-          image: qdrant/qdrant:latest
+          image: qdrant/qdrant
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 6333
               name: http
             - containerPort: 6334
               name: grpc
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "1"
+              memory: 2Gi
           livenessProbe:
             httpGet:
               path: /livez
@@ -54,6 +52,11 @@ spec:
           volumeMounts:
             - name: storage
               mountPath: /qdrant/storage
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
   volumeClaimTemplates:
     - metadata:
         name: storage

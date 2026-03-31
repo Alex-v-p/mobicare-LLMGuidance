@@ -1,48 +1,70 @@
-# Kubernetes deployment
+# Kubernetes production deployment
 
-This directory contains a small-cluster Kubernetes deployment for the full stack:
+This directory now targets **production-style Kubernetes only**. Development stays on Docker Compose.
 
-- API
-- inference HTTP service
-- inference worker
-- Redis
-- Qdrant
-- MinIO
-- Ollama
+## What changed
 
-It is aimed at getting the project running on Kubernetes first. It is not a final production hardening pass yet.
+The manifests are now organized by responsibility:
 
-## Images used
+- `base/` contains reusable workload, storage, and network policy manifests grouped by component.
+- `overlays/production/` contains the production config, pinned image tags, ingress, and bootstrap jobs.
+- `kustomization.yaml` at the root points to the production overlay so `kubectl apply -k deploy/kubernetes` still works.
 
-The manifests expect these application images to exist:
+## Key production improvements
 
-- `mobicare-llm/api:local`
-- `mobicare-llm/inference-http:local`
-- `mobicare-llm/inference-worker:local`
+- static image tags are centralized in `overlays/production/kustomization.yaml`
+- explicit CPU and memory requests/limits were added to every workload
+- PodDisruptionBudgets were added for all long-running workloads
+- namespace-wide default deny network policies were added, then opened back up only where needed
+- a production ingress with TLS termination is included
+- secrets and TLS certificates are no longer stored in the deploy tree
+- service account tokens are no longer auto-mounted into the pods
+- pod/container security settings now use runtime-default seccomp and drop Linux capabilities where practical
 
-## Build images
+## Before first deploy
 
-From the repository root:
+### 1. Review production config
 
-```bash
-docker build -f deploy/api.Dockerfile -t mobicare-llm/api:local .
-docker build -f deploy/inference.http.Dockerfile -t mobicare-llm/inference-http:local .
-docker build -f deploy/inference.worker.Dockerfile -t mobicare-llm/inference-worker:local .
-```
-
-If your cluster cannot see your local Docker images directly, load or push them before deploying.
-
-Example for `kind`:
+Update the production ConfigMap values in:
 
 ```bash
-kind load docker-image mobicare-llm/api:local
-kind load docker-image mobicare-llm/inference-http:local
-kind load docker-image mobicare-llm/inference-worker:local
+deploy/kubernetes/overlays/production/config/app-config.yaml
 ```
+
+At minimum, check:
+
+- `AUTH_VALIDATION_URL`
+- `OLLAMA_MODEL`
+- `OLLAMA_EMBEDDING_MODEL`
+- storage sizing
+- image tags in `overlays/production/kustomization.yaml`
+
+### 2. Create the runtime secret out of band
+
+The deployment expects a pre-created secret named `llmguidance-secrets` in the `llmguidance` namespace.
+
+Example:
+
+```bash
+kubectl create namespace llmguidance --dry-run=client -o yaml | kubectl apply -f -
+kubectl create secret generic llmguidance-secrets   -n llmguidance   --from-literal=MINIO_ROOT_USER='replace-me'   --from-literal=MINIO_ROOT_PASSWORD='replace-me'   --from-literal=JWT_SECRET_KEY='replace-me'   --from-literal=INTERNAL_SERVICE_TOKEN='replace-me'
+```
+
+### 3. Create the TLS secret out of band
+
+The ingress expects a TLS secret named `llmguidance-api-tls` in the same namespace.
+
+Example with existing cert/key files:
+
+```bash
+kubectl create secret tls llmguidance-api-tls   -n llmguidance   --cert=/path/to/fullchain.pem   --key=/path/to/privkey.pem
+```
+
+If you use cert-manager, create a `Certificate` for the same secret name instead.
 
 ## Deploy the stack
 
-Apply the main manifests:
+Apply the main production manifests:
 
 ```bash
 kubectl apply -k deploy/kubernetes
@@ -57,10 +79,10 @@ kubectl rollout status statefulset/minio -n llmguidance
 kubectl rollout status statefulset/ollama -n llmguidance
 ```
 
-Run the one-shot bootstrap jobs:
+Run the bootstrap jobs:
 
 ```bash
-kubectl apply -f deploy/kubernetes/bootstrap-jobs.yaml
+kubectl apply -k deploy/kubernetes/overlays/production/bootstrap
 kubectl wait --for=condition=complete job/inference-bootstrap-minio -n llmguidance --timeout=10m
 kubectl wait --for=condition=complete job/ollama-pull-models -n llmguidance --timeout=20m
 ```
@@ -73,59 +95,23 @@ kubectl rollout status deployment/inference-worker -n llmguidance
 kubectl rollout status deployment/api -n llmguidance
 ```
 
-## Access the API locally
+## Access and operations
 
-Port-forward the API service:
+Port-forward the API if you need an admin tunnel:
 
 ```bash
 kubectl port-forward svc/api 8000:8000 -n llmguidance
 ```
 
-The API will then be reachable at:
-
-- `http://localhost:8000`
-- `http://localhost:8000/docs` in `APP_ENV=dev`
-
-Port-forward the MinIO console if needed:
+Port-forward the MinIO console when needed:
 
 ```bash
 kubectl port-forward svc/minio-console 9001:9001 -n llmguidance
 ```
 
-## Optional ingress
+## Operational notes
 
-If you already have an NGINX ingress controller installed, you can also expose the API with:
-
-```bash
-kubectl apply -f deploy/kubernetes/ingress.optional.yaml
-```
-
-That ingress carries over the important reverse-proxy behavior from the Docker Compose gateway:
-
-- 64 MB request body limit
-- 300 second proxy read timeout
-- 300 second proxy send timeout
-
-## Re-running bootstrap jobs
-
-The jobs are intentionally separate from normal service startup.
-If you want to run them again, delete them first and re-apply:
-
-```bash
-kubectl delete job inference-bootstrap-minio ollama-pull-models -n llmguidance --ignore-not-found
-kubectl apply -f deploy/kubernetes/bootstrap-jobs.yaml
-```
-
-## Configuration
-
-Edit these files before moving to a shared or production-like cluster:
-
-- `deploy/kubernetes/configmap.yaml`
-- `deploy/kubernetes/secret.yaml`
-
-Important notes:
-
-- the default manifests run with `APP_ENV=dev`
-- `secret.yaml` contains placeholders for production-sensitive values
-- the storage classes are left unspecified so your cluster default can be used
-- the Ollama workload is CPU-only for now; add GPU scheduling later if you move it to GPU nodes
+- the PodDisruptionBudgets protect singleton workloads from voluntary evictions, which is good for production safety but can block node drains until you temporarily relax the PDB or scale out
+- the network policies assume your workloads only need intra-namespace traffic, DNS, and outbound HTTP/HTTPS; add more egress rules if your environment needs extra ports
+- the ingress host is currently `llmguidance.example.com`; replace it with your real production hostname
+- the ingress class is currently `nginx`; change it if your cluster uses a different ingress controller

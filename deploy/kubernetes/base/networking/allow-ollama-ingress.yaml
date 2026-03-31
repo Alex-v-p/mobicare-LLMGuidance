@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ollama-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ollama
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: inference
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: inference-worker
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ollama-pull-models
+      ports:
+        - protocol: TCP
+          port: 11434

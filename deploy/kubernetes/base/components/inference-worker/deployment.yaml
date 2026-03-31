@@ -2,9 +2,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: inference-worker
-  namespace: llmguidance
 spec:
   replicas: 1
+  revisionHistoryLimit: 2
   selector:
     matchLabels:
       app.kubernetes.io/name: inference-worker
@@ -12,23 +12,36 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: inference-worker
+        app.kubernetes.io/component: worker
+        app.kubernetes.io/part-of: llmguidance
     spec:
       terminationGracePeriodSeconds: 60
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: inference-worker
-          image: mobicare-llm/inference-worker:local
+          image: mobicare-llm/inference-worker
           imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:
                 name: llmguidance-config
             - secretRef:
                 name: llmguidance-secrets
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 2Gi
           startupProbe:
             exec:
               command:
                 - /bin/sh
                 - -c
-                - "grep -aq 'inference.worker.runtime.main' /proc/1/cmdline"
+                - grep -aq 'inference.worker.runtime.main' /proc/1/cmdline
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 18
@@ -37,7 +50,12 @@ spec:
               command:
                 - /bin/sh
                 - -c
-                - "grep -aq 'inference.worker.runtime.main' /proc/1/cmdline"
+                - grep -aq 'inference.worker.runtime.main' /proc/1/cmdline
             periodSeconds: 20
             timeoutSeconds: 5
             failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
