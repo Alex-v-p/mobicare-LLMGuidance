@@ -168,6 +168,24 @@ def _render_clinical_result(config_name: str) -> None:
     st.json(result["body"])
 
 
+def _render_document_table(documents: list[dict[str, Any]]) -> None:
+    if not documents:
+        st.info("No documents found in the configured bucket/prefix.")
+        return
+
+    rows = [
+        {
+            "object_name": item.get("object_name"),
+            "size_bytes": item.get("size_bytes"),
+            "content_type": item.get("content_type"),
+            "etag": item.get("etag"),
+            "last_modified": item.get("last_modified"),
+        }
+        for item in documents
+    ]
+    st.dataframe(rows, use_container_width=True)
+
+
 def render() -> None:
     st.subheader("Endpoint playground")
     base_url = st.text_input("Gateway base URL", value=DEFAULT_GATEWAY_BASE_URL)
@@ -274,6 +292,83 @@ def render() -> None:
                 st.json({"job_id": result.job_id, "status": result.status, "record": result.record})
             except Exception as exc:  # noqa: BLE001
                 st.error(str(exc))
+
+        st.divider()
+        st.markdown("#### Document management")
+        st.caption("Use these gateway-backed document endpoints to upload files into MinIO before triggering ingestion.")
+
+        documents_client = GatewayClient(
+            base_url=base_url,
+            timeout_seconds=int(timeout_seconds),
+            auth_token=auth_token or None,
+            verify_ssl=verify_ssl,
+        )
+
+        doc_action_col1, doc_action_col2 = st.columns([1, 2])
+        with doc_action_col1:
+            list_limit = st.number_input("List limit", min_value=1, max_value=500, value=100, step=10)
+        with doc_action_col2:
+            st.caption("List documents from GET /documents")
+
+        if st.button("Refresh document list", key="documents_refresh"):
+            try:
+                started = time.perf_counter()
+                response = documents_client.list_documents(limit=int(list_limit))
+                elapsed_ms = (time.perf_counter() - started) * 1000.0
+                st.success(f"Loaded {response.body.get('count', 0)} documents in {elapsed_ms:.2f} ms")
+                _render_document_table(response.body.get("documents") or [])
+                with st.expander("Raw list response", expanded=False):
+                    st.json(response.body)
+            except Exception as exc:  # noqa: BLE001
+                st.error(str(exc))
+
+        upload_col, delete_col = st.columns(2)
+
+        with upload_col:
+            st.markdown("##### Upload document")
+            uploaded_file = st.file_uploader(
+                "Choose a file",
+                key="playground_document_upload",
+                help="This calls POST /documents with multipart/form-data.",
+            )
+            overwrite_existing = st.checkbox("Overwrite if document already exists", value=True, key="playground_document_overwrite")
+            if st.button("Upload selected document", key="documents_upload"):
+                try:
+                    if uploaded_file is None:
+                        raise ValueError("Select a file before uploading.")
+                    started = time.perf_counter()
+                    response = documents_client.upload_document(
+                        filename=uploaded_file.name,
+                        content=uploaded_file.getvalue(),
+                        content_type=uploaded_file.type or None,
+                        overwrite=overwrite_existing,
+                    )
+                    elapsed_ms = (time.perf_counter() - started) * 1000.0
+                    st.success(f"Uploaded {uploaded_file.name} in {elapsed_ms:.2f} ms")
+                    st.json(response.body)
+                except Exception as exc:  # noqa: BLE001
+                    st.error(str(exc))
+
+        with delete_col:
+            st.markdown("##### Delete document")
+            st.caption("Enter the exact object_name returned by the list endpoint.")
+            document_name_to_delete = st.text_input(
+                "object_name",
+                key="playground_document_delete_name",
+                placeholder="guidelines/heart-failure.pdf",
+            )
+            if st.button("Delete document", key="documents_delete"):
+                try:
+                    object_name = document_name_to_delete.strip()
+                    if not object_name:
+                        raise ValueError("object_name must not be empty.")
+                    started = time.perf_counter()
+                    response = documents_client.delete_document(object_name)
+                    elapsed_ms = (time.perf_counter() - started) * 1000.0
+                    st.success(f"Deleted {object_name} in {elapsed_ms:.2f} ms")
+                    st.json(response.body)
+                except Exception as exc:  # noqa: BLE001
+                    st.error(str(exc))
 
     with guidance_tab:
         guidance_text = st.text_area("Guidance payload", value=json.dumps(DEFAULT_GUIDANCE_PAYLOAD, indent=2), height=280)

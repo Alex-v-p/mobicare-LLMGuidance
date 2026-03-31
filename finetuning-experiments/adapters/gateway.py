@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import logging
 import time
 from dataclasses import dataclass
@@ -74,6 +75,38 @@ class GatewayClient:
         )
         response.raise_for_status()
         return response.json()
+
+    def list_documents(self, *, offset: int = 0, limit: int = 100) -> GatewayAPIResponse:
+        return self._request_json("GET", "/documents", params={"offset": offset, "limit": limit})
+
+    def upload_document(
+        self,
+        *,
+        filename: str,
+        content: bytes,
+        content_type: str | None = None,
+        overwrite: bool = True,
+    ) -> GatewayAPIResponse:
+        url = f"{self._base_url}/documents"
+        logger.info("Uploading document %s via %s", filename, url)
+        response = requests.post(
+            url,
+            params={"overwrite": str(overwrite).lower()},
+            files={"file": (filename, io.BytesIO(content), content_type or "application/octet-stream")},
+            headers=self._auth_headers() or None,
+            timeout=self._timeout_seconds,
+            verify=self._verify_ssl,
+        )
+        response.raise_for_status()
+        body = response.json() if response.content else {}
+        return GatewayAPIResponse(
+            status_code=response.status_code,
+            body=body,
+            headers={key: value for key, value in response.headers.items()},
+        )
+
+    def delete_document(self, object_name: str) -> GatewayAPIResponse:
+        return self._request_json("DELETE", f"/documents/{object_name}")
 
     def run_ingestion_and_wait(
         self,
@@ -186,6 +219,7 @@ class GatewayClient:
         path: str,
         *,
         json_body: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
         expected_etag: str | None = None,
         expected_checksum_sha256: str | None = None,
     ) -> GatewayAPIResponse:
@@ -200,6 +234,7 @@ class GatewayClient:
             method,
             url,
             json=json_body,
+            params=params,
             headers=headers or None,
             timeout=self._timeout_seconds,
             verify=self._verify_ssl,
