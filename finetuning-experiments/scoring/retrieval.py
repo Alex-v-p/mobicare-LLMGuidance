@@ -114,7 +114,12 @@ def _lenient_success(ranked_labels: list[str]) -> float:
 
 
 def score_retrieval(source_mapping: dict[str, Any] | None, retrieved_chunks: list[dict[str, Any]]) -> dict[str, Any]:
-    label_map = _build_chunk_label_map(source_mapping)
+    mapping = source_mapping or {}
+    metadata = dict(mapping.get("metadata") or {})
+    applicable = bool(metadata.get("applicable", True))
+    skipped_reason = metadata.get("skipped_reason")
+
+    label_map = _build_chunk_label_map(mapping)
     ranked_chunk_ids = [str(chunk.get("chunk_id")) for chunk in retrieved_chunks if chunk.get("chunk_id")]
     ranked_labels = [
         next((label_map.get(alias) for alias in _chunk_id_aliases(chunk_id) if label_map.get(alias) is not None), "irrelevant")
@@ -142,7 +147,7 @@ def score_retrieval(source_mapping: dict[str, Any] | None, retrieved_chunks: lis
                 return 1.0
         return 0.0
 
-    source_list = (source_mapping or {}).get("source_list") or {}
+    source_list = mapping.get("source_list") or {}
     strict_items = list(source_list.get("direct_evidence") or []) + list(source_list.get("partial_direct_evidence") or [])
     overlap_scores = [float(item.get("metadata", {}).get("passage_coverage", 0.0) or 0.0) for item in strict_items]
     semantic_scores = [float(item.get("semantic_score", 0.0) or 0.0) for item in strict_items]
@@ -153,29 +158,31 @@ def score_retrieval(source_mapping: dict[str, Any] | None, retrieved_chunks: lis
     lenient_success = _lenient_success(ranked_labels)
 
     return {
-        "hit_at_1": hit_at(1, relevant_chunk_ids),
-        "hit_at_3": hit_at(3, relevant_chunk_ids),
-        "hit_at_5": hit_at(5, relevant_chunk_ids),
-        "mrr": (1.0 / first_relevant_rank) if first_relevant_rank else 0.0,
-        "strict_hit_at_1": hit_at(1, strict_chunk_ids),
-        "strict_hit_at_3": hit_at(3, strict_chunk_ids),
-        "strict_hit_at_5": hit_at(5, strict_chunk_ids),
-        "strict_mrr": (1.0 / first_strict_rank) if first_strict_rank else 0.0,
-        "strict_success": bool(first_strict_rank),
-        "relevance_success": bool(first_relevant_rank),
-        "lenient_success_score": lenient_success,
-        "strict_hit_rank": first_strict_rank,
-        "relevance_hit_rank": first_relevant_rank,
-        "average_overlap_score": _mean(overlap_scores),
-        "average_semantic_score": _mean(semantic_scores),
-        "retrieved_average_overlap_score": _mean(retrieved_overlap_scores),
-        "retrieved_average_semantic_score": _mean(retrieved_semantic_scores),
-        "weighted_relevance_score": adjusted_relevance,
-        "weighted_relevance_raw": raw_relevance,
-        "duplicate_chunk_count": duplicate_count,
-        "duplicate_chunk_rate": (duplicate_count / len(ranked_chunk_ids)) if ranked_chunk_ids else 0.0,
-        "context_diversity_score": 1.0 - ((duplicate_count / len(ranked_chunk_ids)) if ranked_chunk_ids else 0.0),
-        "soft_ndcg": _soft_ndcg(ranked_weights, ideal_weights),
+        "applicable": applicable,
+        "skipped_reason": skipped_reason,
+        "hit_at_1": hit_at(1, relevant_chunk_ids) if applicable else None,
+        "hit_at_3": hit_at(3, relevant_chunk_ids) if applicable else None,
+        "hit_at_5": hit_at(5, relevant_chunk_ids) if applicable else None,
+        "mrr": ((1.0 / first_relevant_rank) if first_relevant_rank else 0.0) if applicable else None,
+        "strict_hit_at_1": hit_at(1, strict_chunk_ids) if applicable else None,
+        "strict_hit_at_3": hit_at(3, strict_chunk_ids) if applicable else None,
+        "strict_hit_at_5": hit_at(5, strict_chunk_ids) if applicable else None,
+        "strict_mrr": ((1.0 / first_strict_rank) if first_strict_rank else 0.0) if applicable else None,
+        "strict_success": bool(first_strict_rank) if applicable else None,
+        "relevance_success": bool(first_relevant_rank) if applicable else None,
+        "lenient_success_score": lenient_success if applicable else None,
+        "strict_hit_rank": first_strict_rank if applicable else None,
+        "relevance_hit_rank": first_relevant_rank if applicable else None,
+        "average_overlap_score": _mean(overlap_scores) if applicable else None,
+        "average_semantic_score": _mean(semantic_scores) if applicable else None,
+        "retrieved_average_overlap_score": _mean(retrieved_overlap_scores) if applicable else None,
+        "retrieved_average_semantic_score": _mean(retrieved_semantic_scores) if applicable else None,
+        "weighted_relevance_score": adjusted_relevance if applicable else None,
+        "weighted_relevance_raw": raw_relevance if applicable else None,
+        "duplicate_chunk_count": duplicate_count if applicable else None,
+        "duplicate_chunk_rate": ((duplicate_count / len(ranked_chunk_ids)) if ranked_chunk_ids else 0.0) if applicable else None,
+        "context_diversity_score": (1.0 - ((duplicate_count / len(ranked_chunk_ids)) if ranked_chunk_ids else 0.0)) if applicable else None,
+        "soft_ndcg": _soft_ndcg(ranked_weights, ideal_weights) if applicable else None,
         "retrieved_chunk_ids": ranked_chunk_ids,
         "retrieved_chunk_count": len(ranked_chunk_ids),
         "retrieved_chunk_labels": ranked_labels,

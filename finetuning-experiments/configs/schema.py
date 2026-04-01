@@ -43,6 +43,7 @@ class InferenceConfig:
     embedding_model: str | None = None
     prompt_engineering_label: str = "default"
     use_example_response: bool = False
+    pipeline_variant: str = "standard"
 
 
 @dataclass(slots=True)

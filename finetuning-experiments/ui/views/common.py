@@ -187,6 +187,7 @@ def normalize_run_row(run: dict[str, Any]) -> dict[str, Any]:
         "retrieval_mode": safe_str(inference_config.get("retrieval_mode") or get_nested(payload, "config", "inference", "retrieval_mode")),
         "llm_model": safe_str(inference_config.get("llm_model") or get_nested(payload, "config", "inference", "llm_model")),
         "prompt_label": safe_str(inference_config.get("prompt_engineering_label") or get_nested(payload, "config", "inference", "prompt_engineering_label")),
+        "pipeline_variant": safe_str(first_defined(inference_config.get("pipeline_variant"), get_nested(payload, "config", "inference", "pipeline_variant"), default="standard")),
         "query_rewriting": bool(inference_config.get("enable_query_rewriting") or get_nested(payload, "config", "inference", "enable_query_rewriting", default=False)),
         "verification": bool(inference_config.get("enable_response_verification") or get_nested(payload, "config", "inference", "enable_response_verification", default=False)),
         "graph_augmentation": bool(inference_config.get("use_graph_augmentation") or get_nested(payload, "config", "inference", "use_graph_augmentation", default=False)),

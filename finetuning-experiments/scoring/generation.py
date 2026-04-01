@@ -166,8 +166,10 @@ def score_generation(
     deterministic_rubric_score: float | None = None
     deterministic_grade: str | None = None
 
+    required_fact_subscore = _metric_or_none(required_fact_recall or 0.0, applicable=required_fact_applicable)
     subscores = {
-        "required_fact_recall": _metric_or_none(required_fact_recall or 0.0, applicable=required_fact_applicable),
+        "required_fact": required_fact_subscore,
+        "required_fact_recall": required_fact_subscore,
         "reference_alignment": _metric_or_none(reference_token_f1, applicable=dimension_applicability["reference_alignment"]),
         "gold_alignment": _metric_or_none(gold_token_f1, applicable=dimension_applicability["gold_alignment"]),
         "context_alignment": _metric_or_none(max(faith_context, context_token_f1), applicable=dimension_applicability["context_alignment"]),
@@ -189,16 +191,23 @@ def score_generation(
     exact_pass_applicable = bool(deterministic_applicable and (required_fact_applicable or forbidden_fact_applicable))
     exact_pass = None
     if exact_pass_applicable:
+        meets_required_facts = True if not required_fact_applicable else (required_fact_recall or 0.0) >= 0.999
         exact_pass = bool(
-            (required_fact_recall or 0.0) >= 0.999
+            meets_required_facts
             and forbidden_hits == 0
             and unsupported == 0
         )
 
+    skipped_reason = None
+    if not deterministic_applicable:
+        skipped_reason = "observation_only_case" if observation_only else "deterministic_rubric_disabled"
+    elif weight_total <= 0:
+        skipped_reason = "no_applicable_dimensions"
+
     deterministic = {
         "enabled": deterministic_applicable,
         "applicable": deterministic_applicable,
-        "skipped_reason": None if deterministic_applicable else "observation_only_case",
+        "skipped_reason": skipped_reason,
         "score": deterministic_rubric_score,
         "grade": deterministic_grade,
         "weights": base_weights,

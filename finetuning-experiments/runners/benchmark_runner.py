@@ -37,27 +37,38 @@ def _build_guidance_payload(case: BenchmarkCase, config: BenchmarkRunConfig) -> 
     generation_metadata = case.generation_metadata or {}
     omit_question = bool(generation_metadata.get("omit_question_from_request"))
     request_question = "" if omit_question else case.question
+
+    options = {
+        "use_retrieval": True,
+        "top_k": config.inference.top_k,
+        "temperature": config.inference.temperature,
+        "max_tokens": config.inference.max_tokens,
+        "use_example_response": config.inference.use_example_response,
+        "retrieval_mode": config.inference.retrieval_mode,
+        "hybrid_dense_weight": config.inference.hybrid_dense_weight,
+        "hybrid_sparse_weight": config.inference.hybrid_sparse_weight,
+        "use_graph_augmentation": config.inference.use_graph_augmentation,
+        "graph_max_extra_nodes": config.inference.graph_max_extra_nodes,
+        "enable_query_rewriting": config.inference.enable_query_rewriting,
+        "enable_response_verification": config.inference.enable_response_verification,
+        "enable_regeneration": config.inference.enable_regeneration,
+        "max_regeneration_attempts": config.inference.max_regeneration_attempts,
+        "llm_model": config.inference.llm_model,
+        "embedding_model": config.inference.embedding_model,
+        "pipeline_variant": config.inference.pipeline_variant,
+    }
+
+    case_request_options = dict(generation_metadata.get("request_options") or {})
+    if generation_metadata.get("pipeline_variant") and "pipeline_variant" not in case_request_options:
+        case_request_options["pipeline_variant"] = generation_metadata.get("pipeline_variant")
+    for key, value in case_request_options.items():
+        if value is not None:
+            options[key] = value
+
     return {
         "question": request_question,
         "patient": {"values": case.patient_variables or {}},
-        "options": {
-            "use_retrieval": True,
-            "top_k": config.inference.top_k,
-            "temperature": config.inference.temperature,
-            "max_tokens": config.inference.max_tokens,
-            "use_example_response": config.inference.use_example_response,
-            "retrieval_mode": config.inference.retrieval_mode,
-            "hybrid_dense_weight": config.inference.hybrid_dense_weight,
-            "hybrid_sparse_weight": config.inference.hybrid_sparse_weight,
-            "use_graph_augmentation": config.inference.use_graph_augmentation,
-            "graph_max_extra_nodes": config.inference.graph_max_extra_nodes,
-            "enable_query_rewriting": config.inference.enable_query_rewriting,
-            "enable_response_verification": config.inference.enable_response_verification,
-            "enable_regeneration": config.inference.enable_regeneration,
-            "max_regeneration_attempts": config.inference.max_regeneration_attempts,
-            "llm_model": config.inference.llm_model,
-            "embedding_model": config.inference.embedding_model,
-        },
+        "options": options,
     }
 
 

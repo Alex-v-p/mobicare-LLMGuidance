@@ -264,15 +264,34 @@ class SourceMatcher:
         llm_labeler: OptionalLLMLabeler | None = None,
         max_soft_candidates: int = 12,
     ) -> CaseSourceMapping:
+        has_source_document = bool((case.source_document_id or "").strip() or (case.source_document_name or "").strip())
+        has_gold_passage = bool((case.gold_passage_text or "").strip())
+        retrieval_applicable = bool(has_source_document and has_gold_passage)
+
         chunks = self._filter_and_prepare_chunks(case, payloads)
         logger.info("Case %s: evaluating %s document-local chunks for mapping_label=%s", case.id, len(chunks), mapping_label)
 
-        if not chunks or not (case.gold_passage_text or "").strip():
+        if not chunks or not has_gold_passage:
+            if not retrieval_applicable:
+                skipped_reason = "missing_source_document_and_gold_passage"
+                if has_gold_passage and not has_source_document:
+                    skipped_reason = "missing_source_document"
+                elif has_source_document and not has_gold_passage:
+                    skipped_reason = "missing_gold_passage"
+            else:
+                skipped_reason = "no_document_local_chunks"
             return CaseSourceMapping(
                 case_id=case.id,
                 mapping_label=mapping_label,
                 strategy=strategy,
                 source_list={label: [] for label in ALL_LABELS},
+                metadata={
+                    "applicable": retrieval_applicable,
+                    "skipped_reason": skipped_reason,
+                    "has_source_document": has_source_document,
+                    "has_gold_passage": has_gold_passage,
+                    "document_local_chunk_count": len(chunks),
+                },
             )
 
         candidate_units = self._build_candidate_units(chunks)
@@ -300,6 +319,11 @@ class SourceMatcher:
             strategy=strategy,
             source_list=source_list,
             metadata={
+                "applicable": retrieval_applicable,
+                "skipped_reason": None,
+                "has_source_document": has_source_document,
+                "has_gold_passage": has_gold_passage,
+                "document_local_chunk_count": len(chunks),
                 "strict_match_count": len(source_list["direct_evidence"]) + len(source_list["partial_direct_evidence"]),
                 "soft_match_count": len(source_list["supporting"]) + len(source_list["tangential"]),
                 "llm_second_pass_enabled": bool(llm_labeler and llm_labeler.enabled),

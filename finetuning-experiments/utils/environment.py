@@ -99,6 +99,7 @@ def collect_environment_snapshot(config: Any) -> dict[str, Any]:
             'inference_embedding_model': getattr(getattr(config, 'inference', None), 'embedding_model', None),
             'ingestion_embedding_model': getattr(getattr(config, 'ingestion', None), 'embedding_model', None),
             'prompt_engineering_label': getattr(getattr(config, 'inference', None), 'prompt_engineering_label', None),
+            'pipeline_variant': getattr(getattr(config, 'inference', None), 'pipeline_variant', None),
         },
         'runtime': {
             'python_version': sys.version.split()[0],

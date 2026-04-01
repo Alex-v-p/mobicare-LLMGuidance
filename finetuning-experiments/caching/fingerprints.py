@@ -42,6 +42,7 @@ def build_run_fingerprint(config: BenchmarkRunConfig) -> str:
             "embedding_model": config.inference.embedding_model,
             "prompt_engineering_label": config.inference.prompt_engineering_label,
             "use_example_response": config.inference.use_example_response,
+            "pipeline_variant": config.inference.pipeline_variant,
         },
         "source_mapping": {
             "max_matches": config.source_mapping.max_matches,

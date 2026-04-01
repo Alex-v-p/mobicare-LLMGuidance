@@ -8,6 +8,7 @@ _ALLOWED_RETRIEVAL_MODES = {"dense", "sparse", "hybrid"}
 _ALLOWED_PERCENTILE_POLICIES = {"all", "success_only"}
 _ALLOWED_OUTLIER_POLICIES = {"keep_all", "exclude_failures"}
 _ALLOWED_GATEWAY_AUTH_MODES = {"none", "bearer", "gateway_login", "local_jwt"}
+_ALLOWED_PIPELINE_VARIANTS = {"standard", "drug_dosing"}
 
 
 
@@ -44,6 +45,8 @@ def validate_run_config(config: BenchmarkRunConfig) -> None:
         errors.append("inference.max_regeneration_attempts must be at least 1.")
     if not config.inference.enable_regeneration and config.inference.max_regeneration_attempts != 1:
         errors.append("max_regeneration_attempts should remain 1 when regeneration is disabled.")
+    if config.inference.pipeline_variant not in _ALLOWED_PIPELINE_VARIANTS:
+        errors.append(f"inference.pipeline_variant must be one of {sorted(_ALLOWED_PIPELINE_VARIANTS)}.")
 
     if config.source_mapping.max_matches <= 0:
         errors.append("source_mapping.max_matches must be positive.")

@@ -26,7 +26,8 @@ def _avg_defined(values: list[Any]) -> float:
 
 def summarize_results(per_case_results: list[dict[str, Any]]) -> dict[str, Any]:
     completed_cases = [item for item in per_case_results if item.get("status") != "failed"]
-    retrieval_items = [item["retrieval_scores"] for item in per_case_results if "retrieval_scores" in item]
+    retrieval_items_all = [item["retrieval_scores"] for item in per_case_results if "retrieval_scores" in item]
+    retrieval_items = [item for item in retrieval_items_all if item.get("applicable", True)]
     generation_items = [item["generation_scores"] for item in per_case_results if "generation_scores" in item]
     deterministic_items = [
         item for item in generation_items
@@ -59,26 +60,28 @@ def summarize_results(per_case_results: list[dict[str, Any]]) -> dict[str, Any]:
     retrieval_summary = {
         "completed_case_count": len(completed_cases),
         "failed_case_count": sum(1 for item in per_case_results if item.get("status") == "failed"),
-        "case_count": len(retrieval_items),
-        "hit_at_1": _avg([float(x.get("hit_at_1", 0.0)) for x in retrieval_items]),
-        "hit_at_3": _avg([float(x.get("hit_at_3", 0.0)) for x in retrieval_items]),
-        "hit_at_5": _avg([float(x.get("hit_at_5", 0.0)) for x in retrieval_items]),
-        "mrr": _avg([float(x.get("mrr", 0.0)) for x in retrieval_items]),
-        "strict_hit_at_1": _avg([float(x.get("strict_hit_at_1", 0.0)) for x in retrieval_items]),
-        "strict_hit_at_3": _avg([float(x.get("strict_hit_at_3", 0.0)) for x in retrieval_items]),
-        "strict_hit_at_5": _avg([float(x.get("strict_hit_at_5", 0.0)) for x in retrieval_items]),
-        "strict_mrr": _avg([float(x.get("strict_mrr", 0.0)) for x in retrieval_items]),
+        "case_count": len(retrieval_items_all),
+        "applicable_case_count": len(retrieval_items),
+        "non_applicable_case_count": max(0, len(retrieval_items_all) - len(retrieval_items)),
+        "hit_at_1": _avg_defined([x.get("hit_at_1") for x in retrieval_items]),
+        "hit_at_3": _avg_defined([x.get("hit_at_3") for x in retrieval_items]),
+        "hit_at_5": _avg_defined([x.get("hit_at_5") for x in retrieval_items]),
+        "mrr": _avg_defined([x.get("mrr") for x in retrieval_items]),
+        "strict_hit_at_1": _avg_defined([x.get("strict_hit_at_1") for x in retrieval_items]),
+        "strict_hit_at_3": _avg_defined([x.get("strict_hit_at_3") for x in retrieval_items]),
+        "strict_hit_at_5": _avg_defined([x.get("strict_hit_at_5") for x in retrieval_items]),
+        "strict_mrr": _avg_defined([x.get("strict_mrr") for x in retrieval_items]),
         "strict_success_rate": _avg([1.0 if x.get("strict_success") else 0.0 for x in retrieval_items]),
         "relevance_success_rate": _avg([1.0 if x.get("relevance_success") else 0.0 for x in retrieval_items]),
-        "lenient_success_score": _avg([float(x.get("lenient_success_score", 0.0)) for x in retrieval_items]),
-        "average_overlap_score": _avg([float(x.get("average_overlap_score", 0.0)) for x in retrieval_items]),
-        "average_semantic_score": _avg([float(x.get("average_semantic_score", 0.0)) for x in retrieval_items]),
-        "weighted_relevance_score": _avg([float(x.get("weighted_relevance_score", 0.0)) for x in retrieval_items]),
-        "soft_ndcg": _avg([float(x.get("soft_ndcg", 0.0)) for x in retrieval_items]),
-        "retrieved_average_overlap_score": _avg([float(x.get("retrieved_average_overlap_score", 0.0)) for x in retrieval_items]),
-        "retrieved_average_semantic_score": _avg([float(x.get("retrieved_average_semantic_score", 0.0)) for x in retrieval_items]),
-        "duplicate_chunk_rate": _avg([float(x.get("duplicate_chunk_rate", 0.0)) for x in retrieval_items]),
-        "context_diversity_score": _avg([float(x.get("context_diversity_score", 0.0)) for x in retrieval_items]),
+        "lenient_success_score": _avg_defined([x.get("lenient_success_score") for x in retrieval_items]),
+        "average_overlap_score": _avg_defined([x.get("average_overlap_score") for x in retrieval_items]),
+        "average_semantic_score": _avg_defined([x.get("average_semantic_score") for x in retrieval_items]),
+        "weighted_relevance_score": _avg_defined([x.get("weighted_relevance_score") for x in retrieval_items]),
+        "soft_ndcg": _avg_defined([x.get("soft_ndcg") for x in retrieval_items]),
+        "retrieved_average_overlap_score": _avg_defined([x.get("retrieved_average_overlap_score") for x in retrieval_items]),
+        "retrieved_average_semantic_score": _avg_defined([x.get("retrieved_average_semantic_score") for x in retrieval_items]),
+        "duplicate_chunk_rate": _avg_defined([x.get("duplicate_chunk_rate") for x in retrieval_items]),
+        "context_diversity_score": _avg_defined([x.get("context_diversity_score") for x in retrieval_items]),
     }
     warning_counts = [len(item.get("warnings") or []) for item in per_case_results]
     verification_items = [item.get("verification") or {} for item in per_case_results]
