@@ -93,8 +93,13 @@ spec:
                 echo "waiting for ollama"
                 sleep 2
               done
-              curl -fsS http://ollama:11434/api/pull -d "{"name":"${OLLAMA_MODEL}","stream":false}"
-              curl -fsS http://ollama:11434/api/pull -d "{"name":"${OLLAMA_EMBEDDING_MODEL}","stream":false}"
+              curl -fsS http://ollama:11434/api/pull \
+              -H 'Content-Type: application/json' \
+              -d "{\"name\":\"${OLLAMA_MODEL}\",\"stream\":false}"
+
+              curl -fsS http://ollama:11434/api/pull \
+              -H 'Content-Type: application/json' \
+              -d "{\"name\":\"${OLLAMA_EMBEDDING_MODEL}\",\"stream\":false}"
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

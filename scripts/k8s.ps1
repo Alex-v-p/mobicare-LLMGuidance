@@ -30,10 +30,13 @@ function Load-AppImages {
     $context = Get-KubeContext
     Write-Host "Active Kubernetes context: $context"
 
-    if ($context -eq 'minikube') {
+    $profiles = minikube profile list -o json | ConvertFrom-Json
+    $profileNames = @($profiles.valid | ForEach-Object { $_.Name })
+
+    if ($profileNames -contains $context) {
         foreach ($spec in $AppImages) {
-            Write-Host "Loading $($spec.Image) into minikube..."
-            minikube image load $spec.Image
+            Write-Host "Loading $($spec.Image) into minikube profile '$context'..."
+            minikube -p $context image load $spec.Image
         }
         return
     }
