@@ -23,7 +23,7 @@ SERVICE_NAME = "Gateway API"
 def create_app(
     settings: ApiSettings | None = None,
     *,
-    bootstrap_minio_on_startup: bool = True,
+    bootstrap_minio_on_startup: bool = False,
 ) -> FastAPI:
     resolved = settings or get_api_settings()
     configure_logging(SERVICE_NAME)

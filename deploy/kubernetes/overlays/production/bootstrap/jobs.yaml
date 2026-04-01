@@ -1,0 +1,107 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: inference-bootstrap-minio
+  namespace: llmguidance
+spec:
+  ttlSecondsAfterFinished: 86400
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: inference-bootstrap-minio
+        app.kubernetes.io/component: bootstrap
+        app.kubernetes.io/part-of: llmguidance
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: bootstrap-minio
+          image: mobicare-llm/inference-http:1.0.0
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: llmguidance-config
+            - secretRef:
+                name: llmguidance-secrets
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              until curl -fsS http://minio:9000/minio/health/ready >/dev/null; do
+                echo "waiting for minio"
+                sleep 2
+              done
+              python -m inference.bootstrap_minio
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ollama-pull-models
+  namespace: llmguidance
+spec:
+  ttlSecondsAfterFinished: 86400
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ollama-pull-models
+        app.kubernetes.io/component: bootstrap
+        app.kubernetes.io/part-of: llmguidance
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ollama-pull-models
+          image: curlimages/curl:8.10.1
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: llmguidance-config
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              until curl -fsS http://ollama:11434/api/tags >/dev/null; do
+                echo "waiting for ollama"
+                sleep 2
+              done
+              curl -fsS http://ollama:11434/api/pull \
+              -H 'Content-Type: application/json' \
+              -d "{\"name\":\"${OLLAMA_MODEL}\",\"stream\":false}"
+
+              curl -fsS http://ollama:11434/api/pull \
+              -H 'Content-Type: application/json' \
+              -d "{\"name\":\"${OLLAMA_EMBEDDING_MODEL}\",\"stream\":false}"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL

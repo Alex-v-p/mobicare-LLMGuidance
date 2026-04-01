@@ -93,6 +93,7 @@ async def test_vector_indexer_indexes_only_non_empty_chunks():
     assert indexed == 1
     assert embedding_client.selected_model == "embed-x"
     assert vector_store.ensure_calls == [1]
+    assert len(vector_store.upsert_calls) == 1
     assert len(vector_store.upsert_calls[0][0]) == 1
     assert vector_store.upsert_calls[0][2] == "embed-x"
     assert embedding_client.embed_many_calls == [["hello"]]
@@ -151,3 +152,5 @@ async def test_vector_indexer_respects_embedding_batch_size_setting():
 
     assert indexed == 3
     assert embedding_client.embed_many_calls == [["one", "two"], ["three"]]
+    assert vector_store.ensure_calls == [1]
+    assert [len(call[0]) for call in vector_store.upsert_calls] == [2, 1]

@@ -1,0 +1,34 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace/namespace.yaml
+  - components/api/service.yaml
+  - components/api/deployment.yaml
+  - components/api/poddisruptionbudget.yaml
+  - components/inference/service.yaml
+  - components/inference/deployment.yaml
+  - components/inference/poddisruptionbudget.yaml
+  - components/inference-worker/deployment.yaml
+  - components/inference-worker/poddisruptionbudget.yaml
+  - components/redis/service.yaml
+  - components/redis/statefulset.yaml
+  - components/redis/poddisruptionbudget.yaml
+  - components/qdrant/service.yaml
+  - components/qdrant/statefulset.yaml
+  - components/qdrant/poddisruptionbudget.yaml
+  - components/minio/service.yaml
+  - components/minio/console-service.yaml
+  - components/minio/statefulset.yaml
+  - components/minio/poddisruptionbudget.yaml
+  - components/ollama/service.yaml
+  - components/ollama/statefulset.yaml
+  - components/ollama/poddisruptionbudget.yaml
+  - networking/default-deny-ingress.yaml
+  - networking/default-deny-egress.yaml
+  - networking/allow-approved-egress.yaml
+  - networking/allow-api-ingress.yaml
+  - networking/allow-inference-ingress.yaml
+  - networking/allow-redis-ingress.yaml
+  - networking/allow-qdrant-ingress.yaml
+  - networking/allow-minio-ingress.yaml
+  - networking/allow-ollama-ingress.yaml
