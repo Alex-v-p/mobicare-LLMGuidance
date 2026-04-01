@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('up', 'redeploy', 'rebootstrap', 'reset-redis', 'status', 'port-forward-api', 'port-forward-minio')]
+    [ValidateSet('up', 'redeploy', 'rebootstrap', 'reset-redis', 'status', 'start', 'shutdown', 'port-forward-api', 'port-forward-minio')]
     [string]$Command = 'status'
 )
 
@@ -8,15 +8,20 @@ $ErrorActionPreference = 'Stop'
 $RootDir = Split-Path -Parent $PSScriptRoot
 $Namespace = 'llmguidance'
 $AppImages = @(
-@{ Dockerfile = 'deploy/api.Dockerfile'; Image = 'mobicare-llm/api:1.0.0' },
-@{ Dockerfile = 'deploy/inference.http.Dockerfile'; Image = 'mobicare-llm/inference-http:1.0.0' },
-@{ Dockerfile = 'deploy/inference.worker.Dockerfile'; Image = 'mobicare-llm/inference-worker:1.0.0' }
+    @{ Dockerfile = 'deploy/api.Dockerfile'; Image = 'mobicare-llm/api:1.0.0' },
+    @{ Dockerfile = 'deploy/inference.http.Dockerfile'; Image = 'mobicare-llm/inference-http:1.0.0' },
+    @{ Dockerfile = 'deploy/inference.worker.Dockerfile'; Image = 'mobicare-llm/inference-worker:1.0.0' }
 )
 
 Set-Location $RootDir
 
 function Get-KubeContext {
     return (kubectl config current-context).Trim()
+}
+
+function Get-MinikubeProfileNames {
+    $profiles = minikube profile list -o json | ConvertFrom-Json
+    return @($profiles.valid | ForEach-Object { $_.Name })
 }
 
 function Build-AppImages {
@@ -30,8 +35,7 @@ function Load-AppImages {
     $context = Get-KubeContext
     Write-Host "Active Kubernetes context: $context"
 
-    $profiles = minikube profile list -o json | ConvertFrom-Json
-    $profileNames = @($profiles.valid | ForEach-Object { $_.Name })
+    $profileNames = Get-MinikubeProfileNames
 
     if ($profileNames -contains $context) {
         foreach ($spec in $AppImages) {
@@ -51,6 +55,39 @@ function Load-AppImages {
 
     Write-Host "No automatic image loader configured for context '$context'."
     Write-Host 'If your cluster cannot see local Docker images directly, push them to a registry or load them manually.'
+}
+
+function Start-MinikubeGracefully {
+    $context = Get-KubeContext
+    Write-Host "Active Kubernetes context: $context"
+
+    $profileNames = Get-MinikubeProfileNames
+
+    if ($profileNames -contains $context) {
+        Write-Host "Starting minikube profile '$context'..."
+        minikube -p $context start
+        kubectl config use-context $context | Out-Null
+        Write-Host "Minikube profile '$context' has been started."
+        return
+    }
+
+    throw "Current context '$context' is not a known minikube profile, so start was aborted."
+}
+
+function Shutdown-MinikubeGracefully {
+    $context = Get-KubeContext
+    Write-Host "Active Kubernetes context: $context"
+
+    $profileNames = Get-MinikubeProfileNames
+
+    if ($profileNames -contains $context) {
+        Write-Host "Stopping minikube profile '$context' gracefully..."
+        minikube -p $context stop
+        Write-Host "Minikube profile '$context' has been stopped."
+        return
+    }
+
+    throw "Current context '$context' is not a known minikube profile, so shutdown was aborted."
 }
 
 function Wait-Infra {
@@ -115,6 +152,14 @@ switch ($Command) {
     'status' {
         kubectl get pods -n $Namespace
         kubectl get jobs -n $Namespace
+        break
+    }
+    'start' {
+        Start-MinikubeGracefully
+        break
+    }
+    'shutdown' {
+        Shutdown-MinikubeGracefully
         break
     }
     'port-forward-api' {
