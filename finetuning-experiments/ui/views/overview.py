@@ -21,10 +21,9 @@ RUN_COLUMNS = [
     "hit@3",
     "mrr",
     "avg_answer_similarity",
-    "avg_answer_quality",
-    "avg_judge_score",
-    "avg_fact_recall",
-    "avg_faithfulness",
+    "avg_deterministic_rubric",
+    "avg_llm_judge_score",
+    "avg_effective_generation_score",
     "exact_pass_rate",
     "verification_pass_rate",
     "avg_latency",
@@ -44,9 +43,10 @@ HIGHER_IS_BETTER = {
     "soft_ndcg",
     "avg_answer_similarity",
     "avg_answer_quality",
+    "avg_deterministic_rubric",
     "avg_judge_score",
-    "avg_fact_recall",
-    "avg_faithfulness",
+    "avg_llm_judge_score",
+    "avg_effective_generation_score",
     "exact_pass_rate",
     "verification_pass_rate",
     "api_completion_rate",
@@ -70,39 +70,14 @@ LOWER_IS_BETTER = {
 }
 
 
-def _bar(df: pd.DataFrame, x: str, y: str, title: str) -> alt.Chart:
-    return (
-        alt.Chart(df)
-        .mark_bar()
-        .encode(
-            x=alt.X(x, sort="-y"),
-            y=alt.Y(y),
-            tooltip=list(df.columns),
-        )
-        .properties(title=title)
-        .interactive()
-    )
-
-
-def _line(df: pd.DataFrame, x: str, y: str, color: str, title: str) -> alt.Chart:
-    return (
-        alt.Chart(df)
-        .mark_line(point=True)
-        .encode(x=alt.X(x), y=alt.Y(y), color=color, tooltip=list(df.columns))
-        .properties(title=title)
-        .interactive()
-    )
-
-
 def _build_scorecard(df: pd.DataFrame) -> pd.DataFrame:
     metrics = [
         "hit@3",
         "mrr",
         "avg_answer_similarity",
-        "avg_answer_quality",
-        "avg_judge_score",
-        "avg_fact_recall",
-        "avg_faithfulness",
+        "avg_deterministic_rubric",
+        "avg_llm_judge_score",
+        "avg_effective_generation_score",
         "exact_pass_rate",
         "verification_pass_rate",
         "avg_latency",
@@ -127,7 +102,7 @@ def _build_scorecard(df: pd.DataFrame) -> pd.DataFrame:
     norm_cols = [f"{metric}__norm" for metric in available]
     scored["composite_score"] = scored[norm_cols].mean(axis=1).round(4)
     scored["efficiency_score"] = (
-        scored[[c for c in ["hit@3__norm", "avg_answer_similarity__norm", "p95_latency__norm"] if c in scored.columns]]
+        scored[[c for c in ["hit@3__norm", "avg_effective_generation_score__norm", "p95_latency__norm"] if c in scored.columns]]
         .mean(axis=1)
         .round(4)
     )
@@ -142,31 +117,31 @@ def _summarize_patterns(df: pd.DataFrame) -> list[str]:
     ranked = df.sort_values("composite_score", ascending=False)
     best = ranked.iloc[0]
     findings.append(
-        f"**Top overall run:** `{best['run_id']}` ({best.get('label') or 'unlabeled'}) with composite score **{best['composite_score']:.3f}**, hit@3 **{best.get('hit@3', 0.0):.3f}**, and answer quality **{best.get('avg_answer_quality', 0.0):.3f}**."
+        f"**Top overall run:** `{best['run_id']}` ({best.get('label') or 'unlabeled'}) with composite score **{best['composite_score']:.3f}**, hit@3 **{best.get('hit@3', 0.0):.3f}**, and effective generation score **{best.get('avg_effective_generation_score', 0.0):.3f}**."
     )
 
     if len(df) > 1:
         fastest = df.sort_values("p95_latency", ascending=True).iloc[0]
         strongest_retrieval = df.sort_values("hit@3", ascending=False).iloc[0]
-        strongest_generation = df.sort_values("avg_answer_quality", ascending=False).iloc[0]
+        strongest_generation = df.sort_values("avg_effective_generation_score", ascending=False).iloc[0]
         findings.append(
             f"**Best trade-off on speed:** `{fastest['run_id']}` has the lowest p95 latency at **{fastest.get('p95_latency', 0.0):.1f} ms**."
         )
         findings.append(
-            f"**Best retrieval:** `{strongest_retrieval['run_id']}` leads hit@3 at **{strongest_retrieval.get('hit@3', 0.0):.3f}**; **best generation:** `{strongest_generation['run_id']}` leads answer quality at **{strongest_generation.get('avg_answer_quality', 0.0):.3f}**."
+            f"**Best retrieval:** `{strongest_retrieval['run_id']}` leads hit@3 at **{strongest_retrieval.get('hit@3', 0.0):.3f}**; **best generation:** `{strongest_generation['run_id']}` leads effective generation score at **{strongest_generation.get('avg_effective_generation_score', 0.0):.3f}**."
         )
 
     for dimension in ["chunking_strategy", "retrieval_mode", "llm_model"]:
         if dimension in df.columns and df[dimension].nunique(dropna=True) > 1:
             grouped = (
-                df.groupby(dimension, dropna=False)[["composite_score", "hit@3", "avg_answer_quality", "p95_latency"]]
+                df.groupby(dimension, dropna=False)[["composite_score", "hit@3", "avg_effective_generation_score", "p95_latency"]]
                 .mean(numeric_only=True)
                 .sort_values("composite_score", ascending=False)
                 .reset_index()
             )
             leader = grouped.iloc[0]
             findings.append(
-                f"**Strongest {dimension.replace('_', ' ')}:** `{leader[dimension] or 'unspecified'}` averages composite **{leader['composite_score']:.3f}**, hit@3 **{leader['hit@3']:.3f}**, answer quality **{leader['avg_answer_quality']:.3f}**, p95 latency **{leader['p95_latency']:.1f} ms**."
+                f"**Strongest {dimension.replace('_', ' ')}:** `{leader[dimension] or 'unspecified'}` averages composite **{leader['composite_score']:.3f}**, hit@3 **{leader['hit@3']:.3f}**, effective generation **{leader['avg_effective_generation_score']:.3f}**, p95 latency **{leader['p95_latency']:.1f} ms**."
             )
     return findings
 
@@ -197,7 +172,7 @@ def render(df: pd.DataFrame) -> None:
     with top2:
         metric_card("Best hit@3", round(float(df["hit@3"].max()), 4))
     with top3:
-        metric_card("Best answer quality", round(float(df["avg_answer_quality"].max()), 4))
+        metric_card("Best generation", round(float(df["avg_effective_generation_score"].max()), 4))
     with top4:
         valid_p95 = df["p95_latency"].replace(0, pd.NA).dropna()
         metric_card("Lowest p95 latency", round(float(valid_p95.min()), 2) if not valid_p95.empty else 0.0)
@@ -235,11 +210,10 @@ def render(df: pd.DataFrame) -> None:
         "composite_score",
         "efficiency_score",
         "hit@3",
-        "avg_answer_similarity",
-        "avg_answer_quality",
-        "avg_judge_score",
-        "avg_fact_recall",
-        "avg_faithfulness",
+        "mrr",
+        "avg_deterministic_rubric",
+        "avg_llm_judge_score",
+        "avg_effective_generation_score",
         "p95_latency",
         "api_failure_rate",
         "hallucination_rate",
@@ -266,104 +240,61 @@ def render(df: pd.DataFrame) -> None:
             .encode(
                 x=alt.X("p95_latency:Q", title="p95 latency (ms)"),
                 y=alt.Y("hit@3:Q", title="hit@3"),
-                color=alt.Color("avg_answer_similarity:Q", title="Answer similarity"),
+                color=alt.Color("avg_effective_generation_score:Q", title="Generation"),
                 tooltip=[
                     "run_label",
                     "chunking_strategy",
                     "retrieval_mode",
                     "llm_model",
                     "hit@3",
-                    "avg_answer_similarity",
-        "avg_answer_quality",
-        "avg_judge_score",
-                    "avg_fact_recall",
+                    "mrr",
+                    "avg_deterministic_rubric",
+                    "avg_llm_judge_score",
+                    "avg_effective_generation_score",
                     "p95_latency",
                     "api_failure_rate",
-                    "composite_score",
                 ],
             )
-            .properties(title="Retrieval-quality vs latency trade-off")
+            .properties(title="Retrieval vs latency, colored by generation score")
+            .interactive()
         )
-        frontier_chart = (
-            alt.Chart(frontier)
-            .mark_line(point=True)
-            .encode(x="p95_latency:Q", y="hit@3:Q", tooltip=["run_label", "p95_latency", "hit@3"])
-        )
-        st.altair_chart((scatter + frontier_chart).interactive(), use_container_width=True)
+        if not frontier.empty:
+            frontier_chart = (
+                alt.Chart(frontier)
+                .mark_line(point=True)
+                .encode(x="p95_latency:Q", y="hit@3:Q", tooltip=["run_label", "p95_latency", "hit@3"])
+            )
+            st.altair_chart(scatter + frontier_chart, use_container_width=True)
+        else:
+            st.altair_chart(scatter, use_container_width=True)
 
     with right:
-        dimension = st.selectbox(
-            "Group experiments by",
-            ["chunking_strategy", "retrieval_mode", "llm_model", "prompt_label"],
-            index=0,
+        diagnostic_metrics = [
+            "hit@3",
+            "mrr",
+            "avg_deterministic_rubric",
+            "avg_llm_judge_score",
+            "avg_effective_generation_score",
+            "p95_latency",
+            "api_failure_rate",
+        ]
+        melted = scored.melt(
+            id_vars=["run_label"],
+            value_vars=[metric for metric in diagnostic_metrics if metric in scored.columns],
+            var_name="metric",
+            value_name="value",
         )
-        grouped = (
-            scored.groupby(dimension, dropna=False)[
-                ["composite_score", "hit@3", "avg_answer_similarity", "avg_fact_recall", "p95_latency"]
-            ]
-            .mean(numeric_only=True)
-            .reset_index()
-            .sort_values("composite_score", ascending=False)
-        )
-        st.altair_chart(
-            _bar(grouped, f"{dimension}:N", "composite_score:Q", f"Average composite score by {dimension.replace('_', ' ')}"),
-            use_container_width=True,
-        )
-
-    detail_left, detail_right = st.columns(2)
-    with detail_left:
-        metric = st.selectbox(
-            "Single-metric ranking",
-            [
-                "hit@1",
-                "hit@3",
-                "mrr",
-                "avg_answer_similarity",
-        "avg_answer_quality",
-        "avg_judge_score",
-                "avg_fact_recall",
-                "avg_faithfulness",
-                "exact_pass_rate",
-                "verification_pass_rate",
-                "avg_latency",
-                "p95_latency",
-                "queue_delay_avg",
-                "chunks_created",
-                "avg_chunk_length",
-            ],
-            index=1,
-        )
-        chart_df = scored[["run_id", "label", metric]].copy()
-        chart_df["run_label"] = chart_df["label"].fillna("") + " | " + chart_df["run_id"].fillna("")
-        st.altair_chart(_bar(chart_df, "run_label:N", f"{metric}:Q", f"{metric} by run"), use_container_width=True)
-
-    with detail_right:
-        timeline_df = scored.dropna(subset=["datetime_parsed"]).copy()
-        if not timeline_df.empty:
-            timeline_metric = st.selectbox(
-                "Timeline metric",
-                [
-                    "composite_score",
-                    "hit@3",
-                    "avg_answer_similarity",
-        "avg_answer_quality",
-        "avg_judge_score",
-                    "exact_pass_rate",
-                    "avg_latency",
-                    "p95_latency",
-                ],
-                index=0,
+        chart = (
+            alt.Chart(melted)
+            .mark_bar()
+            .encode(
+                x=alt.X("metric:N", title="Metric"),
+                y=alt.Y("value:Q", title="Value"),
+                color="run_label:N",
+                xOffset="run_label:N",
+                tooltip=["run_label", "metric", "value"],
             )
-            st.altair_chart(
-                _line(
-                    timeline_df,
-                    "datetime_parsed:T",
-                    f"{timeline_metric}:Q",
-                    "run_label:N",
-                    f"{timeline_metric} over time",
-                ),
-                use_container_width=True,
-            )
-
-    st.markdown("### Raw run table")
-    st.dataframe(filtered[RUN_COLUMNS], use_container_width=True, hide_index=True)
+            .properties(title="Key benchmark metrics")
+            .interactive()
+        )
+        st.altair_chart(chart, use_container_width=True)

@@ -76,6 +76,39 @@ def _is_observation_only(case: dict[str, Any]) -> bool:
     )
 
 
+def _metric_or_none(value: float, *, applicable: bool) -> float | None:
+    return value if applicable else None
+
+
+def _default_weights(rubric_config: Any | None) -> dict[str, float]:
+    weights = {
+        "required_fact": 0.35,
+        "reference_alignment": 0.15,
+        "gold_alignment": 0.10,
+        "context_alignment": 0.15,
+        "groundedness": 0.15,
+        "verification": 0.10,
+    }
+    if rubric_config is None:
+        return weights
+    return {
+        "required_fact": float(getattr(rubric_config, "required_fact_weight", weights["required_fact"])),
+        "reference_alignment": float(getattr(rubric_config, "reference_alignment_weight", weights["reference_alignment"])),
+        "gold_alignment": float(getattr(rubric_config, "gold_alignment_weight", weights["gold_alignment"])),
+        "context_alignment": float(getattr(rubric_config, "context_alignment_weight", weights["context_alignment"])),
+        "groundedness": float(getattr(rubric_config, "groundedness_weight", weights["groundedness"])),
+        "verification": float(getattr(rubric_config, "verification_weight", weights["verification"])),
+    }
+
+
+def _applied_weights(base_weights: dict[str, float], applicability: dict[str, bool]) -> dict[str, float]:
+    return {
+        key: weight
+        for key, weight in base_weights.items()
+        if applicability.get(key, False) and weight > 0
+    }
+
+
 def score_generation(
     case: dict[str, Any],
     answer: str,
@@ -108,44 +141,59 @@ def score_generation(
     unsupported = max(0, len(unsupported_tokens))
     unsupported_rate = (unsupported / len(answer_token_set)) if answer_token_set else 0.0
     groundedness = max(0.0, 1.0 - unsupported_rate)
-    verification_score = _verification_score(verification)
-    required_fact_recall = (required_hits / len(required)) if required else 1.0
 
-    weights = {
-        "required_fact": 0.35,
-        "reference_alignment": 0.15,
-        "gold_alignment": 0.10,
-        "context_alignment": 0.15,
-        "groundedness": 0.15,
-        "verification": 0.10,
+    verification_payload = verification or {}
+    verification_present = bool(verification_payload)
+    verification_score = _verification_score(verification_payload) if verification_present else 0.5
+
+    required_fact_applicable = bool(required)
+    forbidden_fact_applicable = bool(forbidden)
+    required_fact_recall = (required_hits / len(required)) if required_fact_applicable else None
+
+    base_weights = _default_weights(rubric_config)
+    dimension_applicability = {
+        "required_fact": required_fact_applicable,
+        "reference_alignment": bool(reference_token_set),
+        "gold_alignment": bool(gold_token_set),
+        "context_alignment": bool(context_tokens),
+        "groundedness": bool(answer_token_set),
+        "verification": verification_present,
     }
-    if rubric_config is not None:
-        weights = {
-            "required_fact": float(getattr(rubric_config, "required_fact_weight", weights["required_fact"])),
-            "reference_alignment": float(getattr(rubric_config, "reference_alignment_weight", weights["reference_alignment"])),
-            "gold_alignment": float(getattr(rubric_config, "gold_alignment_weight", weights["gold_alignment"])),
-            "context_alignment": float(getattr(rubric_config, "context_alignment_weight", weights["context_alignment"])),
-            "groundedness": float(getattr(rubric_config, "groundedness_weight", weights["groundedness"])),
-            "verification": float(getattr(rubric_config, "verification_weight", weights["verification"])),
-        }
-    weight_total = sum(weights.values()) or 1.0
+    applied_weights = _applied_weights(base_weights, dimension_applicability)
+    weight_total = sum(applied_weights.values())
 
     deterministic_applicable = bool(not observation_only and getattr(rubric_config, "enabled", True))
     deterministic_rubric_score: float | None = None
     deterministic_grade: str | None = None
-    if deterministic_applicable:
-        deterministic_rubric_score = (
-            weights["required_fact"] * required_fact_recall
-            + weights["reference_alignment"] * reference_token_f1
-            + weights["gold_alignment"] * gold_token_f1
-            + weights["context_alignment"] * max(faith_context, context_token_f1)
-            + weights["groundedness"] * groundedness
-            + weights["verification"] * verification_score
-        ) / weight_total
+
+    subscores = {
+        "required_fact_recall": _metric_or_none(required_fact_recall or 0.0, applicable=required_fact_applicable),
+        "reference_alignment": _metric_or_none(reference_token_f1, applicable=dimension_applicability["reference_alignment"]),
+        "gold_alignment": _metric_or_none(gold_token_f1, applicable=dimension_applicability["gold_alignment"]),
+        "context_alignment": _metric_or_none(max(faith_context, context_token_f1), applicable=dimension_applicability["context_alignment"]),
+        "groundedness": _metric_or_none(groundedness, applicable=dimension_applicability["groundedness"]),
+        "verification": _metric_or_none(verification_score, applicable=dimension_applicability["verification"]),
+    }
+
+    if deterministic_applicable and weight_total > 0:
+        weighted_sum = sum(
+            float(subscores[key] or 0.0) * applied_weights[key]
+            for key in applied_weights
+        )
+        deterministic_rubric_score = weighted_sum / weight_total
         if forbidden_hits:
             deterministic_rubric_score = max(0.0, deterministic_rubric_score - min(0.4, 0.2 * forbidden_hits))
         deterministic_rubric_score = max(0.0, min(1.0, deterministic_rubric_score))
         deterministic_grade = _grade_from_score(deterministic_rubric_score)
+
+    exact_pass_applicable = bool(deterministic_applicable and (required_fact_applicable or forbidden_fact_applicable))
+    exact_pass = None
+    if exact_pass_applicable:
+        exact_pass = bool(
+            (required_fact_recall or 0.0) >= 0.999
+            and forbidden_hits == 0
+            and unsupported == 0
+        )
 
     deterministic = {
         "enabled": deterministic_applicable,
@@ -153,15 +201,10 @@ def score_generation(
         "skipped_reason": None if deterministic_applicable else "observation_only_case",
         "score": deterministic_rubric_score,
         "grade": deterministic_grade,
-        "weights": weights,
-        "subscores": {
-            "required_fact_recall": required_fact_recall,
-            "reference_alignment": reference_token_f1,
-            "gold_alignment": gold_token_f1,
-            "context_alignment": max(faith_context, context_token_f1),
-            "groundedness": groundedness,
-            "verification": verification_score,
-        },
+        "weights": base_weights,
+        "applied_weights": applied_weights,
+        "applicable_dimensions": dimension_applicability,
+        "subscores": subscores,
         "required_fact_hits": required_hits,
         "required_fact_total": len(required),
         "required_fact_misses": max(0, len(required) - required_hits),
@@ -182,19 +225,25 @@ def score_generation(
         "answer_quality_grade": deterministic_grade,
         "judge_score": deterministic_rubric_score,
         "judge_grade": deterministic_grade,
-        "verification_score": verification_score,
+        "judge_score_source": "deterministic_rubric",
+        "llm_judge_score": None,
+        "llm_judge_grade": None,
+        "verification_score": _metric_or_none(verification_score, applicable=verification_present),
+        "fact_recall_applicable": required_fact_applicable,
         "required_fact_recall": required_fact_recall,
         "required_fact_hits": required_hits,
         "required_fact_total": len(required),
         "required_fact_misses": max(0, len(required) - required_hits),
+        "forbidden_fact_applicable": forbidden_fact_applicable,
         "forbidden_fact_violations": forbidden_hits,
         "forbidden_fact_total": len(forbidden),
-        "faithfulness_to_gold_passage": faith_gold,
-        "faithfulness_to_retrieved_context": faith_context,
-        "groundedness_score": groundedness,
+        "faithfulness_to_gold_passage": _metric_or_none(faith_gold, applicable=bool(gold_token_set)),
+        "faithfulness_to_retrieved_context": _metric_or_none(faith_context, applicable=bool(context_tokens)),
+        "groundedness_score": _metric_or_none(groundedness, applicable=bool(answer_token_set)),
         "hallucination_unsupported_token_count": unsupported,
         "hallucination_rate": unsupported_rate,
         "unsupported_tokens": unsupported_tokens[:25],
         "retrieved_context_chunk_count": len(retrieved_context),
-        "exact_pass": bool(deterministic_applicable and required_fact_recall >= 0.999 and forbidden_hits == 0 and unsupported == 0),
+        "exact_pass_applicable": exact_pass_applicable,
+        "exact_pass": exact_pass,
     }

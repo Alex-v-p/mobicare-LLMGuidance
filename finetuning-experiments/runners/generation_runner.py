@@ -56,8 +56,8 @@ def run_generation_stage(
         }
         try:
             generation_scores["llm_judge"] = evaluate_llm_judge(llm_judge_config, payload)
-            generation_scores["judge_score"] = generation_scores["llm_judge"].get("score")
-            generation_scores["judge_grade"] = generation_scores["llm_judge"].get("overall_grade")
+            generation_scores["llm_judge_score"] = generation_scores["llm_judge"].get("score")
+            generation_scores["llm_judge_grade"] = generation_scores["llm_judge"].get("overall_grade")
         except Exception as exc:  # noqa: BLE001
             if getattr(llm_judge_config, "fail_open", True):
                 generation_scores["llm_judge"] = {
@@ -72,6 +72,8 @@ def run_generation_stage(
                     "model": getattr(llm_judge_config, "model", None),
                     "raw_response": "",
                 }
+                generation_scores["llm_judge_score"] = None
+                generation_scores["llm_judge_grade"] = None
             else:
                 raise
 

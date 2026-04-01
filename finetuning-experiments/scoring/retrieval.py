@@ -12,7 +12,24 @@ _SOURCE_WEIGHTS = {
     "irrelevant": 0.0,
 }
 _STRICT_LABELS = {"direct_evidence", "partial_direct_evidence"}
+_RELEVANT_LABELS = _STRICT_LABELS | {"supporting"}
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
+
+
+def _chunk_id_aliases(chunk_id: Any) -> set[str]:
+    raw = str(chunk_id or "").strip()
+    if not raw:
+        return set()
+    aliases = {raw, raw.lower()}
+    if "#" in raw:
+        suffix = raw.split("#", 1)[1].strip()
+        if suffix:
+            aliases.add(suffix)
+            aliases.add(suffix.lower())
+    basename = raw.rsplit("/", 1)[-1]
+    aliases.add(basename)
+    aliases.add(basename.lower())
+    return {alias for alias in aliases if alias}
 
 
 def _build_chunk_label_map(source_mapping: dict[str, Any] | None) -> dict[str, str]:
@@ -20,16 +37,20 @@ def _build_chunk_label_map(source_mapping: dict[str, Any] | None) -> dict[str, s
     source_list = mapping.get("source_list") or {}
     label_map: dict[str, str] = {}
 
+    def register(chunk_id: Any, label: str) -> None:
+        for alias in _chunk_id_aliases(chunk_id):
+            label_map[alias] = str(label)
+
     if source_list:
         for label, items in source_list.items():
             for item in items or []:
                 for chunk_id in item.get("chunk_ids") or []:
-                    label_map[str(chunk_id)] = str(label)
+                    register(chunk_id, str(label))
         return label_map
 
     for item in mapping.get("matches") or []:
         for chunk_id in item.get("chunk_ids") or []:
-            label_map[str(chunk_id)] = "direct_evidence"
+            register(chunk_id, "direct_evidence")
     return label_map
 
 
@@ -61,7 +82,8 @@ def _deduplicated_relevance(retrieved_chunks: list[dict[str, Any]], label_map: d
     previous_snippets: list[str] = []
     for chunk in retrieved_chunks:
         snippet = str(chunk.get("snippet") or "")
-        label = label_map.get(str(chunk.get("chunk_id")), "irrelevant")
+        chunk_id = next(iter(_chunk_id_aliases(chunk.get("chunk_id"))), "")
+        label = label_map.get(chunk_id, "irrelevant")
         weight = _SOURCE_WEIGHTS.get(label, 0.0)
         is_duplicate = any(_snippet_similarity(snippet, prev) >= 0.75 for prev in previous_snippets)
         if is_duplicate:
@@ -84,7 +106,7 @@ def _lenient_success(ranked_labels: list[str]) -> float:
         return 0.9
     if sum(1 for label in top5 if label in _STRICT_LABELS) >= 1:
         return 0.75
-    if sum(1 for label in top5 if label in {"supporting", * _STRICT_LABELS}) >= 2:
+    if sum(1 for label in top5 if label in _RELEVANT_LABELS) >= 2:
         return 0.6
     if any(label == "supporting" for label in top3):
         return 0.4
@@ -94,18 +116,31 @@ def _lenient_success(ranked_labels: list[str]) -> float:
 def score_retrieval(source_mapping: dict[str, Any] | None, retrieved_chunks: list[dict[str, Any]]) -> dict[str, Any]:
     label_map = _build_chunk_label_map(source_mapping)
     ranked_chunk_ids = [str(chunk.get("chunk_id")) for chunk in retrieved_chunks if chunk.get("chunk_id")]
-    ranked_labels = [label_map.get(chunk_id, "irrelevant") for chunk_id in ranked_chunk_ids]
+    ranked_labels = [
+        next((label_map.get(alias) for alias in _chunk_id_aliases(chunk_id) if label_map.get(alias) is not None), "irrelevant")
+        for chunk_id in ranked_chunk_ids
+    ]
     ranked_weights = [_SOURCE_WEIGHTS.get(label, 0.0) for label in ranked_labels]
 
     strict_chunk_ids = {chunk_id for chunk_id, label in label_map.items() if label in _STRICT_LABELS}
-    first_rank = None
+    relevant_chunk_ids = {chunk_id for chunk_id, label in label_map.items() if label in _RELEVANT_LABELS}
+
+    first_strict_rank = None
+    first_relevant_rank = None
     for index, chunk_id in enumerate(ranked_chunk_ids, start=1):
-        if chunk_id in strict_chunk_ids:
-            first_rank = index
+        aliases = _chunk_id_aliases(chunk_id)
+        if first_strict_rank is None and aliases & strict_chunk_ids:
+            first_strict_rank = index
+        if first_relevant_rank is None and aliases & relevant_chunk_ids:
+            first_relevant_rank = index
+        if first_strict_rank is not None and first_relevant_rank is not None:
             break
 
-    def hit_at(k: int) -> float:
-        return 1.0 if any(chunk_id in strict_chunk_ids for chunk_id in ranked_chunk_ids[:k]) else 0.0
+    def hit_at(k: int, targets: set[str]) -> float:
+        for chunk_id in ranked_chunk_ids[:k]:
+            if _chunk_id_aliases(chunk_id) & targets:
+                return 1.0
+        return 0.0
 
     source_list = (source_mapping or {}).get("source_list") or {}
     strict_items = list(source_list.get("direct_evidence") or []) + list(source_list.get("partial_direct_evidence") or [])
@@ -118,13 +153,19 @@ def score_retrieval(source_mapping: dict[str, Any] | None, retrieved_chunks: lis
     lenient_success = _lenient_success(ranked_labels)
 
     return {
-        "hit_at_1": hit_at(1),
-        "hit_at_3": hit_at(3),
-        "hit_at_5": hit_at(5),
-        "mrr": (1.0 / first_rank) if first_rank else 0.0,
-        "strict_success": bool(first_rank),
+        "hit_at_1": hit_at(1, relevant_chunk_ids),
+        "hit_at_3": hit_at(3, relevant_chunk_ids),
+        "hit_at_5": hit_at(5, relevant_chunk_ids),
+        "mrr": (1.0 / first_relevant_rank) if first_relevant_rank else 0.0,
+        "strict_hit_at_1": hit_at(1, strict_chunk_ids),
+        "strict_hit_at_3": hit_at(3, strict_chunk_ids),
+        "strict_hit_at_5": hit_at(5, strict_chunk_ids),
+        "strict_mrr": (1.0 / first_strict_rank) if first_strict_rank else 0.0,
+        "strict_success": bool(first_strict_rank),
+        "relevance_success": bool(first_relevant_rank),
         "lenient_success_score": lenient_success,
-        "strict_hit_rank": first_rank,
+        "strict_hit_rank": first_strict_rank,
+        "relevance_hit_rank": first_relevant_rank,
         "average_overlap_score": _mean(overlap_scores),
         "average_semantic_score": _mean(semantic_scores),
         "retrieved_average_overlap_score": _mean(retrieved_overlap_scores),
@@ -139,5 +180,6 @@ def score_retrieval(source_mapping: dict[str, Any] | None, retrieved_chunks: lis
         "retrieved_chunk_count": len(ranked_chunk_ids),
         "retrieved_chunk_labels": ranked_labels,
         "strict_chunk_ids": sorted(strict_chunk_ids),
+        "relevant_chunk_ids": sorted(relevant_chunk_ids),
         "source_weight_scheme": dict(_SOURCE_WEIGHTS),
     }

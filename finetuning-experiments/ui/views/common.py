@@ -126,6 +126,30 @@ def get_nested(data: dict[str, Any], *keys: str, default: Any = None) -> Any:
 
 
 
+def first_defined(*values: Any, default: Any = None) -> Any:
+    for value in values:
+        if value is not None:
+            return value
+    return default
+
+
+
+def _resolve_run_generation_score(generation: dict[str, Any]) -> tuple[Any, Any, Any]:
+    deterministic = first_defined(
+        generation.get("average_deterministic_rubric_score"),
+        generation.get("average_answer_quality_score"),
+        generation.get("average_judge_score"),
+    )
+    llm = first_defined(generation.get("average_llm_judge_score"))
+    deterministic_cases = safe_int(generation.get("deterministic_applicable_case_count"))
+    if deterministic_cases == 0 and llm is not None:
+        effective = llm
+    else:
+        effective = first_defined(deterministic, llm)
+    return deterministic, llm, effective
+
+
+
 def normalize_run_row(run: dict[str, Any]) -> dict[str, Any]:
     payload = run.get("payload") or {}
     retrieval = payload.get("retrieval_summary") or {}
@@ -137,9 +161,17 @@ def normalize_run_row(run: dict[str, Any]) -> dict[str, Any]:
     source_mapping = payload.get("source_mapping_summary") or {}
     normalized = payload.get("normalized_metrics") or {}
     config_overview = payload.get("config_overview") or {}
-    ingestion_config = (config_overview.get("ingestion") or {})
-    inference_config = (config_overview.get("inference") or {})
-    source_mapping_config = (config_overview.get("source_mapping") or {})
+    ingestion_config = config_overview.get("ingestion") or {}
+    inference_config = config_overview.get("inference") or {}
+    source_mapping_config = config_overview.get("source_mapping") or {}
+
+    avg_deterministic_raw, avg_llm_raw, avg_effective_raw = _resolve_run_generation_score(generation)
+    avg_faithfulness_raw = first_defined(
+        generation.get("average_groundedness_score"),
+        generation.get("average_faithfulness_to_retrieved_context"),
+        generation.get("average_faithfulness_to_context"),
+        generation.get("average_faithfulness_score"),
+    )
 
     return {
         "run_id": safe_str(payload.get("run_id") or run.get("run_id")),
@@ -163,18 +195,23 @@ def normalize_run_row(run: dict[str, Any]) -> dict[str, Any]:
         "hit@3": safe_float(retrieval.get("hit_at_3")),
         "hit@5": safe_float(retrieval.get("hit_at_5")),
         "mrr": safe_float(retrieval.get("mrr")),
+        "strict_hit@1": safe_float(retrieval.get("strict_hit_at_1")),
+        "strict_hit@3": safe_float(retrieval.get("strict_hit_at_3")),
+        "strict_hit@5": safe_float(retrieval.get("strict_hit_at_5")),
+        "strict_mrr": safe_float(retrieval.get("strict_mrr")),
         "weighted_relevance": safe_float(retrieval.get("weighted_relevance_score")),
         "lenient_success_score": safe_float(retrieval.get("lenient_success_score")),
         "duplicate_chunk_rate": safe_float(retrieval.get("duplicate_chunk_rate")),
         "context_diversity_score": safe_float(retrieval.get("context_diversity_score")),
         "soft_ndcg": safe_float(retrieval.get("soft_ndcg")),
         "avg_answer_similarity": safe_float(generation.get("average_answer_similarity")),
-        "avg_answer_quality": safe_float(generation.get("average_answer_quality_score")),
-        "avg_deterministic_rubric": safe_float(generation.get("average_deterministic_rubric_score") or generation.get("average_answer_quality_score")),
-        "avg_judge_score": safe_float(generation.get("average_judge_score")),
-        "avg_llm_judge_score": safe_float(generation.get("average_llm_judge_score") or generation.get("average_judge_score")),
+        "avg_answer_quality": safe_float(first_defined(generation.get("average_answer_quality_score"), avg_deterministic_raw)),
+        "avg_deterministic_rubric": safe_float(avg_deterministic_raw),
+        "avg_judge_score": safe_float(avg_deterministic_raw),
+        "avg_llm_judge_score": safe_float(avg_llm_raw),
+        "avg_effective_generation_score": safe_float(avg_effective_raw),
         "avg_fact_recall": safe_float(generation.get("average_required_fact_recall")),
-        "avg_faithfulness": safe_float(generation.get("average_faithfulness_score") or generation.get("average_faithfulness_to_context")),
+        "avg_faithfulness": safe_float(avg_faithfulness_raw),
         "exact_pass_rate": safe_float(generation.get("exact_pass_rate")),
         "verification_pass_rate": safe_float(generation.get("verification_pass_rate")),
         "forbidden_violation_rate": safe_float(generation.get("forbidden_fact_violation_rate")),
@@ -229,32 +266,71 @@ def build_case_dataframe(artifact: dict[str, Any]) -> pd.DataFrame:
         timings = case.get("timings") or {}
         derived = (case.get("telemetry") or {}).get("derived") or {}
         source_list = case.get("source_list") or {}
+
+        deterministic_score_raw = first_defined(
+            get_nested(generation_scores, "deterministic_rubric", "score"),
+            generation_scores.get("answer_quality_score"),
+            generation_scores.get("judge_score"),
+        )
+        llm_score_raw = first_defined(
+            generation_scores.get("llm_judge_score"),
+            get_nested(generation_scores, "llm_judge", "score"),
+        )
+        evaluation_profile = safe_str(generation_scores.get("evaluation_profile"))
+        if evaluation_profile == "observation_only" and llm_score_raw is not None:
+            display_generation_score_raw = llm_score_raw
+        else:
+            display_generation_score_raw = first_defined(deterministic_score_raw, llm_score_raw)
+
+        latency_ms_raw = first_defined(
+            timings.get("total_duration_ms"),
+            timings.get("total_latency_ms"),
+            derived.get("total_duration_ms"),
+        )
+        if latency_ms_raw is None and timings.get("total_latency_seconds") is not None:
+            latency_ms_raw = safe_float(timings.get("total_latency_seconds")) * 1000.0
+
+        faithfulness_raw = first_defined(
+            generation_scores.get("groundedness_score"),
+            generation_scores.get("faithfulness_to_retrieved_context"),
+            generation_scores.get("faithfulness_to_context"),
+            generation_scores.get("faithfulness_score"),
+        )
+        hallucination_raw = first_defined(
+            generation_scores.get("hallucination_rate"),
+            1.0 if safe_float(generation_scores.get("hallucination_unsupported_token_count")) > 0 else 0.0,
+        )
+
         rows.append(
             {
                 "case_id": safe_str(case.get("case_id")),
                 "question": safe_str(case.get("question")),
                 "status": safe_str(case.get("status") or "completed"),
                 "answerability": safe_str(case.get("answerability")),
+                "evaluation_profile": evaluation_profile,
                 "retrieval_hit@1": safe_float(retrieval_scores.get("hit_at_1")),
                 "retrieval_hit@3": safe_float(retrieval_scores.get("hit_at_3")),
+                "strict_hit@3": safe_float(retrieval_scores.get("strict_hit_at_3")),
                 "mrr": safe_float(retrieval_scores.get("mrr")),
+                "strict_mrr": safe_float(retrieval_scores.get("strict_mrr")),
                 "weighted_relevance_score": safe_float(retrieval_scores.get("weighted_relevance_score")),
                 "lenient_success_score": safe_float(retrieval_scores.get("lenient_success_score")),
                 "duplicate_chunk_rate": safe_float(retrieval_scores.get("duplicate_chunk_rate")),
-                "answer_similarity": safe_float(generation_scores.get("answer_similarity")),
-                "answer_quality_score": safe_float(generation_scores.get("answer_quality_score")),
-                "deterministic_rubric_score": safe_float(get_nested(generation_scores, "deterministic_rubric", "score", default=generation_scores.get("answer_quality_score"))),
-                "judge_score": safe_float(generation_scores.get("judge_score")),
-                "llm_judge_score": safe_float(get_nested(generation_scores, "llm_judge", "score", default=generation_scores.get("judge_score"))),
+                "answer_similarity": safe_float(first_defined(generation_scores.get("answer_similarity"), generation_scores.get("reference_token_f1"))),
+                "answer_quality_score": safe_float(first_defined(generation_scores.get("answer_quality_score"), deterministic_score_raw)),
+                "deterministic_rubric_score": safe_float(deterministic_score_raw),
+                "judge_score": safe_float(first_defined(generation_scores.get("judge_score"), deterministic_score_raw)),
+                "llm_judge_score": safe_float(llm_score_raw),
+                "generation_score_display": safe_float(display_generation_score_raw),
                 "fact_recall": safe_float(generation_scores.get("required_fact_recall")),
-                "faithfulness": safe_float(generation_scores.get("faithfulness_score") or generation_scores.get("faithfulness_to_context")),
-                "hallucination_rate": safe_float(generation_scores.get("hallucination_rate")),
+                "faithfulness": safe_float(faithfulness_raw),
+                "hallucination_rate": safe_float(hallucination_raw),
                 "exact_pass": safe_float(generation_scores.get("exact_pass")),
                 "warning_count": len(case.get("warnings") or []),
                 "retrieved_chunk_count": len(case.get("retrieved_chunks") or []),
                 "direct_evidence_count": len(source_list.get("direct_evidence") or []),
                 "supporting_count": len(source_list.get("supporting") or []),
-                "total_latency_ms": safe_float(timings.get("total_latency_ms") or derived.get("total_duration_ms")),
+                "total_latency_ms": safe_float(latency_ms_raw),
                 "queue_delay_ms": safe_float(derived.get("queue_delay_ms")),
                 "execution_duration_ms": safe_float(derived.get("execution_duration_ms")),
                 "api_failure_category": safe_str((case.get("raw_endpoint_result") or {}).get("error")),

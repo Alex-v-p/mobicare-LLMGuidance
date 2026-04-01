@@ -19,14 +19,15 @@ COMPARE_COLUMNS = [
     "hit@1",
     "hit@3",
     "mrr",
+    "strict_hit@3",
+    "strict_mrr",
     "weighted_relevance",
     "lenient_success_score",
     "context_diversity_score",
     "avg_answer_similarity",
-    "avg_answer_quality",
-    "avg_judge_score",
-    "avg_fact_recall",
-    "avg_faithfulness",
+    "avg_deterministic_rubric",
+    "avg_llm_judge_score",
+    "avg_effective_generation_score",
     "exact_pass_rate",
     "verification_pass_rate",
     "hallucination_rate",
@@ -42,14 +43,15 @@ BENEFIT_DIRECTION = {
     "hit@1": 1,
     "hit@3": 1,
     "mrr": 1,
+    "strict_hit@3": 1,
+    "strict_mrr": 1,
     "weighted_relevance": 1,
     "lenient_success_score": 1,
     "context_diversity_score": 1,
     "avg_answer_similarity": 1,
-    "avg_answer_quality": 1,
-    "avg_judge_score": 1,
-    "avg_fact_recall": 1,
-    "avg_faithfulness": 1,
+    "avg_deterministic_rubric": 1,
+    "avg_llm_judge_score": 1,
+    "avg_effective_generation_score": 1,
     "exact_pass_rate": 1,
     "verification_pass_rate": 1,
     "hallucination_rate": -1,
@@ -96,7 +98,7 @@ def _narrative(delta_df: pd.DataFrame, baseline_run_label: str) -> list[str]:
         return non_baseline.sort_values(metric, ascending=ascending).iloc[0]
 
     retrieval_winner = best("Δ hit@3", ascending=False)
-    generation_winner = best("Δ avg_answer_similarity", ascending=False)
+    generation_winner = best("Δ avg_effective_generation_score", ascending=False)
     latency_winner = best("Δ p95_latency", ascending=True)
     risk_winner = best("Δ api_failure_rate", ascending=True)
 
@@ -104,7 +106,7 @@ def _narrative(delta_df: pd.DataFrame, baseline_run_label: str) -> list[str]:
         f"**Retrieval lift:** `{retrieval_winner['run_label']}` improves hit@3 by **{retrieval_winner['Δ hit@3']:+.3f}** vs baseline."
     )
     insights.append(
-        f"**Generation lift:** `{generation_winner['run_label']}` changes answer similarity by **{generation_winner['Δ avg_answer_similarity']:+.3f}**."
+        f"**Generation lift:** `{generation_winner['run_label']}` changes effective generation score by **{generation_winner['Δ avg_effective_generation_score']:+.3f}**."
     )
     insights.append(
         f"**Latency movement:** `{latency_winner['run_label']}` changes p95 latency by **{latency_winner['Δ p95_latency']:+.1f} ms**. Negative is better here."
@@ -158,8 +160,8 @@ def render(df: pd.DataFrame) -> None:
     left, right = st.columns([1.1, 0.9])
     with left:
         metric_groups = {
-            "Retrieval": ["hit@1", "hit@3", "mrr", "weighted_relevance"],
-            "Generation": ["avg_answer_similarity", "avg_fact_recall", "avg_faithfulness", "exact_pass_rate", "verification_pass_rate", "hallucination_rate"],
+            "Retrieval": ["hit@1", "hit@3", "mrr", "strict_hit@3", "strict_mrr", "weighted_relevance"],
+            "Generation": ["avg_deterministic_rubric", "avg_llm_judge_score", "avg_effective_generation_score", "exact_pass_rate", "hallucination_rate"],
             "Latency / reliability": ["avg_latency", "p95_latency", "queue_delay_avg", "api_failure_rate", "api_timeout_rate"],
             "Pipeline complexity": ["chunks_created"],
         }
@@ -186,7 +188,7 @@ def render(df: pd.DataFrame) -> None:
         st.altair_chart(chart, use_container_width=True)
 
     with right:
-        diagnostic_cols = ["hit@3", "lenient_success_score", "avg_answer_quality", "avg_judge_score", "p95_latency", "api_failure_rate", "hallucination_rate"]
+        diagnostic_cols = ["hit@3", "mrr", "avg_deterministic_rubric", "avg_llm_judge_score", "avg_effective_generation_score", "p95_latency", "api_failure_rate"]
         heatmap_df = _normalize_for_heatmap(compare_df, diagnostic_cols)
         heatmap = (
             alt.Chart(heatmap_df)
@@ -207,7 +209,7 @@ def render(df: pd.DataFrame) -> None:
         .mark_circle(size=170)
         .encode(
             x=alt.X("p95_latency:Q", title="p95 latency (ms)"),
-            y=alt.Y("avg_answer_quality:Q", title="Answer quality"),
+            y=alt.Y("avg_effective_generation_score:Q", title="Generation score"),
             color=alt.Color("hit@3:Q", title="hit@3"),
             shape=alt.Shape("retrieval_mode:N", title="Retrieval mode"),
             tooltip=[
@@ -217,9 +219,10 @@ def render(df: pd.DataFrame) -> None:
                 "llm_model",
                 "prompt_label",
                 "hit@3",
-                "avg_answer_quality",
-                "avg_judge_score",
-                "avg_fact_recall",
+                "mrr",
+                "avg_deterministic_rubric",
+                "avg_llm_judge_score",
+                "avg_effective_generation_score",
                 "p95_latency",
                 "api_failure_rate",
             ],
