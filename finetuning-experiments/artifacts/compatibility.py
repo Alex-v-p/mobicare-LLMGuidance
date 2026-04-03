@@ -66,6 +66,24 @@ def _patch_stage_latency_summary(summary: dict[str, Any]) -> dict[str, Any]:
     return patched
 
 
+
+
+def backfill_retrieval_summary_fields(retrieval: dict[str, Any]) -> dict[str, Any]:
+    retrieval = dict(retrieval or {})
+    legacy = retrieval.get("weighted_relevance_score")
+    v2 = first_defined(retrieval.get("weighted_relevance_score_v2"))
+    display = first_defined(retrieval.get("weighted_relevance_display"), v2, legacy)
+    retrieval.setdefault("weighted_relevance_score", legacy)
+    retrieval.setdefault("weighted_relevance_score_v2", v2)
+    retrieval.setdefault("weighted_relevance_display", display)
+    retrieval.setdefault("weighted_relevance_score_source", "legacy_v1" if legacy is not None else None)
+    retrieval.setdefault("weighted_relevance_score_v2_source", "relevance_gated_v2" if v2 is not None else None)
+    retrieval.setdefault(
+        "weighted_relevance_display_source",
+        "relevance_gated_v2" if retrieval.get("weighted_relevance_score_v2") is not None else retrieval.get("weighted_relevance_score_source"),
+    )
+    return retrieval
+
 def backfill_generation_summary_fields(generation: dict[str, Any]) -> dict[str, Any]:
     generation = dict(generation or {})
     deterministic = first_defined(
@@ -146,7 +164,7 @@ def build_telemetry_summary(payload: dict[str, Any]) -> dict[str, Any]:
 
 def normalize_run_row_payload(payload: dict[str, Any], run: dict[str, Any] | None = None) -> dict[str, Any]:
     run_meta = run or {}
-    retrieval = payload.get("retrieval_summary") or {}
+    retrieval = backfill_retrieval_summary_fields(payload.get("retrieval_summary") or {})
     generation = backfill_generation_summary_fields(payload.get("generation_summary") or {})
     api = payload.get("api_summary") or {}
     primary_api = (api.get("endpoint_summaries") or {}).get("guidance_endpoint") or api
@@ -196,6 +214,8 @@ def normalize_run_row_payload(payload: dict[str, Any], run: dict[str, Any] | Non
         "strict_hit@5": safe_float(retrieval.get("strict_hit_at_5")),
         "strict_mrr": safe_float(retrieval.get("strict_mrr")),
         "weighted_relevance": safe_float(retrieval.get("weighted_relevance_score")),
+        "weighted_relevance_v2": safe_float(retrieval.get("weighted_relevance_score_v2"), default=float("nan")),
+        "weighted_relevance_display": safe_float(retrieval.get("weighted_relevance_display", retrieval.get("weighted_relevance_score"))),
         "lenient_success_score": safe_float(retrieval.get("lenient_success_score")),
         "duplicate_chunk_rate": safe_float(retrieval.get("duplicate_chunk_rate")),
         "context_diversity_score": safe_float(retrieval.get("context_diversity_score")),
@@ -239,6 +259,13 @@ def normalize_run_row_payload(payload: dict[str, Any], run: dict[str, Any] | Non
         "normalized.avg_judge_score": safe_float(normalized.get("generation.average_judge_score")),
         "normalized.avg_llm_judge_score": safe_float(normalized.get("generation.average_llm_judge_score")),
         "normalized.avg_effective_generation_score": safe_float(normalized.get("generation.average_effective_generation_score")),
+        "normalized.weighted_relevance_v2": safe_float(
+            first_defined(normalized.get("retrieval.weighted_relevance_score_v2"), retrieval.get("weighted_relevance_score_v2")),
+            default=float("nan"),
+        ),
+        "normalized.weighted_relevance_display": safe_float(
+            first_defined(normalized.get("retrieval.weighted_relevance_display"), retrieval.get("weighted_relevance_display"), retrieval.get("weighted_relevance_score"))
+        ),
         "normalized.avg_latency": safe_float(normalized.get("latency.average_ms")),
     }
 

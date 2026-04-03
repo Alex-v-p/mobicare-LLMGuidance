@@ -91,6 +91,14 @@ def summarize_results(per_case_results: list[dict[str, Any]]) -> dict[str, Any]:
         "average_overlap_score": _avg_defined([x.get("average_overlap_score") for x in retrieval_items]),
         "average_semantic_score": _avg_defined([x.get("average_semantic_score") for x in retrieval_items]),
         "weighted_relevance_score": _avg_defined([x.get("weighted_relevance_score") for x in retrieval_items]),
+        "weighted_relevance_score_v2": _avg_defined([
+            x.get("weighted_relevance_score_v2", x.get("weighted_relevance_display"))
+            for x in retrieval_items
+        ]),
+        "weighted_relevance_display": _avg_defined([
+            x.get("weighted_relevance_display", x.get("weighted_relevance_score_v2", x.get("weighted_relevance_score")))
+            for x in retrieval_items
+        ]),
         "soft_ndcg": _avg_defined([x.get("soft_ndcg") for x in retrieval_items]),
         "retrieved_average_overlap_score": _avg_defined(retrieved_overlap_values),
         "retrieved_average_semantic_score": _avg_defined(retrieved_semantic_values),

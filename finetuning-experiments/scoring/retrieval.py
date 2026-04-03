@@ -104,7 +104,13 @@ def _metric_availability_rate(values: list[float], *, total: int) -> float:
     return len(values) / total
 
 
-def _deduplicated_relevance(retrieved_chunks: list[dict[str, Any]], label_map: dict[str, str]) -> tuple[float, float, int]:
+def _relevance_gated_score(raw: float, diversity: float) -> float:
+    if raw <= 0.0:
+        return 0.0
+    return min(1.0, raw * (0.8 + (diversity * 0.2)))
+
+
+def _deduplicated_relevance(retrieved_chunks: list[dict[str, Any]], label_map: dict[str, str]) -> tuple[float, float, float, int]:
     kept_weights: list[float] = []
     duplicate_count = 0
     previous_snippets: list[str] = []
@@ -121,8 +127,9 @@ def _deduplicated_relevance(retrieved_chunks: list[dict[str, Any]], label_map: d
         previous_snippets.append(snippet)
     raw = _mean(kept_weights)
     diversity = 1.0 - (duplicate_count / len(retrieved_chunks)) if retrieved_chunks else 1.0
-    adjusted = min(1.0, (raw * 0.8) + (diversity * 0.2))
-    return raw, adjusted, duplicate_count
+    adjusted_legacy = min(1.0, (raw * 0.8) + (diversity * 0.2))
+    adjusted_v2 = _relevance_gated_score(raw, diversity)
+    return raw, adjusted_legacy, adjusted_v2, duplicate_count
 
 
 def _lenient_success(ranked_labels: list[str]) -> float:
@@ -206,9 +213,11 @@ def score_retrieval(source_mapping: dict[str, Any] | None, retrieved_chunks: lis
     ]
 
     ideal_weights = [_SOURCE_WEIGHTS.get(label, 0.0) for label, items in source_list.items() for _ in (items or [])]
-    raw_relevance, adjusted_relevance, duplicate_count = _deduplicated_relevance(retrieved_chunks, label_map)
+    raw_relevance, adjusted_relevance, adjusted_relevance_v2, duplicate_count = _deduplicated_relevance(retrieved_chunks, label_map)
     lenient_success = _lenient_success(ranked_labels)
     retrieved_count = len(retrieved_chunks)
+    duplicate_chunk_rate = (duplicate_count / len(ranked_chunk_ids)) if ranked_chunk_ids else 0.0
+    context_diversity = 1.0 - duplicate_chunk_rate
 
     return {
         "applicable": applicable,
@@ -240,10 +249,15 @@ def score_retrieval(source_mapping: dict[str, Any] | None, retrieved_chunks: lis
         "retrieved_average_clinical_term_overlap": _mean_or_none(retrieved_clinical_overlaps) if applicable else None,
         "retrieved_ranking_score_available_rate": _metric_availability_rate(retrieved_ranking_scores, total=retrieved_count) if applicable else None,
         "weighted_relevance_score": adjusted_relevance if applicable else None,
+        "weighted_relevance_score_v2": adjusted_relevance_v2 if applicable else None,
+        "weighted_relevance_display": adjusted_relevance_v2 if applicable else None,
+        "weighted_relevance_score_source": "legacy_v1" if applicable else None,
+        "weighted_relevance_score_v2_source": "relevance_gated_v2" if applicable else None,
+        "weighted_relevance_display_source": "relevance_gated_v2" if applicable else None,
         "weighted_relevance_raw": raw_relevance if applicable else None,
         "duplicate_chunk_count": duplicate_count if applicable else None,
-        "duplicate_chunk_rate": ((duplicate_count / len(ranked_chunk_ids)) if ranked_chunk_ids else 0.0) if applicable else None,
-        "context_diversity_score": (1.0 - ((duplicate_count / len(ranked_chunk_ids)) if ranked_chunk_ids else 0.0)) if applicable else None,
+        "duplicate_chunk_rate": duplicate_chunk_rate if applicable else None,
+        "context_diversity_score": context_diversity if applicable else None,
         "soft_ndcg": _soft_ndcg(ranked_weights, ideal_weights) if applicable else None,
         "retrieved_chunk_ids": ranked_chunk_ids,
         "retrieved_chunk_count": len(ranked_chunk_ids),

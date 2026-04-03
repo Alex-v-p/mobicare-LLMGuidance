@@ -6,7 +6,7 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-from artifacts.compatibility import first_defined, get_nested, normalize_run_row_payload, safe_float, safe_int, safe_str
+from artifacts.compatibility import backfill_retrieval_summary_fields, first_defined, get_nested, normalize_run_row_payload, safe_float, safe_int, safe_str
 from artifacts.loader import list_run_artifacts, list_run_summaries, load_run_artifact
 from utils.json import read_json
 
@@ -159,6 +159,17 @@ def build_case_dataframe(artifact: dict[str, Any]) -> pd.DataFrame:
             1.0 if safe_float(generation_scores.get("hallucination_unsupported_token_count")) > 0 else 0.0,
         )
 
+        retrieval_scores = backfill_retrieval_summary_fields(retrieval_scores)
+        weighted_relevance_v2_raw = first_defined(
+            retrieval_scores.get("weighted_relevance_score_v2"),
+            retrieval_scores.get("weighted_relevance_display"),
+        )
+        weighted_relevance_display_raw = first_defined(
+            retrieval_scores.get("weighted_relevance_display"),
+            retrieval_scores.get("weighted_relevance_score_v2"),
+            retrieval_scores.get("weighted_relevance_score"),
+        )
+
         rows.append(
             {
                 "case_id": safe_str(case.get("case_id")),
@@ -172,6 +183,8 @@ def build_case_dataframe(artifact: dict[str, Any]) -> pd.DataFrame:
                 "mrr": safe_float(retrieval_scores.get("mrr")),
                 "strict_mrr": safe_float(retrieval_scores.get("strict_mrr")),
                 "weighted_relevance_score": safe_float(retrieval_scores.get("weighted_relevance_score")),
+                "weighted_relevance_score_v2": safe_float(weighted_relevance_v2_raw, default=float("nan")),
+                "weighted_relevance_display": safe_float(weighted_relevance_display_raw),
                 "lenient_success_score": safe_float(retrieval_scores.get("lenient_success_score")),
                 "duplicate_chunk_rate": safe_float(retrieval_scores.get("duplicate_chunk_rate")),
                 "retrieved_overlap_available_rate": safe_float(retrieval_scores.get("retrieved_overlap_score_available_rate")),

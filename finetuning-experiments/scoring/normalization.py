@@ -12,6 +12,8 @@ _CORE_DEFAULTS: dict[str, float] = {
     "retrieval.average_overlap_score": 0.0,
     "retrieval.average_semantic_score": 0.0,
     "retrieval.weighted_relevance_score": 0.0,
+    "retrieval.weighted_relevance_score_v2": 0.0,
+    "retrieval.weighted_relevance_display": 0.0,
     "retrieval.soft_ndcg": 0.0,
     "retrieval.duplicate_chunk_rate": 0.0,
     "retrieval.context_diversity_score": 0.0,
@@ -85,6 +87,10 @@ def normalize_run_metrics(
             "retrieval.average_overlap_score": _coerce_float(retrieval_summary.get("average_overlap_score")),
             "retrieval.average_semantic_score": _coerce_float(retrieval_summary.get("average_semantic_score")),
             "retrieval.weighted_relevance_score": _coerce_float(retrieval_summary.get("weighted_relevance_score")),
+            "retrieval.weighted_relevance_score_v2": _coerce_float(retrieval_summary.get("weighted_relevance_score_v2")),
+            "retrieval.weighted_relevance_display": _coerce_float(
+                retrieval_summary.get("weighted_relevance_display", retrieval_summary.get("weighted_relevance_score_v2", retrieval_summary.get("weighted_relevance_score")))
+            ),
             "retrieval.soft_ndcg": _coerce_float(retrieval_summary.get("soft_ndcg")),
             "retrieval.duplicate_chunk_rate": _coerce_float(retrieval_summary.get("duplicate_chunk_rate")),
             "retrieval.context_diversity_score": _coerce_float(retrieval_summary.get("context_diversity_score")),
