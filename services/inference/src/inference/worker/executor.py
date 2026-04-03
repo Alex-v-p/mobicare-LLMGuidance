@@ -72,6 +72,7 @@ async def execute_next_job(
             return False
 
         async def process() -> None:
+            nonlocal record
             try:
                 if before_run is not None:
                     await before_run(record)
@@ -89,7 +90,7 @@ async def execute_next_job(
                     )
                 )
                 try:
-                    await store.mark_completed(
+                    record = await store.mark_completed(
                         record,
                         result=result,
                         completed_at=completed_at,
@@ -134,7 +135,7 @@ async def execute_next_job(
                     )
                 )
                 try:
-                    await store.mark_failed(
+                    record = await store.mark_failed(
                         record,
                         error=error,
                         completed_at=failed_at,
@@ -182,7 +183,7 @@ async def execute_next_job(
             operation=process,
         )
 
-        if post_process is not None:
+        if post_process is not None and getattr(record, "status", None) in {"completed", "failed"}:
             try:
                 await post_process(record)
                 await store.update(record)

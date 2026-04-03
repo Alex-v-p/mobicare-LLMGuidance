@@ -32,15 +32,61 @@ def _coerce_list_of_dicts(value: Any) -> list[dict[str, Any]]:
     return [dict(item) for item in value if isinstance(item, dict)]
 
 
+def _coerce_float(value: Any) -> float | None:
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _index_retrieval_ranking(metadata: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    ranking = _coerce_list_of_dicts(metadata.get("retrieval_ranking"))
+    indexed: dict[str, dict[str, Any]] = {}
+    for position, item in enumerate(ranking, start=1):
+        chunk_id = str(item.get("chunk_id") or "").strip()
+        if not chunk_id:
+            continue
+        indexed[chunk_id] = {
+            "retrieval_rank": position,
+            "retrieval_ranking_score": _coerce_float(item.get("score")),
+            "retrieval_query_term_overlap": _coerce_float(item.get("query_term_overlap")),
+            "retrieval_heart_failure_overlap": _coerce_float(item.get("heart_failure_overlap")),
+            "retrieval_clinical_term_overlap": _coerce_float(item.get("clinical_term_overlap")),
+            "retrieval_cluster_hits": _coerce_float(item.get("cluster_hits")),
+            "retrieval_ranking_clusters": (dict(item.get("clusters") or {}) if isinstance(item.get("clusters"), dict) else item.get("clusters")),
+            "retrieval_ranking_score_available": item.get("score") is not None,
+        }
+    return indexed
+
+
 def extract_retrieved_context(record: dict[str, Any]) -> list[dict[str, Any]]:
     snapshot = _coerce_dict(record)
     rag = snapshot.get("rag")
     if isinstance(rag, list):
-        return [dict(item) for item in rag if isinstance(item, dict)]
-    retrieved_context = snapshot.get("retrieved_context")
-    if isinstance(retrieved_context, list):
-        return [dict(item) for item in retrieved_context if isinstance(item, dict)]
-    return []
+        chunks = [dict(item) for item in rag if isinstance(item, dict)]
+    else:
+        retrieved_context = snapshot.get("retrieved_context")
+        if isinstance(retrieved_context, list):
+            chunks = [dict(item) for item in retrieved_context if isinstance(item, dict)]
+        else:
+            chunks = []
+
+    metadata = _coerce_dict(snapshot.get("metadata"))
+    ranking_by_chunk_id = _index_retrieval_ranking(metadata)
+    annotated: list[dict[str, Any]] = []
+    for index, chunk in enumerate(chunks, start=1):
+        enriched = dict(chunk)
+        chunk_id = str(enriched.get("chunk_id") or "").strip()
+        ranking = ranking_by_chunk_id.get(chunk_id)
+        if ranking:
+            for key, value in ranking.items():
+                enriched.setdefault(key, value)
+        enriched.setdefault("retrieved_position", index)
+        enriched.setdefault("retrieval_ranking_score_available", bool(ranking))
+        annotated.append(enriched)
+    return annotated
 
 
 def infer_response_shape(record: dict[str, Any]) -> str:

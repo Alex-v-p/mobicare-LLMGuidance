@@ -8,6 +8,9 @@ _ALLOWED_RETRIEVAL_MODES = {"dense", "sparse", "hybrid"}
 _ALLOWED_PERCENTILE_POLICIES = {"all", "success_only"}
 _ALLOWED_OUTLIER_POLICIES = {"keep_all", "exclude_failures"}
 _ALLOWED_GATEWAY_AUTH_MODES = {"none", "bearer", "gateway_login", "local_jwt"}
+_ALLOWED_PIPELINE_VARIANTS = {"standard", "drug_dosing"}
+_ALLOWED_SOURCE_MAPPING_PROFILES = {"legacy_v1", "semantic_recovery_v2"}
+_ALLOWED_LLM_LABELING_PROFILES = {"heuristic_v1", "semantic_recovery_v2"}
 
 
 
@@ -44,6 +47,8 @@ def validate_run_config(config: BenchmarkRunConfig) -> None:
         errors.append("inference.max_regeneration_attempts must be at least 1.")
     if not config.inference.enable_regeneration and config.inference.max_regeneration_attempts != 1:
         errors.append("max_regeneration_attempts should remain 1 when regeneration is disabled.")
+    if config.inference.pipeline_variant not in _ALLOWED_PIPELINE_VARIANTS:
+        errors.append(f"inference.pipeline_variant must be one of {sorted(_ALLOWED_PIPELINE_VARIANTS)}.")
 
     if config.source_mapping.max_matches <= 0:
         errors.append("source_mapping.max_matches must be positive.")
@@ -53,6 +58,14 @@ def validate_run_config(config: BenchmarkRunConfig) -> None:
         errors.append("source_mapping.page_offset_candidates must not be empty.")
     if config.source_mapping.max_soft_candidates < 0:
         errors.append("source_mapping.max_soft_candidates cannot be negative.")
+    if config.source_mapping.mapping_profile not in _ALLOWED_SOURCE_MAPPING_PROFILES:
+        errors.append(f"source_mapping.mapping_profile must be one of {sorted(_ALLOWED_SOURCE_MAPPING_PROFILES)}.")
+    if config.source_mapping.llm_labeling_profile not in _ALLOWED_LLM_LABELING_PROFILES:
+        errors.append(f"source_mapping.llm_labeling_profile must be one of {sorted(_ALLOWED_LLM_LABELING_PROFILES)}.")
+    if config.source_mapping.max_sequence_length < 1:
+        errors.append("source_mapping.max_sequence_length must be at least 1.")
+    if config.source_mapping.semantic_fallback_max_matches < 1:
+        errors.append("source_mapping.semantic_fallback_max_matches must be at least 1.")
 
     if config.execution.batch_size <= 0:
         errors.append("execution.batch_size must be positive.")

@@ -4,6 +4,7 @@ from statistics import mean
 from typing import Any
 
 from .latency import summarize_latencies, summarize_stage_latencies
+from artifacts.compatibility import first_defined
 
 
 def _avg(items: list[float]) -> float:
@@ -24,14 +25,29 @@ def _avg_defined(values: list[Any]) -> float:
     return _avg(numeric)
 
 
+def _defined_count(values: list[Any]) -> int:
+    return sum(1 for value in values if _to_float(value) is not None)
+
+
+def _availability_rate(values: list[Any]) -> float:
+    if not values:
+        return 0.0
+    return _defined_count(values) / len(values)
+
+
 def summarize_results(per_case_results: list[dict[str, Any]]) -> dict[str, Any]:
     completed_cases = [item for item in per_case_results if item.get("status") != "failed"]
-    retrieval_items = [item["retrieval_scores"] for item in per_case_results if "retrieval_scores" in item]
+    retrieval_items_all = [item["retrieval_scores"] for item in per_case_results if "retrieval_scores" in item]
+    retrieval_items = [item for item in retrieval_items_all if item.get("applicable", True)]
     generation_items = [item["generation_scores"] for item in per_case_results if "generation_scores" in item]
     deterministic_items = [
         item for item in generation_items
         if (item.get("deterministic_rubric") or {}).get("applicable", (item.get("deterministic_rubric") or {}).get("enabled", True))
     ]
+    fact_recall_items = [item for item in generation_items if item.get("fact_recall_applicable", (item.get("required_fact_total") or 0) > 0)]
+    fact_recall_v2_items = [item for item in generation_items if item.get("fact_recall_applicable", (item.get("required_fact_total") or 0) > 0) and (item.get("required_fact_recall_v2") is not None or item.get("required_fact_support_score_v2") is not None)]
+    exact_pass_items = [item for item in generation_items if item.get("exact_pass_applicable", item.get("exact_pass") is not None)]
+    grounded_fact_pass_items = [item for item in generation_items if item.get("grounded_fact_pass_applicable", item.get("grounded_fact_pass") is not None)]
 
     stage_lists = [list((item.get("telemetry") or {}).get("stages") or []) for item in per_case_results]
     derived_timings = [dict((item.get("telemetry") or {}).get("derived") or {}) for item in per_case_results]
@@ -54,24 +70,53 @@ def summarize_results(per_case_results: list[dict[str, Any]]) -> dict[str, Any]:
         if derived.get("execution_duration_ms") is not None
     ]
 
+    retrieved_overlap_values = [x.get("retrieved_average_overlap_score") for x in retrieval_items]
+    retrieved_semantic_values = [x.get("retrieved_average_semantic_score") for x in retrieval_items]
+    retrieved_ranking_values = [x.get("retrieved_average_ranking_score") for x in retrieval_items]
+
     retrieval_summary = {
         "completed_case_count": len(completed_cases),
         "failed_case_count": sum(1 for item in per_case_results if item.get("status") == "failed"),
-        "case_count": len(retrieval_items),
-        "hit_at_1": _avg([float(x.get("hit_at_1", 0.0)) for x in retrieval_items]),
-        "hit_at_3": _avg([float(x.get("hit_at_3", 0.0)) for x in retrieval_items]),
-        "hit_at_5": _avg([float(x.get("hit_at_5", 0.0)) for x in retrieval_items]),
-        "mrr": _avg([float(x.get("mrr", 0.0)) for x in retrieval_items]),
+        "case_count": len(retrieval_items_all),
+        "applicable_case_count": len(retrieval_items),
+        "non_applicable_case_count": max(0, len(retrieval_items_all) - len(retrieval_items)),
+        "hit_at_1": _avg_defined([x.get("hit_at_1") for x in retrieval_items]),
+        "hit_at_3": _avg_defined([x.get("hit_at_3") for x in retrieval_items]),
+        "hit_at_5": _avg_defined([x.get("hit_at_5") for x in retrieval_items]),
+        "mrr": _avg_defined([x.get("mrr") for x in retrieval_items]),
+        "strict_hit_at_1": _avg_defined([x.get("strict_hit_at_1") for x in retrieval_items]),
+        "strict_hit_at_3": _avg_defined([x.get("strict_hit_at_3") for x in retrieval_items]),
+        "strict_hit_at_5": _avg_defined([x.get("strict_hit_at_5") for x in retrieval_items]),
+        "strict_mrr": _avg_defined([x.get("strict_mrr") for x in retrieval_items]),
         "strict_success_rate": _avg([1.0 if x.get("strict_success") else 0.0 for x in retrieval_items]),
-        "lenient_success_score": _avg([float(x.get("lenient_success_score", 0.0)) for x in retrieval_items]),
-        "average_overlap_score": _avg([float(x.get("average_overlap_score", 0.0)) for x in retrieval_items]),
-        "average_semantic_score": _avg([float(x.get("average_semantic_score", 0.0)) for x in retrieval_items]),
-        "weighted_relevance_score": _avg([float(x.get("weighted_relevance_score", 0.0)) for x in retrieval_items]),
-        "soft_ndcg": _avg([float(x.get("soft_ndcg", 0.0)) for x in retrieval_items]),
-        "retrieved_average_overlap_score": _avg([float(x.get("retrieved_average_overlap_score", 0.0)) for x in retrieval_items]),
-        "retrieved_average_semantic_score": _avg([float(x.get("retrieved_average_semantic_score", 0.0)) for x in retrieval_items]),
-        "duplicate_chunk_rate": _avg([float(x.get("duplicate_chunk_rate", 0.0)) for x in retrieval_items]),
-        "context_diversity_score": _avg([float(x.get("context_diversity_score", 0.0)) for x in retrieval_items]),
+        "relevance_success_rate": _avg([1.0 if x.get("relevance_success") else 0.0 for x in retrieval_items]),
+        "lenient_success_score": _avg_defined([x.get("lenient_success_score") for x in retrieval_items]),
+        "average_overlap_score": _avg_defined([x.get("average_overlap_score") for x in retrieval_items]),
+        "average_semantic_score": _avg_defined([x.get("average_semantic_score") for x in retrieval_items]),
+        "weighted_relevance_score": _avg_defined([x.get("weighted_relevance_score") for x in retrieval_items]),
+        "weighted_relevance_score_v2": _avg_defined([
+            x.get("weighted_relevance_score_v2", x.get("weighted_relevance_display"))
+            for x in retrieval_items
+        ]),
+        "weighted_relevance_display": _avg_defined([
+            x.get("weighted_relevance_display", x.get("weighted_relevance_score_v2", x.get("weighted_relevance_score")))
+            for x in retrieval_items
+        ]),
+        "soft_ndcg": _avg_defined([x.get("soft_ndcg") for x in retrieval_items]),
+        "retrieved_average_overlap_score": _avg_defined(retrieved_overlap_values),
+        "retrieved_average_semantic_score": _avg_defined(retrieved_semantic_values),
+        "retrieved_overlap_score_observed_case_count": _defined_count(retrieved_overlap_values),
+        "retrieved_semantic_score_observed_case_count": _defined_count(retrieved_semantic_values),
+        "retrieved_overlap_score_available_rate": _avg_defined([x.get("retrieved_overlap_score_available_rate") for x in retrieval_items]),
+        "retrieved_semantic_score_available_rate": _avg_defined([x.get("retrieved_semantic_score_available_rate") for x in retrieval_items]),
+        "retrieved_average_ranking_score": _avg_defined(retrieved_ranking_values),
+        "retrieved_ranking_score_observed_case_count": _defined_count(retrieved_ranking_values),
+        "retrieved_ranking_score_available_rate": _avg_defined([x.get("retrieved_ranking_score_available_rate") for x in retrieval_items]),
+        "retrieved_average_query_term_overlap": _avg_defined([x.get("retrieved_average_query_term_overlap") for x in retrieval_items]),
+        "retrieved_average_heart_failure_overlap": _avg_defined([x.get("retrieved_average_heart_failure_overlap") for x in retrieval_items]),
+        "retrieved_average_clinical_term_overlap": _avg_defined([x.get("retrieved_average_clinical_term_overlap") for x in retrieval_items]),
+        "duplicate_chunk_rate": _avg_defined([x.get("duplicate_chunk_rate") for x in retrieval_items]),
+        "context_diversity_score": _avg_defined([x.get("context_diversity_score") for x in retrieval_items]),
     }
     warning_counts = [len(item.get("warnings") or []) for item in per_case_results]
     verification_items = [item.get("verification") or {} for item in per_case_results]
@@ -79,25 +124,76 @@ def summarize_results(per_case_results: list[dict[str, Any]]) -> dict[str, Any]:
         "case_count": len(generation_items),
         "deterministic_applicable_case_count": len(deterministic_items),
         "observation_only_case_count": sum(1 for x in generation_items if x.get("evaluation_profile") == "observation_only"),
-        "average_answer_similarity": _avg([float(x.get("answer_similarity", 0.0)) for x in generation_items]),
+        "fact_recall_applicable_case_count": len(fact_recall_items),
+        "fact_recall_v2_applicable_case_count": len(fact_recall_v2_items),
+        "exact_pass_applicable_case_count": len(exact_pass_items),
+        "grounded_fact_pass_applicable_case_count": len(grounded_fact_pass_items),
+        "average_answer_similarity": _avg_defined([x.get("answer_similarity") for x in generation_items]),
         "average_answer_quality_score": _avg_defined([x.get("answer_quality_score") for x in deterministic_items]),
-        "average_deterministic_rubric_score": _avg_defined([(x.get("deterministic_rubric") or {}).get("score", x.get("answer_quality_score")) for x in deterministic_items]),
+        "average_deterministic_rubric_score": _avg_defined([
+            x.get("deterministic_rubric_score", (x.get("deterministic_rubric") or {}).get("score", x.get("answer_quality_score")))
+            for x in deterministic_items
+        ]),
         "average_judge_score": _avg_defined([x.get("judge_score") for x in generation_items]),
-        "average_llm_judge_score": _avg_defined([(x.get("llm_judge") or {}).get("score", x.get("judge_score")) for x in generation_items]),
-        "average_reference_token_f1": _avg([float(x.get("reference_token_f1", 0.0)) for x in generation_items]),
-        "llm_judge_enabled_rate": _avg([1.0 if (x.get("llm_judge") or {}).get("enabled") else 0.0 for x in generation_items]),
-        "llm_judge_error_rate": _avg([1.0 if str((x.get("llm_judge") or {}).get("error") or "").strip() else 0.0 for x in generation_items]),
-        "average_required_fact_recall": _avg([float(x.get("required_fact_recall", 0.0)) for x in generation_items]),
-        "forbidden_fact_violation_rate": _avg([1.0 if float(x.get("forbidden_fact_violations", 0.0)) > 0 else 0.0 for x in generation_items]),
-        "average_faithfulness_to_gold_passage": _avg_defined([x.get("faithfulness_to_gold_passage") for x in deterministic_items]),
-        "average_groundedness_score": _avg([float(x.get("groundedness_score", 0.0)) for x in generation_items]),
-        "average_faithfulness_to_retrieved_context": _avg([float(x.get("faithfulness_to_retrieved_context", 0.0)) for x in generation_items]),
-        "average_hallucination_unsupported_token_count": _avg([float(x.get("hallucination_unsupported_token_count", 0.0)) for x in generation_items]),
-        "hallucination_rate": _avg([1.0 if float(x.get("hallucination_unsupported_token_count", 0.0)) > 0 else 0.0 for x in generation_items]),
+        "average_llm_judge_score": _avg_defined([x.get("llm_judge_score", (x.get("llm_judge") or {}).get("score")) for x in generation_items]),
+        "average_llm_judge_score_when_available": _avg_defined([
+            x.get("llm_judge_score", (x.get("llm_judge") or {}).get("score"))
+            for x in generation_items
+            if x.get("llm_judge_available") or x.get("llm_judge_requested")
+        ]),
+        "average_effective_generation_score": _avg_defined([x.get("effective_generation_score") for x in generation_items]),
+        "average_primary_generation_score": _avg_defined([x.get("primary_generation_score") for x in generation_items]),
+        "average_deterministic_rubric_score_v2": (
+            _avg_defined([x.get("deterministic_rubric_score_v2") for x in deterministic_items])
+            if any(x.get("deterministic_rubric_score_v2") is not None for x in deterministic_items) else None
+        ),
+        "average_effective_generation_score_v2": (
+            _avg_defined([x.get("effective_generation_score_v2") for x in generation_items])
+            if any(x.get("effective_generation_score_v2") is not None for x in generation_items) else None
+        ),
+        "average_primary_generation_score_v2": (
+            _avg_defined([x.get("primary_generation_score_v2") for x in generation_items])
+            if any(x.get("primary_generation_score_v2") is not None for x in generation_items) else None
+        ),
+        "average_reference_token_f1": _avg_defined([x.get("reference_token_f1") for x in generation_items]),
+        "llm_judge_requested_case_count": sum(1 for x in generation_items if x.get("llm_judge_requested") or (x.get("llm_judge") or {}).get("enabled")),
+        "llm_judge_available_case_count": sum(1 for x in generation_items if x.get("llm_judge_available") is True),
+        "llm_judge_enabled_rate": _avg([1.0 if (x.get("llm_judge_requested") or (x.get("llm_judge") or {}).get("enabled")) else 0.0 for x in generation_items]),
+        "llm_judge_available_rate": _avg([1.0 if x.get("llm_judge_available") is True else 0.0 for x in generation_items]),
+        "llm_judge_error_rate": _avg([1.0 if str(first_defined(x.get("llm_judge_error"), (x.get("llm_judge") or {}).get("error")) or "").strip() else 0.0 for x in generation_items]),
+        "llm_judge_primary_opt_in_rate": _avg([1.0 if x.get("llm_judge_use_as_primary") else 0.0 for x in generation_items]),
+        "average_required_fact_recall": _avg_defined([x.get("required_fact_recall") for x in fact_recall_items]),
+        "average_required_fact_recall_v2": (
+            _avg_defined([x.get("required_fact_recall_v2") for x in fact_recall_v2_items])
+            if fact_recall_v2_items else None
+        ),
+        "average_required_fact_support_score_v2": (
+            _avg_defined([x.get("required_fact_support_score_v2") for x in fact_recall_v2_items])
+            if fact_recall_v2_items else None
+        ),
+        "forbidden_fact_violation_rate": _avg([1.0 if (_to_float(x.get("forbidden_fact_violations")) or 0.0) > 0 else 0.0 for x in generation_items]),
+        "forbidden_fact_violation_rate_v2": (
+            _avg([1.0 if (_to_float(x.get("forbidden_fact_violations_v2")) or 0.0) > 0 else 0.0 for x in generation_items if x.get("forbidden_fact_violations_v2") is not None])
+            if any(x.get("forbidden_fact_violations_v2") is not None for x in generation_items) else None
+        ),
+        "average_faithfulness_to_gold_passage": _avg_defined([x.get("faithfulness_to_gold_passage") for x in generation_items]),
+        "average_groundedness_score": _avg_defined([x.get("groundedness_score") for x in generation_items]),
+        "average_faithfulness_to_retrieved_context": _avg_defined([x.get("faithfulness_to_retrieved_context") for x in generation_items]),
+        "average_hallucination_unsupported_token_count": _avg([(_to_float(x.get("hallucination_unsupported_token_count")) or 0.0) for x in generation_items]),
+        "hallucination_rate": _avg([1.0 if (_to_float(x.get("hallucination_unsupported_token_count")) or 0.0) > 0 else 0.0 for x in generation_items]),
         "average_warning_count": _avg([float(count) for count in warning_counts]),
         "warning_case_rate": _avg([1.0 if count > 0 else 0.0 for count in warning_counts]),
         "verification_pass_rate": _avg([1.0 if str(item.get("verdict") or "").lower() in {"pass", "passed", "ok", "success"} else 0.0 for item in verification_items]),
-        "exact_pass_rate": _avg([1.0 if x.get("exact_pass") else 0.0 for x in deterministic_items]),
+        "average_verification_alignment_score": _avg_defined([x.get("verification_alignment_score") for x in generation_items]),
+        "verification_alignment_rate": _avg([
+            1.0 if float(x.get("verification_alignment_score", 0.0)) >= 0.75 else 0.0
+            for x in generation_items
+            if x.get("verification_alignment_score") is not None
+        ]),
+        "verification_alignment_applicable_case_count": sum(1 for x in generation_items if x.get("verification_alignment_score") is not None),
+        "average_verification_intrinsic_quality_score": _avg_defined([x.get("verification_intrinsic_quality_score") for x in generation_items]),
+        "exact_pass_rate": _avg_defined([1.0 if x.get("exact_pass") else 0.0 for x in exact_pass_items]),
+        "grounded_fact_pass_rate": _avg_defined([1.0 if x.get("grounded_fact_pass") else 0.0 for x in grounded_fact_pass_items]),
     }
     successful_total_latencies = [float(item.get("timings", {}).get("total_latency_seconds", 0.0)) for item in completed_cases]
     if derived_timings:

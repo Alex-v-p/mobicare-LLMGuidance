@@ -83,11 +83,15 @@ def _map_sources(config: BenchmarkRunConfig, cases: list[BenchmarkCase]) -> tupl
         page_offset_candidates=tuple(config.source_mapping.page_offset_candidates),
         semantic_fallback_enabled=config.source_mapping.semantic_fallback_enabled,
         include_chunk_pairs=config.source_mapping.include_chunk_pairs,
+        max_sequence_length=config.source_mapping.max_sequence_length,
+        mapping_profile=config.source_mapping.mapping_profile,
+        semantic_fallback_max_matches=config.source_mapping.semantic_fallback_max_matches,
     )
     llm_labeler = OptionalLLMLabeler(
         LLMLabelerConfig(
             enabled=config.source_mapping.llm_second_pass_enabled,
             max_candidates=config.source_mapping.max_soft_candidates,
+            profile=config.source_mapping.llm_labeling_profile,
         )
     )
     assignments = [
@@ -121,6 +125,11 @@ def _map_sources(config: BenchmarkRunConfig, cases: list[BenchmarkCase]) -> tupl
             "include_chunk_pairs": config.source_mapping.include_chunk_pairs,
             "llm_second_pass_enabled": config.source_mapping.llm_second_pass_enabled,
             "max_soft_candidates": config.source_mapping.max_soft_candidates,
+            "mapping_profile": config.source_mapping.mapping_profile,
+            "llm_labeling_profile": config.source_mapping.llm_labeling_profile,
+            "max_sequence_length": config.source_mapping.max_sequence_length,
+            "semantic_fallback_max_matches": config.source_mapping.semantic_fallback_max_matches,
+            "source_mapping_version": "2.15",
         },
         "case_chunk_assignments": assignments,
     }

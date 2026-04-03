@@ -13,6 +13,8 @@ from .llm_labeler import LLMLabelerConfig, OptionalLLMLabeler
 from .models import ALL_LABELS, CaseSourceMapping, SourceEvidenceItem
 from .thresholds import MappingThresholds
 
+SOURCE_MAPPING_VERSION = "2.15"
+
 
 logger = logging.getLogger(__name__)
 _RAW_TOKEN_RE = re.compile(r"[a-z0-9]+")
@@ -244,8 +246,11 @@ class SourceMatcher:
         include_chunk_pairs: bool = True,
         max_sequence_length: int = 3,
         window_step_ratio: float = 0.15,
+        mapping_profile: str = "legacy_v1",
+        semantic_fallback_max_matches: int = 1,
     ) -> None:
-        self._thresholds = thresholds or MappingThresholds()
+        self._mapping_profile = (mapping_profile or "legacy_v1").strip() or "legacy_v1"
+        self._thresholds = thresholds or MappingThresholds.for_profile(self._mapping_profile)
         self._max_matches = max(1, max_matches)
         self._page_window = max(0, page_window)
         self._page_offset_candidates = page_offset_candidates
@@ -253,6 +258,7 @@ class SourceMatcher:
         self._include_chunk_pairs = include_chunk_pairs
         self._max_sequence_length = max(1, max_sequence_length)
         self._window_step_ratio = min(max(window_step_ratio, 0.05), 0.5)
+        self._semantic_fallback_max_matches = max(1, semantic_fallback_max_matches)
 
     def build_case_source_mapping(
         self,
@@ -264,15 +270,36 @@ class SourceMatcher:
         llm_labeler: OptionalLLMLabeler | None = None,
         max_soft_candidates: int = 12,
     ) -> CaseSourceMapping:
+        has_source_document = bool((case.source_document_id or "").strip() or (case.source_document_name or "").strip())
+        has_gold_passage = bool((case.gold_passage_text or "").strip())
+        retrieval_applicable = bool(has_source_document and has_gold_passage)
+
         chunks = self._filter_and_prepare_chunks(case, payloads)
         logger.info("Case %s: evaluating %s document-local chunks for mapping_label=%s", case.id, len(chunks), mapping_label)
 
-        if not chunks or not (case.gold_passage_text or "").strip():
+        if not chunks or not has_gold_passage:
+            if not retrieval_applicable:
+                skipped_reason = "missing_source_document_and_gold_passage"
+                if has_gold_passage and not has_source_document:
+                    skipped_reason = "missing_source_document"
+                elif has_source_document and not has_gold_passage:
+                    skipped_reason = "missing_gold_passage"
+            else:
+                skipped_reason = "no_document_local_chunks"
             return CaseSourceMapping(
                 case_id=case.id,
                 mapping_label=mapping_label,
                 strategy=strategy,
                 source_list={label: [] for label in ALL_LABELS},
+                metadata={
+                    "applicable": retrieval_applicable,
+                    "skipped_reason": skipped_reason,
+                    "has_source_document": has_source_document,
+                    "has_gold_passage": has_gold_passage,
+                    "document_local_chunk_count": len(chunks),
+                    "mapping_profile": self._mapping_profile,
+                    "source_mapping_version": SOURCE_MAPPING_VERSION,
+                },
             )
 
         candidate_units = self._build_candidate_units(chunks)
@@ -287,6 +314,8 @@ class SourceMatcher:
                 deduped[key] = metric
 
         ranked = sorted(deduped.values(), key=self._metrics_sort_key, reverse=True)
+        if self._mapping_profile == "semantic_recovery_v2":
+            ranked = self._dedupe_subsumed_metrics(ranked)
         strict_matches = self._select_matches(ranked)
         source_list = self._build_source_list(
             ranked,
@@ -294,15 +323,29 @@ class SourceMatcher:
             llm_labeler=llm_labeler,
             max_soft_candidates=max_soft_candidates,
         )
+        semantic_recovery_used = any(
+            (item.metadata or {}).get("semantic_recovery_used")
+            for label in ("direct_evidence", "partial_direct_evidence", "supporting", "tangential")
+            for item in source_list.get(label, [])
+        )
         return CaseSourceMapping(
             case_id=case.id,
             mapping_label=mapping_label,
             strategy=strategy,
             source_list=source_list,
             metadata={
+                "applicable": retrieval_applicable,
+                "skipped_reason": None,
+                "has_source_document": has_source_document,
+                "has_gold_passage": has_gold_passage,
+                "document_local_chunk_count": len(chunks),
                 "strict_match_count": len(source_list["direct_evidence"]) + len(source_list["partial_direct_evidence"]),
                 "soft_match_count": len(source_list["supporting"]) + len(source_list["tangential"]),
                 "llm_second_pass_enabled": bool(llm_labeler and llm_labeler.enabled),
+                "mapping_profile": self._mapping_profile,
+                "llm_labeling_profile": (llm_labeler.profile if llm_labeler else "heuristic_v1"),
+                "source_mapping_version": SOURCE_MAPPING_VERSION,
+                "semantic_recovery_used": semantic_recovery_used,
             },
         )
 
@@ -436,7 +479,10 @@ class SourceMatcher:
                 )
                 combined_score = lexical_score
                 if self._semantic_fallback_enabled and lexical_score < self._thresholds.min_lexical_score:
-                    combined_score = 0.93 * lexical_score + 0.07 * semantic
+                    if self._mapping_profile == "semantic_recovery_v2":
+                        combined_score = 0.88 * lexical_score + 0.12 * semantic
+                    else:
+                        combined_score = 0.93 * lexical_score + 0.07 * semantic
 
                 reasons: list[str] = []
                 if exact_ratio >= 0.95:
@@ -557,13 +603,31 @@ class SourceMatcher:
             if len(selected) >= self._max_matches:
                 break
 
+        if self._mapping_profile == "semantic_recovery_v2" and selected:
+            return self._dedupe_subsumed_metrics(selected)[: self._max_matches]
         if selected or not self._semantic_fallback_enabled:
             return selected
 
+        recovered: list[_WindowMetrics] = []
         for metric in ranked:
-            if metric.semantic_score >= self._thresholds.semantic_fallback_min and metric.passage_coverage >= 0.35:
-                return [metric]
-        return []
+            if metric.semantic_score < self._thresholds.semantic_fallback_min:
+                continue
+            if not (
+                metric.passage_coverage >= max(0.28, self._thresholds.min_partial_passage_coverage - 0.10)
+                or metric.ordered_token_ratio >= max(0.24, self._thresholds.min_ordered_token_ratio - 0.08)
+                or metric.key_term_coverage >= self._thresholds.min_key_term_coverage
+            ):
+                continue
+            recovered.append(metric)
+            if len(recovered) >= self._semantic_fallback_max_matches:
+                break
+
+        if not recovered:
+            return []
+
+        if self._mapping_profile == "semantic_recovery_v2":
+            return self._dedupe_subsumed_metrics(recovered)[: self._semantic_fallback_max_matches]
+        return recovered[:1]
 
     def _build_source_list(
         self,
@@ -581,17 +645,21 @@ class SourceMatcher:
             buckets[label].append(item)
             seen.add(tuple(metric.chunk_ids))
 
-        unresolved: list[dict[str, Any]] = []
+        unresolved_metrics: list[_WindowMetrics] = []
         for metric in ranked:
             key = tuple(metric.chunk_ids)
             if key in seen:
                 continue
-            if len(unresolved) >= max_soft_candidates:
+            if len(unresolved_metrics) >= max_soft_candidates:
                 break
-            unresolved.append(self._to_source_evidence(metric, label="irrelevant").to_dict())
+            unresolved_metrics.append(metric)
             seen.add(key)
 
-        classifier = llm_labeler or OptionalLLMLabeler(LLMLabelerConfig(enabled=False, max_candidates=max_soft_candidates))
+        if self._mapping_profile == "semantic_recovery_v2":
+            unresolved_metrics = self._dedupe_subsumed_metrics(unresolved_metrics)
+        unresolved = [self._to_source_evidence(metric, label="irrelevant").to_dict() for metric in unresolved_metrics[:max_soft_candidates]]
+
+        classifier = llm_labeler or OptionalLLMLabeler(LLMLabelerConfig(enabled=False, max_candidates=max_soft_candidates, profile="heuristic_v1"))
         for item in classifier.classify(unresolved):
             label = str(item.get("label") or "irrelevant")
             if label not in buckets:
@@ -624,6 +692,10 @@ class SourceMatcher:
         preview = " ".join(preview_words[:60])
         if len(preview_words) > 60:
             preview += " ..."
+        semantic_recovery_used = bool(metric.acceptance_rule is None and self._semantic_fallback_enabled and metric.semantic_score >= self._thresholds.semantic_fallback_min)
+        reasons = list(metric.reasons)
+        if semantic_recovery_used and "semantic_recovery_fallback" not in reasons:
+            reasons.append("semantic_recovery_fallback")
         return SourceEvidenceItem(
             chunk_ids=metric.chunk_ids,
             label=label,
@@ -648,9 +720,12 @@ class SourceMatcher:
                 "rare_phrase_hit_count": metric.rare_phrase_hit_count,
                 "acceptance_rule": metric.acceptance_rule,
                 "window_preview": preview,
-                "reasons": metric.reasons,
+                "reasons": reasons,
                 "from_chunk_pair": metric.from_chunk_pair,
                 "from_chunk_triplet": metric.from_chunk_triplet,
+                "mapping_profile": self._mapping_profile,
+                "source_mapping_version": SOURCE_MAPPING_VERSION,
+                "semantic_recovery_used": semantic_recovery_used,
             },
         )
 
@@ -685,6 +760,26 @@ class SourceMatcher:
         return min(distances) if distances else abs(source_page - payload_page)
 
 
+
+    def _dedupe_subsumed_metrics(self, metrics: list[_WindowMetrics]) -> list[_WindowMetrics]:
+        kept: list[_WindowMetrics] = []
+        for metric in sorted(metrics, key=self._metrics_sort_key, reverse=True):
+            chunk_set = set(metric.chunk_ids)
+            metric_span = (min(metric.page_numbers), max(metric.page_numbers)) if metric.page_numbers else None
+            duplicate = False
+            for existing in kept:
+                existing_set = set(existing.chunk_ids)
+                existing_span = (min(existing.page_numbers), max(existing.page_numbers)) if existing.page_numbers else None
+                page_aligned = metric_span == existing_span
+                same_rule = metric.acceptance_rule == existing.acceptance_rule or bool(metric.acceptance_rule) == bool(existing.acceptance_rule)
+                similar_score = abs(metric.combined_score - existing.combined_score) <= 0.05
+                overlap = len(chunk_set & existing_set) / max(min(len(chunk_set), len(existing_set)), 1)
+                if page_aligned and same_rule and similar_score and overlap >= 0.5 and (chunk_set <= existing_set or existing_set <= chunk_set):
+                    duplicate = True
+                    break
+            if not duplicate:
+                kept.append(metric)
+        return kept
 
     def build_chunk_assignment(
         self,

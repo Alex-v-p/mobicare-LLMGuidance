@@ -42,6 +42,7 @@ def build_run_fingerprint(config: BenchmarkRunConfig) -> str:
             "embedding_model": config.inference.embedding_model,
             "prompt_engineering_label": config.inference.prompt_engineering_label,
             "use_example_response": config.inference.use_example_response,
+            "pipeline_variant": config.inference.pipeline_variant,
         },
         "source_mapping": {
             "max_matches": config.source_mapping.max_matches,
@@ -51,6 +52,10 @@ def build_run_fingerprint(config: BenchmarkRunConfig) -> str:
             "include_chunk_pairs": config.source_mapping.include_chunk_pairs,
             "llm_second_pass_enabled": config.source_mapping.llm_second_pass_enabled,
             "max_soft_candidates": config.source_mapping.max_soft_candidates,
+            "mapping_profile": config.source_mapping.mapping_profile,
+            "llm_labeling_profile": config.source_mapping.llm_labeling_profile,
+            "max_sequence_length": config.source_mapping.max_sequence_length,
+            "semantic_fallback_max_matches": config.source_mapping.semantic_fallback_max_matches,
         },
         "execution": {
             "include_unanswerable": config.execution.include_unanswerable,

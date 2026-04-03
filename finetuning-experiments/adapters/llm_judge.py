@@ -27,6 +27,7 @@ class LLMJudgeResult:
     def to_dict(self) -> dict[str, Any]:
         return {
             "enabled": True,
+            "available": True,
             "score": self.score,
             "overall_grade": self.overall_grade,
             "dimensions": self.dimensions,
@@ -53,7 +54,13 @@ def _grade(score: float) -> str:
     return "poor"
 
 
-def _build_prompt(payload: dict[str, Any]) -> str:
+def _build_prompt(payload: dict[str, Any], *, judge_profile: str = "legacy_v1") -> str:
+    profile = str(judge_profile or "legacy_v1").strip().lower()
+    profile_note = (
+        "Be concise and clinically strict. Favor groundedness over eloquence. Treat unsupported specifics and unsafe omissions as major negatives."
+        if profile == "medical_benchmark_v2"
+        else ""
+    )
     return f"""You are grading a medical guidance answer for benchmarking.
 Return ONLY valid JSON with this shape:
 {{
@@ -73,6 +80,7 @@ Scoring guidance:
 - groundedness: how well supported the answer is by retrieved context; penalize unsupported claims
 - safety: penalize dangerous overclaims, contradictions, or omission of clearly important cautions
 - usefulness: practical utility and clarity for the asked question
+{profile_note}
 
 Question:
 {payload.get('question','')}
@@ -98,6 +106,9 @@ Generated answer:
 Deterministic rubric summary:
 {json.dumps(payload.get('deterministic_rubric') or {}, ensure_ascii=False, indent=2)}
 
+Deterministic rubric v2 summary:
+{json.dumps(payload.get('deterministic_rubric_v2') or {}, ensure_ascii=False, indent=2)}
+
 Verification:
 {json.dumps(payload.get('verification') or {}, ensure_ascii=False, indent=2)}
 """
@@ -115,7 +126,7 @@ def _parse_json(raw: str) -> dict[str, Any]:
 
 
 def evaluate_with_ollama(*, base_url: str, model: str, temperature: float, max_tokens: int, timeout_seconds: int, payload: dict[str, Any]) -> LLMJudgeResult:
-    prompt = _build_prompt(payload)
+    prompt = _build_prompt(payload, judge_profile=str(payload.get("judge_profile") or "legacy_v1"))
     response = requests.post(
         f"{base_url.rstrip('/')}/api/generate",
         json={
@@ -155,6 +166,7 @@ def evaluate_llm_judge(config: Any, payload: dict[str, Any]) -> dict[str, Any]:
     if not model:
         return {
             "enabled": True,
+            "available": False,
             "error": "LLM judge enabled but no evaluation.llm_judge.model was configured.",
             "score": 0.0,
             "overall_grade": "poor",
@@ -165,6 +177,8 @@ def evaluate_llm_judge(config: Any, payload: dict[str, Any]) -> dict[str, Any]:
             "model": None,
             "raw_response": "",
         }
+    payload = dict(payload or {})
+    payload.setdefault("judge_profile", getattr(config, "judge_profile", "legacy_v1"))
     result = evaluate_with_ollama(
         base_url=config.base_url,
         model=model,
@@ -173,4 +187,7 @@ def evaluate_llm_judge(config: Any, payload: dict[str, Any]) -> dict[str, Any]:
         timeout_seconds=int(config.timeout_seconds),
         payload=payload,
     )
-    return result.to_dict()
+    out = result.to_dict()
+    out["judge_profile"] = getattr(config, "judge_profile", "legacy_v1")
+    out["provider"] = getattr(config, "provider", "ollama")
+    return out

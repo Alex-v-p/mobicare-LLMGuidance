@@ -19,3 +19,25 @@ class MappingThresholds:
     supporting_semantic_min: float = 0.70
     tangential_combined_min: float = 0.14
     tangential_semantic_min: float = 0.52
+
+    @classmethod
+    def for_profile(cls, profile: str | None) -> "MappingThresholds":
+        profile_name = (profile or "legacy_v1").strip().lower()
+        if profile_name == "semantic_recovery_v2":
+            return cls(
+                min_combined_score=0.44,
+                min_lexical_score=0.46,
+                min_passage_coverage=0.68,
+                min_partial_passage_coverage=0.54,
+                min_ordered_token_ratio=0.36,
+                min_exact_substring_ratio=0.58,
+                min_anchor_pair_coverage=0.36,
+                min_anchor_coverage_any=0.56,
+                min_key_term_coverage=0.38,
+                semantic_fallback_min=0.82,
+                supporting_combined_min=0.24,
+                supporting_semantic_min=0.62,
+                tangential_combined_min=0.12,
+                tangential_semantic_min=0.42,
+            )
+        return cls()

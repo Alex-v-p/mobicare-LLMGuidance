@@ -74,10 +74,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="Also test adjacent chunk pairs in addition to single chunks.",
     )
     parser.add_argument(
+        "--mapping-profile",
+        default="legacy_v1",
+        choices=("legacy_v1", "semantic_recovery_v2"),
+        help="Versioned source-mapping profile. Defaults to legacy_v1 for backward compatibility.",
+    )
+    parser.add_argument(
+        "--llm-labeling-profile",
+        default="heuristic_v1",
+        choices=("heuristic_v1", "semantic_recovery_v2"),
+        help="Heuristic second-pass labeling profile.",
+    )
+    parser.add_argument(
         "--max-sequence-length",
         type=int,
         default=3,
         help="Maximum adjacent chunk sequence length to reconstruct against the gold passage.",
+    )
+    parser.add_argument(
+        "--semantic-fallback-max-matches",
+        type=int,
+        default=1,
+        help="Maximum number of semantic-recovery strict matches to keep when the mapping profile enables it.",
     )
     parser.add_argument("--verbose", action="store_true")
     return parser
@@ -166,6 +184,8 @@ def main(argv: list[str] | None = None) -> None:
         semantic_fallback_enabled=args.semantic_fallback,
         include_chunk_pairs=args.include_chunk_pairs,
         max_sequence_length=args.max_sequence_length,
+        mapping_profile=args.mapping_profile,
+        semantic_fallback_max_matches=args.semantic_fallback_max_matches,
     )
     assignments: list[dict[str, Any]] = []
 
@@ -201,6 +221,10 @@ def main(argv: list[str] | None = None) -> None:
             "semantic_fallback_enabled": args.semantic_fallback,
             "include_chunk_pairs": args.include_chunk_pairs,
             "max_sequence_length": args.max_sequence_length,
+            "semantic_fallback_max_matches": args.semantic_fallback_max_matches,
+            "mapping_profile": args.mapping_profile,
+            "llm_labeling_profile": args.llm_labeling_profile,
+            "source_mapping_version": "2.15",
         },
         "ingestion_record": ingestion_record,
         "case_chunk_assignments": assignments,

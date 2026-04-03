@@ -12,16 +12,33 @@ _CORE_DEFAULTS: dict[str, float] = {
     "retrieval.average_overlap_score": 0.0,
     "retrieval.average_semantic_score": 0.0,
     "retrieval.weighted_relevance_score": 0.0,
+    "retrieval.weighted_relevance_score_v2": 0.0,
+    "retrieval.weighted_relevance_display": 0.0,
     "retrieval.soft_ndcg": 0.0,
     "retrieval.duplicate_chunk_rate": 0.0,
     "retrieval.context_diversity_score": 0.0,
+    "retrieval.retrieved_average_overlap_score": 0.0,
+    "retrieval.retrieved_average_semantic_score": 0.0,
+    "retrieval.retrieved_overlap_score_available_rate": 0.0,
+    "retrieval.retrieved_semantic_score_available_rate": 0.0,
+    "retrieval.retrieved_average_ranking_score": 0.0,
+    "retrieval.retrieved_ranking_score_available_rate": 0.0,
     "generation.average_answer_similarity": 0.0,
     "generation.average_answer_quality_score": 0.0,
     "generation.average_judge_score": 0.0,
     "generation.average_deterministic_rubric_score": 0.0,
     "generation.average_llm_judge_score": 0.0,
+    "generation.average_llm_judge_score_when_available": 0.0,
+    "generation.average_effective_generation_score": 0.0,
+    "generation.average_primary_generation_score": 0.0,
+    "generation.average_deterministic_rubric_score_v2": 0.0,
+    "generation.average_effective_generation_score_v2": 0.0,
+    "generation.average_primary_generation_score_v2": 0.0,
     "generation.average_required_fact_recall": 0.0,
+    "generation.average_required_fact_recall_v2": 0.0,
+    "generation.average_required_fact_support_score_v2": 0.0,
     "generation.forbidden_fact_violation_rate": 0.0,
+    "generation.forbidden_fact_violation_rate_v2": 0.0,
     "generation.average_faithfulness_to_gold_passage": 0.0,
     "generation.average_groundedness_score": 0.0,
     "generation.average_faithfulness_to_retrieved_context": 0.0,
@@ -29,7 +46,11 @@ _CORE_DEFAULTS: dict[str, float] = {
     "generation.average_hallucination_unsupported_token_count": 0.0,
     "generation.average_warning_count": 0.0,
     "generation.verification_pass_rate": 0.0,
+    "generation.average_verification_alignment_score": 0.0,
+    "generation.verification_alignment_rate": 0.0,
+    "generation.average_verification_intrinsic_quality_score": 0.0,
     "generation.exact_pass_rate": 0.0,
+    "generation.grounded_fact_pass_rate": 0.0,
     "latency.average_ms": 0.0,
     "latency.p50_ms": 0.0,
     "latency.p95_ms": 0.0,
@@ -44,7 +65,6 @@ _CORE_DEFAULTS: dict[str, float] = {
 }
 
 
-
 def _coerce_float(value: Any) -> float:
     try:
         if value is None:
@@ -52,7 +72,6 @@ def _coerce_float(value: Any) -> float:
         return float(value)
     except (TypeError, ValueError):
         return 0.0
-
 
 
 def normalize_run_metrics(
@@ -79,16 +98,35 @@ def normalize_run_metrics(
             "retrieval.average_overlap_score": _coerce_float(retrieval_summary.get("average_overlap_score")),
             "retrieval.average_semantic_score": _coerce_float(retrieval_summary.get("average_semantic_score")),
             "retrieval.weighted_relevance_score": _coerce_float(retrieval_summary.get("weighted_relevance_score")),
+            "retrieval.weighted_relevance_score_v2": _coerce_float(retrieval_summary.get("weighted_relevance_score_v2")),
+            "retrieval.weighted_relevance_display": _coerce_float(
+                retrieval_summary.get("weighted_relevance_display", retrieval_summary.get("weighted_relevance_score_v2", retrieval_summary.get("weighted_relevance_score")))
+            ),
             "retrieval.soft_ndcg": _coerce_float(retrieval_summary.get("soft_ndcg")),
             "retrieval.duplicate_chunk_rate": _coerce_float(retrieval_summary.get("duplicate_chunk_rate")),
             "retrieval.context_diversity_score": _coerce_float(retrieval_summary.get("context_diversity_score")),
+            "retrieval.retrieved_average_overlap_score": _coerce_float(retrieval_summary.get("retrieved_average_overlap_score")),
+            "retrieval.retrieved_average_semantic_score": _coerce_float(retrieval_summary.get("retrieved_average_semantic_score")),
+            "retrieval.retrieved_overlap_score_available_rate": _coerce_float(retrieval_summary.get("retrieved_overlap_score_available_rate")),
+            "retrieval.retrieved_semantic_score_available_rate": _coerce_float(retrieval_summary.get("retrieved_semantic_score_available_rate")),
+            "retrieval.retrieved_average_ranking_score": _coerce_float(retrieval_summary.get("retrieved_average_ranking_score")),
+            "retrieval.retrieved_ranking_score_available_rate": _coerce_float(retrieval_summary.get("retrieved_ranking_score_available_rate")),
             "generation.average_answer_similarity": _coerce_float(generation_summary.get("average_answer_similarity")),
             "generation.average_answer_quality_score": _coerce_float(generation_summary.get("average_answer_quality_score")),
             "generation.average_judge_score": _coerce_float(generation_summary.get("average_judge_score")),
             "generation.average_deterministic_rubric_score": _coerce_float(generation_summary.get("average_deterministic_rubric_score")),
             "generation.average_llm_judge_score": _coerce_float(generation_summary.get("average_llm_judge_score")),
+            "generation.average_llm_judge_score_when_available": _coerce_float(generation_summary.get("average_llm_judge_score_when_available")),
+            "generation.average_effective_generation_score": _coerce_float(generation_summary.get("average_effective_generation_score")),
+            "generation.average_primary_generation_score": _coerce_float(generation_summary.get("average_primary_generation_score")),
+            "generation.average_deterministic_rubric_score_v2": _coerce_float(generation_summary.get("average_deterministic_rubric_score_v2")),
+            "generation.average_effective_generation_score_v2": _coerce_float(generation_summary.get("average_effective_generation_score_v2")),
+            "generation.average_primary_generation_score_v2": _coerce_float(generation_summary.get("average_primary_generation_score_v2")),
             "generation.average_required_fact_recall": _coerce_float(generation_summary.get("average_required_fact_recall")),
+            "generation.average_required_fact_recall_v2": _coerce_float(generation_summary.get("average_required_fact_recall_v2")),
+            "generation.average_required_fact_support_score_v2": _coerce_float(generation_summary.get("average_required_fact_support_score_v2")),
             "generation.forbidden_fact_violation_rate": _coerce_float(generation_summary.get("forbidden_fact_violation_rate")),
+            "generation.forbidden_fact_violation_rate_v2": _coerce_float(generation_summary.get("forbidden_fact_violation_rate_v2")),
             "generation.average_faithfulness_to_gold_passage": _coerce_float(generation_summary.get("average_faithfulness_to_gold_passage")),
             "generation.average_groundedness_score": _coerce_float(generation_summary.get("average_groundedness_score")),
             "generation.average_faithfulness_to_retrieved_context": _coerce_float(generation_summary.get("average_faithfulness_to_retrieved_context")),
@@ -96,7 +134,11 @@ def normalize_run_metrics(
             "generation.average_hallucination_unsupported_token_count": _coerce_float(generation_summary.get("average_hallucination_unsupported_token_count")),
             "generation.average_warning_count": _coerce_float(generation_summary.get("average_warning_count")),
             "generation.verification_pass_rate": _coerce_float(generation_summary.get("verification_pass_rate")),
+            "generation.average_verification_alignment_score": _coerce_float(generation_summary.get("average_verification_alignment_score")),
+            "generation.verification_alignment_rate": _coerce_float(generation_summary.get("verification_alignment_rate")),
+            "generation.average_verification_intrinsic_quality_score": _coerce_float(generation_summary.get("average_verification_intrinsic_quality_score")),
             "generation.exact_pass_rate": _coerce_float(generation_summary.get("exact_pass_rate")),
+            "generation.grounded_fact_pass_rate": _coerce_float(generation_summary.get("grounded_fact_pass_rate")),
             "latency.average_ms": _coerce_float(primary_latency.get("average")) * 1000.0,
             "latency.p50_ms": _coerce_float(primary_latency.get("p50")) * 1000.0,
             "latency.p95_ms": _coerce_float(primary_latency.get("p95")) * 1000.0,
