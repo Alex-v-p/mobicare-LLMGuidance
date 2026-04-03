@@ -15,6 +15,12 @@ _CORE_DEFAULTS: dict[str, float] = {
     "retrieval.soft_ndcg": 0.0,
     "retrieval.duplicate_chunk_rate": 0.0,
     "retrieval.context_diversity_score": 0.0,
+    "retrieval.retrieved_average_overlap_score": 0.0,
+    "retrieval.retrieved_average_semantic_score": 0.0,
+    "retrieval.retrieved_overlap_score_available_rate": 0.0,
+    "retrieval.retrieved_semantic_score_available_rate": 0.0,
+    "retrieval.retrieved_average_ranking_score": 0.0,
+    "retrieval.retrieved_ranking_score_available_rate": 0.0,
     "generation.average_answer_similarity": 0.0,
     "generation.average_answer_quality_score": 0.0,
     "generation.average_judge_score": 0.0,
@@ -44,7 +50,6 @@ _CORE_DEFAULTS: dict[str, float] = {
 }
 
 
-
 def _coerce_float(value: Any) -> float:
     try:
         if value is None:
@@ -52,7 +57,6 @@ def _coerce_float(value: Any) -> float:
         return float(value)
     except (TypeError, ValueError):
         return 0.0
-
 
 
 def normalize_run_metrics(
@@ -82,6 +86,12 @@ def normalize_run_metrics(
             "retrieval.soft_ndcg": _coerce_float(retrieval_summary.get("soft_ndcg")),
             "retrieval.duplicate_chunk_rate": _coerce_float(retrieval_summary.get("duplicate_chunk_rate")),
             "retrieval.context_diversity_score": _coerce_float(retrieval_summary.get("context_diversity_score")),
+            "retrieval.retrieved_average_overlap_score": _coerce_float(retrieval_summary.get("retrieved_average_overlap_score")),
+            "retrieval.retrieved_average_semantic_score": _coerce_float(retrieval_summary.get("retrieved_average_semantic_score")),
+            "retrieval.retrieved_overlap_score_available_rate": _coerce_float(retrieval_summary.get("retrieved_overlap_score_available_rate")),
+            "retrieval.retrieved_semantic_score_available_rate": _coerce_float(retrieval_summary.get("retrieved_semantic_score_available_rate")),
+            "retrieval.retrieved_average_ranking_score": _coerce_float(retrieval_summary.get("retrieved_average_ranking_score")),
+            "retrieval.retrieved_ranking_score_available_rate": _coerce_float(retrieval_summary.get("retrieved_ranking_score_available_rate")),
             "generation.average_answer_similarity": _coerce_float(generation_summary.get("average_answer_similarity")),
             "generation.average_answer_quality_score": _coerce_float(generation_summary.get("average_answer_quality_score")),
             "generation.average_judge_score": _coerce_float(generation_summary.get("average_judge_score")),

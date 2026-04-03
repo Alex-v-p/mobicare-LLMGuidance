@@ -14,7 +14,6 @@ def safe_float(value: Any, default: float = 0.0) -> float:
         return default
 
 
-
 def safe_int(value: Any, default: int = 0) -> int:
     try:
         if value is None:
@@ -24,12 +23,10 @@ def safe_int(value: Any, default: int = 0) -> int:
         return default
 
 
-
 def safe_str(value: Any, default: str = "") -> str:
     if value is None:
         return default
     return str(value)
-
 
 
 def get_nested(data: dict[str, Any], *keys: str, default: Any = None) -> Any:
@@ -43,13 +40,30 @@ def get_nested(data: dict[str, Any], *keys: str, default: Any = None) -> Any:
     return current
 
 
-
 def first_defined(*values: Any, default: Any = None) -> Any:
     for value in values:
         if value is not None:
             return value
     return default
 
+
+def _patch_stage_latency_summary(summary: dict[str, Any]) -> dict[str, Any]:
+    patched: dict[str, Any] = {}
+    for stage_name, value in (summary or {}).items():
+        if not isinstance(value, dict):
+            patched[stage_name] = value
+            continue
+        stage = dict(value)
+        completed_count = safe_int(stage.get("completed_count"))
+        included_count = safe_int(first_defined(stage.get("included_count"), stage.get("timed_count")))
+        count = safe_int(stage.get("count"))
+        if count <= 0:
+            count = max(completed_count, included_count)
+        stage.setdefault("timed_count", included_count)
+        stage.setdefault("untimed_count", max(0, count - safe_int(stage.get("timed_count"))))
+        stage["count"] = count
+        patched[stage_name] = stage
+    return patched
 
 
 def resolve_run_generation_score(generation: dict[str, Any]) -> tuple[Any, Any, Any]:
@@ -65,7 +79,6 @@ def resolve_run_generation_score(generation: dict[str, Any]) -> tuple[Any, Any, 
     else:
         effective = first_defined(deterministic, llm)
     return deterministic, llm, effective
-
 
 
 def build_config_overview(payload: dict[str, Any]) -> dict[str, Any]:
@@ -86,23 +99,24 @@ def build_config_overview(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-
 def build_telemetry_summary(payload: dict[str, Any]) -> dict[str, Any]:
     existing = payload.get("telemetry_summary")
     if isinstance(existing, dict) and existing:
-        return existing
-    api_summary = payload.get("api_summary") or {}
-    endpoint_summaries = api_summary.get("endpoint_summaries") or {}
-    primary_api = endpoint_summaries.get("guidance_endpoint") or api_summary
-    return {
-        "success_only": dict(primary_api.get("success_only") or {}),
-        "queue_delay": dict(primary_api.get("queue_delay") or {}),
-        "execution_duration": dict(primary_api.get("execution_duration") or {}),
-        "stage_latency_summary": dict(primary_api.get("stage_latency_summary") or {}),
-        "endpoint_summaries": dict(endpoint_summaries),
-        "failure_taxonomy": dict(api_summary.get("failure_taxonomy") or {}),
-    }
-
+        summary = dict(existing)
+    else:
+        api_summary = payload.get("api_summary") or {}
+        endpoint_summaries = api_summary.get("endpoint_summaries") or {}
+        primary_api = endpoint_summaries.get("guidance_endpoint") or api_summary
+        summary = {
+            "success_only": dict(primary_api.get("success_only") or {}),
+            "queue_delay": dict(primary_api.get("queue_delay") or {}),
+            "execution_duration": dict(primary_api.get("execution_duration") or {}),
+            "stage_latency_summary": dict(primary_api.get("stage_latency_summary") or {}),
+            "endpoint_summaries": dict(endpoint_summaries),
+            "failure_taxonomy": dict(api_summary.get("failure_taxonomy") or {}),
+        }
+    summary["stage_latency_summary"] = _patch_stage_latency_summary(dict(summary.get("stage_latency_summary") or {}))
+    return summary
 
 
 def normalize_run_row_payload(payload: dict[str, Any], run: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -161,6 +175,10 @@ def normalize_run_row_payload(payload: dict[str, Any], run: dict[str, Any] | Non
         "duplicate_chunk_rate": safe_float(retrieval.get("duplicate_chunk_rate")),
         "context_diversity_score": safe_float(retrieval.get("context_diversity_score")),
         "soft_ndcg": safe_float(retrieval.get("soft_ndcg")),
+        "retrieved_overlap_available_rate": safe_float(retrieval.get("retrieved_overlap_score_available_rate")),
+        "retrieved_semantic_available_rate": safe_float(retrieval.get("retrieved_semantic_score_available_rate")),
+        "retrieved_ranking_available_rate": safe_float(retrieval.get("retrieved_ranking_score_available_rate")),
+        "retrieved_avg_ranking_score": safe_float(retrieval.get("retrieved_average_ranking_score")),
         "avg_answer_similarity": safe_float(generation.get("average_answer_similarity")),
         "avg_answer_quality": safe_float(first_defined(generation.get("average_answer_quality_score"), avg_deterministic_raw)),
         "avg_deterministic_rubric": safe_float(avg_deterministic_raw),
@@ -196,7 +214,6 @@ def normalize_run_row_payload(payload: dict[str, Any], run: dict[str, Any] | Non
         "normalized.avg_llm_judge_score": safe_float(normalized.get("generation.average_llm_judge_score")),
         "normalized.avg_latency": safe_float(normalized.get("latency.average_ms")),
     }
-
 
 
 def stable_digest(payload: Any) -> str:

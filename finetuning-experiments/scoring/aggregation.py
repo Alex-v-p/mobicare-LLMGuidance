@@ -24,6 +24,16 @@ def _avg_defined(values: list[Any]) -> float:
     return _avg(numeric)
 
 
+def _defined_count(values: list[Any]) -> int:
+    return sum(1 for value in values if _to_float(value) is not None)
+
+
+def _availability_rate(values: list[Any]) -> float:
+    if not values:
+        return 0.0
+    return _defined_count(values) / len(values)
+
+
 def summarize_results(per_case_results: list[dict[str, Any]]) -> dict[str, Any]:
     completed_cases = [item for item in per_case_results if item.get("status") != "failed"]
     retrieval_items_all = [item["retrieval_scores"] for item in per_case_results if "retrieval_scores" in item]
@@ -57,6 +67,10 @@ def summarize_results(per_case_results: list[dict[str, Any]]) -> dict[str, Any]:
         if derived.get("execution_duration_ms") is not None
     ]
 
+    retrieved_overlap_values = [x.get("retrieved_average_overlap_score") for x in retrieval_items]
+    retrieved_semantic_values = [x.get("retrieved_average_semantic_score") for x in retrieval_items]
+    retrieved_ranking_values = [x.get("retrieved_average_ranking_score") for x in retrieval_items]
+
     retrieval_summary = {
         "completed_case_count": len(completed_cases),
         "failed_case_count": sum(1 for item in per_case_results if item.get("status") == "failed"),
@@ -78,8 +92,18 @@ def summarize_results(per_case_results: list[dict[str, Any]]) -> dict[str, Any]:
         "average_semantic_score": _avg_defined([x.get("average_semantic_score") for x in retrieval_items]),
         "weighted_relevance_score": _avg_defined([x.get("weighted_relevance_score") for x in retrieval_items]),
         "soft_ndcg": _avg_defined([x.get("soft_ndcg") for x in retrieval_items]),
-        "retrieved_average_overlap_score": _avg_defined([x.get("retrieved_average_overlap_score") for x in retrieval_items]),
-        "retrieved_average_semantic_score": _avg_defined([x.get("retrieved_average_semantic_score") for x in retrieval_items]),
+        "retrieved_average_overlap_score": _avg_defined(retrieved_overlap_values),
+        "retrieved_average_semantic_score": _avg_defined(retrieved_semantic_values),
+        "retrieved_overlap_score_observed_case_count": _defined_count(retrieved_overlap_values),
+        "retrieved_semantic_score_observed_case_count": _defined_count(retrieved_semantic_values),
+        "retrieved_overlap_score_available_rate": _avg_defined([x.get("retrieved_overlap_score_available_rate") for x in retrieval_items]),
+        "retrieved_semantic_score_available_rate": _avg_defined([x.get("retrieved_semantic_score_available_rate") for x in retrieval_items]),
+        "retrieved_average_ranking_score": _avg_defined(retrieved_ranking_values),
+        "retrieved_ranking_score_observed_case_count": _defined_count(retrieved_ranking_values),
+        "retrieved_ranking_score_available_rate": _avg_defined([x.get("retrieved_ranking_score_available_rate") for x in retrieval_items]),
+        "retrieved_average_query_term_overlap": _avg_defined([x.get("retrieved_average_query_term_overlap") for x in retrieval_items]),
+        "retrieved_average_heart_failure_overlap": _avg_defined([x.get("retrieved_average_heart_failure_overlap") for x in retrieval_items]),
+        "retrieved_average_clinical_term_overlap": _avg_defined([x.get("retrieved_average_clinical_term_overlap") for x in retrieval_items]),
         "duplicate_chunk_rate": _avg_defined([x.get("duplicate_chunk_rate") for x in retrieval_items]),
         "context_diversity_score": _avg_defined([x.get("context_diversity_score") for x in retrieval_items]),
     }

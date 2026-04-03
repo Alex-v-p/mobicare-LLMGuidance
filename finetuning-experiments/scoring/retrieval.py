@@ -4,6 +4,7 @@ import math
 import re
 from typing import Any
 
+
 _SOURCE_WEIGHTS = {
     "direct_evidence": 1.0,
     "partial_direct_evidence": 0.8,
@@ -58,6 +59,10 @@ def _mean(values: list[float]) -> float:
     return sum(values) / len(values) if values else 0.0
 
 
+def _mean_or_none(values: list[float]) -> float | None:
+    return _mean(values) if values else None
+
+
 def _discount(rank: int) -> float:
     return 1.0 / math.log2(rank + 1)
 
@@ -74,6 +79,29 @@ def _snippet_similarity(left: str, right: str) -> float:
     if not left_tokens or not right_tokens:
         return 0.0
     return len(left_tokens & right_tokens) / len(left_tokens | right_tokens)
+
+
+def _coerce_float(value: Any) -> float | None:
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _extract_chunk_metric(chunk: dict[str, Any], *keys: str) -> float | None:
+    for key in keys:
+        value = _coerce_float(chunk.get(key))
+        if value is not None:
+            return value
+    return None
+
+
+def _metric_availability_rate(values: list[float], *, total: int) -> float:
+    if total <= 0:
+        return 0.0
+    return len(values) / total
 
 
 def _deduplicated_relevance(retrieved_chunks: list[dict[str, Any]], label_map: dict[str, str]) -> tuple[float, float, int]:
@@ -151,11 +179,36 @@ def score_retrieval(source_mapping: dict[str, Any] | None, retrieved_chunks: lis
     strict_items = list(source_list.get("direct_evidence") or []) + list(source_list.get("partial_direct_evidence") or [])
     overlap_scores = [float(item.get("metadata", {}).get("passage_coverage", 0.0) or 0.0) for item in strict_items]
     semantic_scores = [float(item.get("semantic_score", 0.0) or 0.0) for item in strict_items]
-    retrieved_overlap_scores = [float(chunk.get("overlap_score", 0.0) or 0.0) for chunk in retrieved_chunks]
-    retrieved_semantic_scores = [float(chunk.get("semantic_score", 0.0) or 0.0) for chunk in retrieved_chunks]
+
+    retrieved_overlap_scores = [
+        value for value in (_extract_chunk_metric(chunk, "overlap_score", "retrieval_overlap_score") for chunk in retrieved_chunks)
+        if value is not None
+    ]
+    retrieved_semantic_scores = [
+        value for value in (_extract_chunk_metric(chunk, "semantic_score", "retrieval_semantic_score") for chunk in retrieved_chunks)
+        if value is not None
+    ]
+    retrieved_ranking_scores = [
+        value for value in (_extract_chunk_metric(chunk, "retrieval_ranking_score", "ranking_score") for chunk in retrieved_chunks)
+        if value is not None
+    ]
+    retrieved_query_term_overlaps = [
+        value for value in (_extract_chunk_metric(chunk, "retrieval_query_term_overlap", "query_term_overlap") for chunk in retrieved_chunks)
+        if value is not None
+    ]
+    retrieved_hf_overlaps = [
+        value for value in (_extract_chunk_metric(chunk, "retrieval_heart_failure_overlap", "heart_failure_overlap") for chunk in retrieved_chunks)
+        if value is not None
+    ]
+    retrieved_clinical_overlaps = [
+        value for value in (_extract_chunk_metric(chunk, "retrieval_clinical_term_overlap", "clinical_term_overlap") for chunk in retrieved_chunks)
+        if value is not None
+    ]
+
     ideal_weights = [_SOURCE_WEIGHTS.get(label, 0.0) for label, items in source_list.items() for _ in (items or [])]
     raw_relevance, adjusted_relevance, duplicate_count = _deduplicated_relevance(retrieved_chunks, label_map)
     lenient_success = _lenient_success(ranked_labels)
+    retrieved_count = len(retrieved_chunks)
 
     return {
         "applicable": applicable,
@@ -175,8 +228,17 @@ def score_retrieval(source_mapping: dict[str, Any] | None, retrieved_chunks: lis
         "relevance_hit_rank": first_relevant_rank if applicable else None,
         "average_overlap_score": _mean(overlap_scores) if applicable else None,
         "average_semantic_score": _mean(semantic_scores) if applicable else None,
-        "retrieved_average_overlap_score": _mean(retrieved_overlap_scores) if applicable else None,
-        "retrieved_average_semantic_score": _mean(retrieved_semantic_scores) if applicable else None,
+        "retrieved_average_overlap_score": _mean_or_none(retrieved_overlap_scores) if applicable else None,
+        "retrieved_average_semantic_score": _mean_or_none(retrieved_semantic_scores) if applicable else None,
+        "retrieved_overlap_score_observed_count": len(retrieved_overlap_scores) if applicable else None,
+        "retrieved_semantic_score_observed_count": len(retrieved_semantic_scores) if applicable else None,
+        "retrieved_overlap_score_available_rate": _metric_availability_rate(retrieved_overlap_scores, total=retrieved_count) if applicable else None,
+        "retrieved_semantic_score_available_rate": _metric_availability_rate(retrieved_semantic_scores, total=retrieved_count) if applicable else None,
+        "retrieved_average_ranking_score": _mean_or_none(retrieved_ranking_scores) if applicable else None,
+        "retrieved_average_query_term_overlap": _mean_or_none(retrieved_query_term_overlaps) if applicable else None,
+        "retrieved_average_heart_failure_overlap": _mean_or_none(retrieved_hf_overlaps) if applicable else None,
+        "retrieved_average_clinical_term_overlap": _mean_or_none(retrieved_clinical_overlaps) if applicable else None,
+        "retrieved_ranking_score_available_rate": _metric_availability_rate(retrieved_ranking_scores, total=retrieved_count) if applicable else None,
         "weighted_relevance_score": adjusted_relevance if applicable else None,
         "weighted_relevance_raw": raw_relevance if applicable else None,
         "duplicate_chunk_count": duplicate_count if applicable else None,
