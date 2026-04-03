@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from artifacts.compatibility import build_config_overview, build_telemetry_summary
+from artifacts.compatibility import backfill_source_mapping_summary_fields, build_config_overview, build_telemetry_summary
 from artifacts.models import CURRENT_ARTIFACT_VERSION, RunSummaryArtifact
 from utils.json import write_json
 
@@ -12,6 +12,8 @@ from utils.json import write_json
 def build_run_summary(payload: dict[str, Any]) -> dict[str, Any]:
     config = payload.get("config") or {}
     api_summary = payload.get("api_summary") or {}
+    config_overview = build_config_overview(payload)
+    source_mapping_summary = backfill_source_mapping_summary_fields(payload.get("source_mapping_summary") or {}, config_overview.get("source_mapping") or {})
     primary_api = api_summary.get("endpoint_summaries", {}).get("guidance_endpoint") or api_summary
     summary = RunSummaryArtifact(
         artifact_type="run_summary",
@@ -24,7 +26,7 @@ def build_run_summary(payload: dict[str, Any]) -> dict[str, Any]:
         notes=payload.get("notes", ""),
         change_note=payload.get("change_note", ""),
         case_count=len(payload.get("per_case_results") or []),
-        config_overview=build_config_overview(payload),
+        config_overview=config_overview,
         cache={
             "run_fingerprint": (payload.get("cache") or {}).get("run_fingerprint"),
             "ingestion_fingerprint": (payload.get("cache") or {}).get("ingestion_fingerprint"),
@@ -53,10 +55,11 @@ def build_run_summary(payload: dict[str, Any]) -> dict[str, Any]:
             "ingestion_metrics": ((payload.get("ingestion_summary") or {}).get("ingestion_metrics") or {}),
         },
         source_mapping_summary={
-            "mapping_label": (payload.get("source_mapping_summary") or {}).get("mapping_label"),
-            "strategy": (payload.get("source_mapping_summary") or {}).get("strategy"),
-            "case_count": len((payload.get("source_mapping_summary") or {}).get("case_chunk_assignments") or []),
-            "label_totals": (payload.get("source_mapping_summary") or {}).get("label_totals") or {},
+            "mapping_label": source_mapping_summary.get("mapping_label"),
+            "strategy": source_mapping_summary.get("strategy"),
+            "case_count": len(source_mapping_summary.get("case_chunk_assignments") or []),
+            "label_totals": source_mapping_summary.get("label_totals") or {},
+            "matcher": source_mapping_summary.get("matcher") or {},
         },
         telemetry_summary=build_telemetry_summary(payload),
     )

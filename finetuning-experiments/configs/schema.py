@@ -23,6 +23,10 @@ class SourceMappingConfig:
     include_chunk_pairs: bool = True
     llm_second_pass_enabled: bool = False
     max_soft_candidates: int = 12
+    mapping_profile: str = "legacy_v1"
+    llm_labeling_profile: str = "heuristic_v1"
+    max_sequence_length: int = 3
+    semantic_fallback_max_matches: int = 1
 
 
 @dataclass(slots=True)

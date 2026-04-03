@@ -143,10 +143,15 @@ def build_config_overview(payload: dict[str, Any]) -> dict[str, Any]:
         return existing
     config = payload.get("config") or {}
     execution = config.get("execution") or {}
+    source_mapping = dict(config.get("source_mapping") or {})
+    source_mapping.setdefault("mapping_profile", "legacy_v1")
+    source_mapping.setdefault("llm_labeling_profile", "heuristic_v1")
+    source_mapping.setdefault("max_sequence_length", 3)
+    source_mapping.setdefault("semantic_fallback_max_matches", 1)
     return {
         "ingestion": dict(config.get("ingestion") or {}),
         "inference": dict(config.get("inference") or {}),
-        "source_mapping": dict(config.get("source_mapping") or {}),
+        "source_mapping": source_mapping,
         "evaluation": dict(config.get("evaluation") or {}),
         "execution": {
             "api_test": dict(execution.get("api_test") or {}),
@@ -175,6 +180,22 @@ def build_telemetry_summary(payload: dict[str, Any]) -> dict[str, Any]:
     return summary
 
 
+
+
+def backfill_source_mapping_summary_fields(source_mapping: dict[str, Any], config_source_mapping: dict[str, Any] | None = None) -> dict[str, Any]:
+    mapping = dict(source_mapping or {})
+    config_mapping = dict(config_source_mapping or {})
+    matcher = dict(mapping.get("matcher") or {})
+    matcher.setdefault("mapping_profile", first_defined(matcher.get("mapping_profile"), config_mapping.get("mapping_profile"), default="legacy_v1"))
+    matcher.setdefault("llm_labeling_profile", first_defined(matcher.get("llm_labeling_profile"), config_mapping.get("llm_labeling_profile"), default="heuristic_v1"))
+    matcher.setdefault("source_mapping_version", first_defined(matcher.get("source_mapping_version"), default=None))
+    matcher.setdefault("semantic_fallback_enabled", first_defined(matcher.get("semantic_fallback_enabled"), config_mapping.get("semantic_fallback_enabled"), default=False))
+    matcher.setdefault("llm_second_pass_enabled", first_defined(matcher.get("llm_second_pass_enabled"), config_mapping.get("llm_second_pass_enabled"), default=False))
+    matcher.setdefault("max_sequence_length", first_defined(matcher.get("max_sequence_length"), config_mapping.get("max_sequence_length"), default=3))
+    matcher.setdefault("semantic_fallback_max_matches", first_defined(matcher.get("semantic_fallback_max_matches"), config_mapping.get("semantic_fallback_max_matches"), default=1))
+    mapping["matcher"] = matcher
+    return mapping
+
 def normalize_run_row_payload(payload: dict[str, Any], run: dict[str, Any] | None = None) -> dict[str, Any]:
     run_meta = run or {}
     retrieval = backfill_retrieval_summary_fields(payload.get("retrieval_summary") or {})
@@ -183,7 +204,7 @@ def normalize_run_row_payload(payload: dict[str, Any], run: dict[str, Any] | Non
     primary_api = (api.get("endpoint_summaries") or {}).get("guidance_endpoint") or api
     ingestion = payload.get("ingestion_summary") or {}
     telemetry = build_telemetry_summary(payload)
-    source_mapping = payload.get("source_mapping_summary") or {}
+    source_mapping = backfill_source_mapping_summary_fields(payload.get("source_mapping_summary") or {}, config_overview.get("source_mapping") or {})
     normalized = payload.get("normalized_metrics") or {}
     config_overview = build_config_overview(payload)
     ingestion_config = config_overview.get("ingestion") or {}
@@ -218,6 +239,8 @@ def normalize_run_row_payload(payload: dict[str, Any], run: dict[str, Any] | Non
         "verification": bool(inference_config.get("enable_response_verification") or get_nested(payload, "config", "inference", "enable_response_verification", default=False)),
         "graph_augmentation": bool(inference_config.get("use_graph_augmentation") or get_nested(payload, "config", "inference", "use_graph_augmentation", default=False)),
         "second_pass_mapping": bool(source_mapping_config.get("llm_second_pass_enabled") or get_nested(payload, "config", "source_mapping", "llm_second_pass_enabled", default=False)),
+        "source_mapping_profile": safe_str(first_defined(source_mapping.get("matcher", {}).get("mapping_profile"), source_mapping_config.get("mapping_profile"), default="legacy_v1")),
+        "source_mapping_version": safe_str(first_defined(source_mapping.get("matcher", {}).get("source_mapping_version"), default="")),
         "hit@1": safe_float(retrieval.get("hit_at_1")),
         "hit@3": safe_float(retrieval.get("hit_at_3")),
         "hit@5": safe_float(retrieval.get("hit_at_5")),

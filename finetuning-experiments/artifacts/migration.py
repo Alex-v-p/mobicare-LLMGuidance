@@ -4,7 +4,7 @@ from copy import deepcopy
 from typing import Any
 
 from adapters.guidance_payloads import normalize_guidance_record
-from artifacts.compatibility import backfill_generation_summary_fields, backfill_retrieval_summary_fields, build_config_overview, build_telemetry_summary
+from artifacts.compatibility import backfill_generation_summary_fields, backfill_retrieval_summary_fields, backfill_source_mapping_summary_fields, build_config_overview, build_telemetry_summary
 from artifacts.models import CURRENT_ARTIFACT_VERSION
 from artifacts.summaries import build_run_summary
 from scoring.aggregation import summarize_results
@@ -73,6 +73,7 @@ def migrate_run_artifact(payload: dict[str, Any]) -> dict[str, Any]:
     artifact.setdefault("normalized_metrics", {})
     artifact.setdefault("per_case_results", [])
     artifact["config_overview"] = build_config_overview(artifact)
+    artifact["source_mapping_summary"] = backfill_source_mapping_summary_fields(artifact.get("source_mapping_summary") or {}, artifact["config_overview"].get("source_mapping") or {})
     artifact["telemetry_summary"] = build_telemetry_summary(artifact)
     artifact.setdefault("case_count", len(artifact.get("per_case_results") or []))
     for case in artifact["per_case_results"]:
@@ -115,6 +116,7 @@ def migrate_summary_artifact(payload: dict[str, Any]) -> dict[str, Any]:
     summary["generation_summary"] = backfill_generation_summary_fields(summary.get("generation_summary") or {})
     summary["telemetry_summary"] = build_telemetry_summary(summary)
     summary["config_overview"] = build_config_overview(summary)
+    summary["source_mapping_summary"] = backfill_source_mapping_summary_fields(summary.get("source_mapping_summary") or {}, summary["config_overview"].get("source_mapping") or {})
     summary["normalized_metrics"] = normalize_run_metrics(
         summary.get("retrieval_summary"),
         summary.get("generation_summary"),
