@@ -19,7 +19,7 @@ def _backfill_case_generation(case: dict[str, Any]) -> None:
     generation_scores = dict(case.get("generation_scores") or {})
     if not generation_scores:
         return
-    case["generation_scores"] = finalize_generation_score_fields(generation_scores)
+    case["generation_scores"] = finalize_generation_score_fields(generation_scores, verification=case.get("verification"))
 
 def _backfill_case_retrieval(case: dict[str, Any]) -> None:
     raw_record = case.get("raw_endpoint_result") or {}

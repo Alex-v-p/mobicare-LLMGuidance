@@ -108,6 +108,10 @@ def backfill_generation_summary_fields(generation: dict[str, Any]) -> dict[str, 
     generation.setdefault("average_llm_judge_score", llm)
     generation.setdefault("average_effective_generation_score", effective)
     generation.setdefault("average_primary_generation_score", effective)
+    generation.setdefault("average_verification_alignment_score", generation.get("average_verification_alignment_score"))
+    generation.setdefault("verification_alignment_rate", generation.get("verification_alignment_rate"))
+    generation.setdefault("verification_alignment_applicable_case_count", generation.get("verification_alignment_applicable_case_count"))
+    generation.setdefault("average_verification_intrinsic_quality_score", generation.get("average_verification_intrinsic_quality_score"))
     return generation
 
 
@@ -235,6 +239,9 @@ def normalize_run_row_payload(payload: dict[str, Any], run: dict[str, Any] | Non
         "avg_faithfulness": safe_float(avg_faithfulness_raw),
         "exact_pass_rate": safe_float(generation.get("exact_pass_rate")),
         "verification_pass_rate": safe_float(generation.get("verification_pass_rate")),
+        "avg_verification_alignment_score": safe_float(generation.get("average_verification_alignment_score"), default=float("nan")),
+        "verification_alignment_rate": safe_float(generation.get("verification_alignment_rate"), default=float("nan")),
+        "avg_verification_intrinsic_quality_score": safe_float(generation.get("average_verification_intrinsic_quality_score"), default=float("nan")),
         "forbidden_violation_rate": safe_float(generation.get("forbidden_fact_violation_rate")),
         "hallucination_rate": safe_float(generation.get("hallucination_rate")),
         "avg_latency": safe_float(primary_api.get("average")),
@@ -259,6 +266,14 @@ def normalize_run_row_payload(payload: dict[str, Any], run: dict[str, Any] | Non
         "normalized.avg_judge_score": safe_float(normalized.get("generation.average_judge_score")),
         "normalized.avg_llm_judge_score": safe_float(normalized.get("generation.average_llm_judge_score")),
         "normalized.avg_effective_generation_score": safe_float(normalized.get("generation.average_effective_generation_score")),
+        "normalized.avg_verification_alignment_score": safe_float(
+            normalized.get("generation.average_verification_alignment_score"),
+            default=float("nan"),
+        ),
+        "normalized.verification_alignment_rate": safe_float(
+            normalized.get("generation.verification_alignment_rate"),
+            default=float("nan"),
+        ),
         "normalized.weighted_relevance_v2": safe_float(
             first_defined(normalized.get("retrieval.weighted_relevance_score_v2"), retrieval.get("weighted_relevance_score_v2")),
             default=float("nan"),

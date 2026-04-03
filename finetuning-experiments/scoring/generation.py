@@ -41,10 +41,17 @@ def _set_f1(left: set[str], right: set[str]) -> float:
     return (2 * precision * recall) / (precision + recall) if precision + recall else 0.0
 
 
+def _verification_verdict(verification: dict[str, Any] | None) -> str:
+    return str((verification or {}).get("verdict") or "").strip().lower()
+
+
+def _verification_confidence(verification: dict[str, Any] | None) -> str:
+    return str((verification or {}).get("confidence") or "").strip().lower()
+
+
 def _verification_score(verification: dict[str, Any] | None) -> float:
-    payload = verification or {}
-    verdict = str(payload.get("verdict") or "").strip().lower()
-    confidence = str(payload.get("confidence") or "").strip().lower()
+    verdict = _verification_verdict(verification)
+    confidence = _verification_confidence(verification)
     if verdict in {"pass", "passed", "ok", "success"}:
         return {"high": 1.0, "medium": 0.9, "low": 0.8}.get(confidence, 0.85)
     if verdict in {"partial", "warning", "mixed"}:
@@ -52,6 +59,83 @@ def _verification_score(verification: dict[str, Any] | None) -> float:
     if verdict in {"fail", "failed", "error"}:
         return {"high": 0.1, "medium": 0.2, "low": 0.3}.get(confidence, 0.2)
     return 0.5
+
+
+def _verification_transport_pass(verification: dict[str, Any] | None) -> bool | None:
+    verdict = _verification_verdict(verification)
+    if not verdict:
+        return None
+    return verdict in {"pass", "passed", "ok", "success"}
+
+
+def _verification_band_from_payload(verification: dict[str, Any] | None) -> str | None:
+    verdict = _verification_verdict(verification)
+    if verdict in {"pass", "passed", "ok", "success"}:
+        return "pass"
+    if verdict in {"partial", "warning", "mixed"}:
+        return "partial"
+    if verdict in {"fail", "failed", "error"}:
+        return "fail"
+    return None
+
+
+def _intrinsic_generation_quality_score(generation_scores: dict[str, Any]) -> float | None:
+    components: list[float] = []
+    for key in (
+        "required_fact_recall",
+        "groundedness_score",
+        "faithfulness_to_retrieved_context",
+        "answer_similarity",
+    ):
+        value = generation_scores.get(key)
+        if value is None:
+            continue
+        try:
+            components.append(float(value))
+        except (TypeError, ValueError):
+            continue
+    hallucination_rate = generation_scores.get("hallucination_rate")
+    if hallucination_rate is not None:
+        try:
+            components.append(max(0.0, 1.0 - float(hallucination_rate)))
+        except (TypeError, ValueError):
+            pass
+    if not components:
+        return None
+    return sum(components) / len(components)
+
+
+def _expected_verification_band(intrinsic_quality: float | None) -> str | None:
+    if intrinsic_quality is None:
+        return None
+    if intrinsic_quality >= 0.7:
+        return "pass"
+    if intrinsic_quality >= 0.4:
+        return "partial"
+    return "fail"
+
+
+def _band_distance(left: str | None, right: str | None) -> int | None:
+    if left is None or right is None:
+        return None
+    order = {"fail": 0, "partial": 1, "pass": 2}
+    if left not in order or right not in order:
+        return None
+    return abs(order[left] - order[right])
+
+
+def _verification_alignment_score(expected_band: str | None, observed_band: str | None, verification: dict[str, Any] | None) -> tuple[float | None, str | None]:
+    distance = _band_distance(expected_band, observed_band)
+    if distance is None:
+        return None, None
+    confidence = _verification_confidence(verification)
+    if distance == 0:
+        return 1.0, "aligned"
+    if distance == 1:
+        penalty = {"high": 0.15, "medium": 0.08, "low": 0.03}.get(confidence, 0.05)
+        return max(0.0, 0.65 - penalty), "partially_aligned"
+    penalty = {"high": 0.15, "medium": 0.08, "low": 0.03}.get(confidence, 0.05)
+    return max(0.0, 0.2 - penalty), "misaligned"
 
 
 def _grade_from_score(score: float) -> str:
@@ -120,7 +204,7 @@ def _resolve_effective_generation_fields(generation_scores: dict[str, Any]) -> t
     return deterministic_score, deterministic_grade, llm_score, llm_grade, effective_score, effective_grade, effective_source
 
 
-def finalize_generation_score_fields(generation_scores: dict[str, Any]) -> dict[str, Any]:
+def finalize_generation_score_fields(generation_scores: dict[str, Any], verification: dict[str, Any] | None = None) -> dict[str, Any]:
     deterministic_score, deterministic_grade, llm_score, llm_grade, effective_score, effective_grade, effective_source = _resolve_effective_generation_fields(generation_scores)
 
     generation_scores["deterministic_rubric_score"] = deterministic_score
@@ -144,6 +228,31 @@ def finalize_generation_score_fields(generation_scores: dict[str, Any]) -> dict[
         generation_scores["judge_grade"] = deterministic_grade
     if generation_scores.get("judge_score_source") is None:
         generation_scores["judge_score_source"] = "legacy_alias_of_deterministic_rubric" if deterministic_score is not None else effective_source
+
+    intrinsic_quality = generation_scores.get("verification_intrinsic_quality_score")
+    if intrinsic_quality is None:
+        intrinsic_quality = _intrinsic_generation_quality_score(generation_scores)
+    observed_band = generation_scores.get("verification_observed_verdict_band")
+    if observed_band is None:
+        observed_band = _verification_band_from_payload(verification)
+    expected_band = generation_scores.get("verification_expected_verdict_band")
+    if expected_band is None:
+        expected_band = _expected_verification_band(intrinsic_quality)
+    alignment_score = generation_scores.get("verification_alignment_score")
+    alignment_label = generation_scores.get("verification_alignment_label")
+    if alignment_score is None and verification is not None:
+        alignment_score, alignment_label = _verification_alignment_score(expected_band, observed_band, verification)
+    if alignment_label is None and alignment_score is not None:
+        alignment_label = "aligned" if alignment_score >= 0.75 else ("partially_aligned" if alignment_score >= 0.45 else "misaligned")
+
+    generation_scores["verification_transport_pass"] = generation_scores.get("verification_transport_pass")
+    if generation_scores["verification_transport_pass"] is None:
+        generation_scores["verification_transport_pass"] = _verification_transport_pass(verification)
+    generation_scores["verification_observed_verdict_band"] = observed_band
+    generation_scores["verification_expected_verdict_band"] = expected_band
+    generation_scores["verification_intrinsic_quality_score"] = intrinsic_quality
+    generation_scores["verification_alignment_score"] = alignment_score
+    generation_scores["verification_alignment_label"] = alignment_label
     return generation_scores
 
 
@@ -347,4 +456,4 @@ def score_generation(
         "exact_pass_applicable": exact_pass_applicable,
         "exact_pass": exact_pass,
     }
-    return finalize_generation_score_fields(generation_scores)
+    return finalize_generation_score_fields(generation_scores, verification=verification)

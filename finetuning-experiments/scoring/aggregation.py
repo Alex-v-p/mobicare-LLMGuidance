@@ -123,7 +123,7 @@ def summarize_results(per_case_results: list[dict[str, Any]]) -> dict[str, Any]:
         "observation_only_case_count": sum(1 for x in generation_items if x.get("evaluation_profile") == "observation_only"),
         "fact_recall_applicable_case_count": len(fact_recall_items),
         "exact_pass_applicable_case_count": len(exact_pass_items),
-        "average_answer_similarity": _avg([float(x.get("answer_similarity", 0.0)) for x in generation_items]),
+        "average_answer_similarity": _avg_defined([x.get("answer_similarity") for x in generation_items]),
         "average_answer_quality_score": _avg_defined([x.get("answer_quality_score") for x in deterministic_items]),
         "average_deterministic_rubric_score": _avg_defined([
             x.get("deterministic_rubric_score", (x.get("deterministic_rubric") or {}).get("score", x.get("answer_quality_score")))
@@ -133,19 +133,27 @@ def summarize_results(per_case_results: list[dict[str, Any]]) -> dict[str, Any]:
         "average_llm_judge_score": _avg_defined([x.get("llm_judge_score", (x.get("llm_judge") or {}).get("score")) for x in generation_items]),
         "average_effective_generation_score": _avg_defined([x.get("effective_generation_score") for x in generation_items]),
         "average_primary_generation_score": _avg_defined([x.get("primary_generation_score") for x in generation_items]),
-        "average_reference_token_f1": _avg([float(x.get("reference_token_f1", 0.0)) for x in generation_items]),
+        "average_reference_token_f1": _avg_defined([x.get("reference_token_f1") for x in generation_items]),
         "llm_judge_enabled_rate": _avg([1.0 if (x.get("llm_judge") or {}).get("enabled") else 0.0 for x in generation_items]),
         "llm_judge_error_rate": _avg([1.0 if str((x.get("llm_judge") or {}).get("error") or "").strip() else 0.0 for x in generation_items]),
         "average_required_fact_recall": _avg_defined([x.get("required_fact_recall") for x in fact_recall_items]),
-        "forbidden_fact_violation_rate": _avg([1.0 if float(x.get("forbidden_fact_violations", 0.0)) > 0 else 0.0 for x in generation_items]),
+        "forbidden_fact_violation_rate": _avg([1.0 if (_to_float(x.get("forbidden_fact_violations")) or 0.0) > 0 else 0.0 for x in generation_items]),
         "average_faithfulness_to_gold_passage": _avg_defined([x.get("faithfulness_to_gold_passage") for x in generation_items]),
         "average_groundedness_score": _avg_defined([x.get("groundedness_score") for x in generation_items]),
         "average_faithfulness_to_retrieved_context": _avg_defined([x.get("faithfulness_to_retrieved_context") for x in generation_items]),
-        "average_hallucination_unsupported_token_count": _avg([float(x.get("hallucination_unsupported_token_count", 0.0)) for x in generation_items]),
-        "hallucination_rate": _avg([1.0 if float(x.get("hallucination_unsupported_token_count", 0.0)) > 0 else 0.0 for x in generation_items]),
+        "average_hallucination_unsupported_token_count": _avg([(_to_float(x.get("hallucination_unsupported_token_count")) or 0.0) for x in generation_items]),
+        "hallucination_rate": _avg([1.0 if (_to_float(x.get("hallucination_unsupported_token_count")) or 0.0) > 0 else 0.0 for x in generation_items]),
         "average_warning_count": _avg([float(count) for count in warning_counts]),
         "warning_case_rate": _avg([1.0 if count > 0 else 0.0 for count in warning_counts]),
         "verification_pass_rate": _avg([1.0 if str(item.get("verdict") or "").lower() in {"pass", "passed", "ok", "success"} else 0.0 for item in verification_items]),
+        "average_verification_alignment_score": _avg_defined([x.get("verification_alignment_score") for x in generation_items]),
+        "verification_alignment_rate": _avg([
+            1.0 if float(x.get("verification_alignment_score", 0.0)) >= 0.75 else 0.0
+            for x in generation_items
+            if x.get("verification_alignment_score") is not None
+        ]),
+        "verification_alignment_applicable_case_count": sum(1 for x in generation_items if x.get("verification_alignment_score") is not None),
+        "average_verification_intrinsic_quality_score": _avg_defined([x.get("verification_intrinsic_quality_score") for x in generation_items]),
         "exact_pass_rate": _avg_defined([1.0 if x.get("exact_pass") else 0.0 for x in exact_pass_items]),
     }
     successful_total_latencies = [float(item.get("timings", {}).get("total_latency_seconds", 0.0)) for item in completed_cases]

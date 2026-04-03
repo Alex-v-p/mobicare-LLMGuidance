@@ -77,7 +77,7 @@ def run_generation_stage(
             else:
                 raise
 
-    generation_scores = finalize_generation_score_fields(generation_scores)
+    generation_scores = finalize_generation_score_fields(generation_scores, verification=normalized.get("verification"))
 
     return GenerationStageResult(
         generated_answer=generated_answer,
