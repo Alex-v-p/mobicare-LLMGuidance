@@ -6,7 +6,7 @@ from typing import Any
 from adapters.guidance_payloads import normalize_guidance_record
 from adapters.llm_judge import evaluate_llm_judge
 from datasets.schema import BenchmarkCase
-from scoring.generation import score_generation
+from scoring.generation import finalize_generation_score_fields, score_generation
 
 
 @dataclass(slots=True)
@@ -76,6 +76,8 @@ def run_generation_stage(
                 generation_scores["llm_judge_grade"] = None
             else:
                 raise
+
+    generation_scores = finalize_generation_score_fields(generation_scores)
 
     return GenerationStageResult(
         generated_answer=generated_answer,

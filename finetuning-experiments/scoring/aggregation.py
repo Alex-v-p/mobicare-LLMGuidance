@@ -117,9 +117,14 @@ def summarize_results(per_case_results: list[dict[str, Any]]) -> dict[str, Any]:
         "exact_pass_applicable_case_count": len(exact_pass_items),
         "average_answer_similarity": _avg([float(x.get("answer_similarity", 0.0)) for x in generation_items]),
         "average_answer_quality_score": _avg_defined([x.get("answer_quality_score") for x in deterministic_items]),
-        "average_deterministic_rubric_score": _avg_defined([(x.get("deterministic_rubric") or {}).get("score", x.get("answer_quality_score")) for x in deterministic_items]),
+        "average_deterministic_rubric_score": _avg_defined([
+            x.get("deterministic_rubric_score", (x.get("deterministic_rubric") or {}).get("score", x.get("answer_quality_score")))
+            for x in deterministic_items
+        ]),
         "average_judge_score": _avg_defined([x.get("judge_score") for x in generation_items]),
         "average_llm_judge_score": _avg_defined([x.get("llm_judge_score", (x.get("llm_judge") or {}).get("score")) for x in generation_items]),
+        "average_effective_generation_score": _avg_defined([x.get("effective_generation_score") for x in generation_items]),
+        "average_primary_generation_score": _avg_defined([x.get("primary_generation_score") for x in generation_items]),
         "average_reference_token_f1": _avg([float(x.get("reference_token_f1", 0.0)) for x in generation_items]),
         "llm_judge_enabled_rate": _avg([1.0 if (x.get("llm_judge") or {}).get("enabled") else 0.0 for x in generation_items]),
         "llm_judge_error_rate": _avg([1.0 if str((x.get("llm_judge") or {}).get("error") or "").strip() else 0.0 for x in generation_items]),

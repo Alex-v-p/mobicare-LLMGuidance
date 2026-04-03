@@ -4,12 +4,21 @@ from copy import deepcopy
 from typing import Any
 
 from adapters.guidance_payloads import normalize_guidance_record
-from artifacts.compatibility import build_config_overview, build_telemetry_summary
+from artifacts.compatibility import backfill_generation_summary_fields, build_config_overview, build_telemetry_summary
 from artifacts.models import CURRENT_ARTIFACT_VERSION
 from artifacts.summaries import build_run_summary
 from scoring.aggregation import summarize_results
+from scoring.generation import finalize_generation_score_fields
 from scoring.retrieval import score_retrieval
 
+
+
+
+def _backfill_case_generation(case: dict[str, Any]) -> None:
+    generation_scores = dict(case.get("generation_scores") or {})
+    if not generation_scores:
+        return
+    case["generation_scores"] = finalize_generation_score_fields(generation_scores)
 
 def _backfill_case_retrieval(case: dict[str, Any]) -> None:
     raw_record = case.get("raw_endpoint_result") or {}
@@ -70,10 +79,11 @@ def migrate_run_artifact(payload: dict[str, Any]) -> dict[str, Any]:
             case.setdefault("generation_scores", {})
             case.setdefault("timings", {})
             case.setdefault("telemetry", {})
+            _backfill_case_generation(case)
             _backfill_case_retrieval(case)
     recomputed = summarize_results(artifact["per_case_results"]) if artifact.get("per_case_results") else {}
     artifact["retrieval_summary"] = {**(artifact.get("retrieval_summary") or {}), **(recomputed.get("retrieval_summary") or {})}
-    artifact["generation_summary"] = {**(artifact.get("generation_summary") or {}), **(recomputed.get("generation_summary") or {})}
+    artifact["generation_summary"] = backfill_generation_summary_fields({**(artifact.get("generation_summary") or {}), **(recomputed.get("generation_summary") or {})})
     artifact["api_summary"] = {**(artifact.get("api_summary") or {}), **(recomputed.get("api_summary") or {})}
     artifact["telemetry_summary"] = build_telemetry_summary(artifact)
     artifact["cache"].setdefault("run_fingerprint", None)
@@ -93,6 +103,7 @@ def migrate_summary_artifact(payload: dict[str, Any]) -> dict[str, Any]:
     summary.setdefault("artifact_type", "run_summary")
     summary.setdefault("api_summary", {})
     summary.setdefault("environment", {})
+    summary["generation_summary"] = backfill_generation_summary_fields(summary.get("generation_summary") or {})
     summary["telemetry_summary"] = build_telemetry_summary(summary)
     summary["config_overview"] = build_config_overview(summary)
     summary["artifact_version"] = CURRENT_ARTIFACT_VERSION

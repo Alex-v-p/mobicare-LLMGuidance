@@ -119,6 +119,7 @@ def build_case_dataframe(artifact: dict[str, Any]) -> pd.DataFrame:
         source_list = case.get("source_list") or {}
 
         deterministic_score_raw = first_defined(
+            generation_scores.get("deterministic_rubric_score"),
             get_nested(generation_scores, "deterministic_rubric", "score"),
             generation_scores.get("answer_quality_score"),
             generation_scores.get("judge_score"),
@@ -128,10 +129,16 @@ def build_case_dataframe(artifact: dict[str, Any]) -> pd.DataFrame:
             get_nested(generation_scores, "llm_judge", "score"),
         )
         evaluation_profile = safe_str(generation_scores.get("evaluation_profile"))
-        if evaluation_profile == "observation_only" and llm_score_raw is not None:
-            display_generation_score_raw = llm_score_raw
-        else:
-            display_generation_score_raw = first_defined(deterministic_score_raw, llm_score_raw)
+        effective_generation_score_raw = first_defined(
+            generation_scores.get("effective_generation_score"),
+            generation_scores.get("primary_generation_score"),
+        )
+        if effective_generation_score_raw is None:
+            if evaluation_profile == "observation_only" and llm_score_raw is not None:
+                effective_generation_score_raw = llm_score_raw
+            else:
+                effective_generation_score_raw = first_defined(deterministic_score_raw, llm_score_raw)
+        display_generation_score_raw = effective_generation_score_raw
 
         latency_ms_raw = first_defined(
             timings.get("total_duration_ms"),
@@ -175,6 +182,8 @@ def build_case_dataframe(artifact: dict[str, Any]) -> pd.DataFrame:
                 "deterministic_rubric_score": safe_float(deterministic_score_raw),
                 "judge_score": safe_float(first_defined(generation_scores.get("judge_score"), deterministic_score_raw)),
                 "llm_judge_score": safe_float(llm_score_raw),
+                "effective_generation_score": safe_float(effective_generation_score_raw),
+                "primary_generation_score": safe_float(first_defined(generation_scores.get("primary_generation_score"), effective_generation_score_raw)),
                 "generation_score_display": safe_float(display_generation_score_raw),
                 "fact_recall": safe_float(generation_scores.get("required_fact_recall")),
                 "faithfulness": safe_float(faithfulness_raw),

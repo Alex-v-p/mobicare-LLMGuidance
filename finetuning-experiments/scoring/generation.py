@@ -64,6 +64,89 @@ def _grade_from_score(score: float) -> str:
     return "poor"
 
 
+def _nested_score(payload: dict[str, Any], container_key: str, score_key: str = "score") -> Any:
+    container = payload.get(container_key) or {}
+    if not isinstance(container, dict):
+        return None
+    return container.get(score_key)
+
+
+def _resolve_effective_generation_fields(generation_scores: dict[str, Any]) -> tuple[Any, Any, Any]:
+    deterministic_score = generation_scores.get("deterministic_rubric_score")
+    if deterministic_score is None:
+        deterministic_score = _nested_score(generation_scores, "deterministic_rubric")
+    if deterministic_score is None:
+        deterministic_score = generation_scores.get("answer_quality_score")
+    if deterministic_score is None:
+        deterministic_score = generation_scores.get("judge_score")
+
+    deterministic_grade = generation_scores.get("deterministic_rubric_grade")
+    if deterministic_grade is None:
+        deterministic_grade = _nested_score(generation_scores, "deterministic_rubric", "grade")
+    if deterministic_grade is None:
+        deterministic_grade = generation_scores.get("answer_quality_grade")
+    if deterministic_grade is None:
+        deterministic_grade = generation_scores.get("judge_grade")
+
+    llm_score = generation_scores.get("llm_judge_score")
+    if llm_score is None:
+        llm_score = _nested_score(generation_scores, "llm_judge")
+
+    llm_grade = generation_scores.get("llm_judge_grade")
+    if llm_grade is None:
+        llm_grade = _nested_score(generation_scores, "llm_judge", "overall_grade")
+    if llm_grade is None:
+        llm_grade = _nested_score(generation_scores, "llm_judge", "grade")
+
+    evaluation_profile = str(generation_scores.get("evaluation_profile") or "").strip().lower()
+    effective_score = generation_scores.get("effective_generation_score")
+    effective_grade = generation_scores.get("effective_generation_grade")
+    effective_source = generation_scores.get("effective_generation_score_source")
+
+    if effective_score is None:
+        if evaluation_profile == "observation_only" and llm_score is not None:
+            effective_score = llm_score
+            effective_grade = llm_grade
+            effective_source = "llm_judge"
+        elif deterministic_score is not None:
+            effective_score = deterministic_score
+            effective_grade = deterministic_grade
+            effective_source = "deterministic_rubric"
+        elif llm_score is not None:
+            effective_score = llm_score
+            effective_grade = llm_grade
+            effective_source = "llm_judge"
+
+    return deterministic_score, deterministic_grade, llm_score, llm_grade, effective_score, effective_grade, effective_source
+
+
+def finalize_generation_score_fields(generation_scores: dict[str, Any]) -> dict[str, Any]:
+    deterministic_score, deterministic_grade, llm_score, llm_grade, effective_score, effective_grade, effective_source = _resolve_effective_generation_fields(generation_scores)
+
+    generation_scores["deterministic_rubric_score"] = deterministic_score
+    generation_scores["deterministic_rubric_grade"] = deterministic_grade
+    generation_scores["llm_judge_score"] = llm_score
+    generation_scores["llm_judge_grade"] = llm_grade
+    generation_scores["effective_generation_score"] = effective_score
+    generation_scores["effective_generation_grade"] = effective_grade
+    generation_scores["effective_generation_score_source"] = effective_source
+    generation_scores["primary_generation_score"] = generation_scores.get("primary_generation_score", effective_score)
+    generation_scores["primary_generation_grade"] = generation_scores.get("primary_generation_grade", effective_grade)
+    generation_scores["primary_generation_score_source"] = generation_scores.get("primary_generation_score_source", effective_source)
+
+    if generation_scores.get("answer_quality_score") is None:
+        generation_scores["answer_quality_score"] = deterministic_score
+    if generation_scores.get("answer_quality_grade") is None:
+        generation_scores["answer_quality_grade"] = deterministic_grade
+    if generation_scores.get("judge_score") is None:
+        generation_scores["judge_score"] = deterministic_score
+    if generation_scores.get("judge_grade") is None:
+        generation_scores["judge_grade"] = deterministic_grade
+    if generation_scores.get("judge_score_source") is None:
+        generation_scores["judge_score_source"] = "legacy_alias_of_deterministic_rubric" if deterministic_score is not None else effective_source
+    return generation_scores
+
+
 def _is_observation_only(case: dict[str, Any]) -> bool:
     generation_metadata = case.get("generation_metadata") or {}
     tags = {str(tag).strip().lower() for tag in (case.get("tags") or [])}
@@ -221,22 +304,30 @@ def score_generation(
         "forbidden_fact_total": len(forbidden),
     }
 
-    return {
+    generation_scores = {
         "evaluation_profile": "observation_only" if observation_only else "standard",
         "deterministic_rubric_applicable": deterministic_applicable,
         "answer_similarity": reference_token_f1,
-        "answer_similarity_legacy_note": "Token-F1 against the reference answer. Prefer deterministic_rubric.score and llm_judge.score.",
+        "answer_similarity_legacy_note": "Token-F1 against the reference answer. Prefer deterministic_rubric.score and effective_generation_score.",
         "reference_token_f1": reference_token_f1,
         "gold_token_f1": gold_token_f1,
         "context_token_f1": context_token_f1,
         "deterministic_rubric": deterministic,
+        "deterministic_rubric_score": deterministic_rubric_score,
+        "deterministic_rubric_grade": deterministic_grade,
         "answer_quality_score": deterministic_rubric_score,
         "answer_quality_grade": deterministic_grade,
         "judge_score": deterministic_rubric_score,
         "judge_grade": deterministic_grade,
-        "judge_score_source": "deterministic_rubric",
+        "judge_score_source": "legacy_alias_of_deterministic_rubric",
         "llm_judge_score": None,
         "llm_judge_grade": None,
+        "effective_generation_score": deterministic_rubric_score,
+        "effective_generation_grade": deterministic_grade,
+        "effective_generation_score_source": "deterministic_rubric" if deterministic_rubric_score is not None else None,
+        "primary_generation_score": deterministic_rubric_score,
+        "primary_generation_grade": deterministic_grade,
+        "primary_generation_score_source": "deterministic_rubric" if deterministic_rubric_score is not None else None,
         "verification_score": _metric_or_none(verification_score, applicable=verification_present),
         "fact_recall_applicable": required_fact_applicable,
         "required_fact_recall": required_fact_recall,
@@ -256,3 +347,4 @@ def score_generation(
         "exact_pass_applicable": exact_pass_applicable,
         "exact_pass": exact_pass,
     }
+    return finalize_generation_score_fields(generation_scores)

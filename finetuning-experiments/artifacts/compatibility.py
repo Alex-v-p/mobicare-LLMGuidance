@@ -66,18 +66,43 @@ def _patch_stage_latency_summary(summary: dict[str, Any]) -> dict[str, Any]:
     return patched
 
 
-def resolve_run_generation_score(generation: dict[str, Any]) -> tuple[Any, Any, Any]:
+def backfill_generation_summary_fields(generation: dict[str, Any]) -> dict[str, Any]:
+    generation = dict(generation or {})
     deterministic = first_defined(
         generation.get("average_deterministic_rubric_score"),
         generation.get("average_answer_quality_score"),
         generation.get("average_judge_score"),
     )
     llm = first_defined(generation.get("average_llm_judge_score"))
+    effective = first_defined(
+        generation.get("average_effective_generation_score"),
+        generation.get("average_primary_generation_score"),
+    )
     deterministic_cases = safe_int(generation.get("deterministic_applicable_case_count"))
-    if deterministic_cases == 0 and llm is not None:
-        effective = llm
-    else:
-        effective = first_defined(deterministic, llm)
+    if effective is None:
+        if deterministic_cases == 0 and llm is not None:
+            effective = llm
+        else:
+            effective = first_defined(deterministic, llm)
+    generation.setdefault("average_answer_quality_score", deterministic)
+    generation.setdefault("average_deterministic_rubric_score", deterministic)
+    generation.setdefault("average_judge_score", deterministic)
+    generation.setdefault("average_llm_judge_score", llm)
+    generation.setdefault("average_effective_generation_score", effective)
+    generation.setdefault("average_primary_generation_score", effective)
+    return generation
+
+
+def resolve_run_generation_score(generation: dict[str, Any]) -> tuple[Any, Any, Any]:
+    generation = backfill_generation_summary_fields(generation)
+    deterministic = generation.get("average_deterministic_rubric_score")
+    llm = generation.get("average_llm_judge_score")
+    effective = first_defined(
+        generation.get("average_effective_generation_score"),
+        generation.get("average_primary_generation_score"),
+        deterministic,
+        llm,
+    )
     return deterministic, llm, effective
 
 
@@ -122,7 +147,7 @@ def build_telemetry_summary(payload: dict[str, Any]) -> dict[str, Any]:
 def normalize_run_row_payload(payload: dict[str, Any], run: dict[str, Any] | None = None) -> dict[str, Any]:
     run_meta = run or {}
     retrieval = payload.get("retrieval_summary") or {}
-    generation = payload.get("generation_summary") or {}
+    generation = backfill_generation_summary_fields(payload.get("generation_summary") or {})
     api = payload.get("api_summary") or {}
     primary_api = (api.get("endpoint_summaries") or {}).get("guidance_endpoint") or api
     ingestion = payload.get("ingestion_summary") or {}
@@ -182,9 +207,10 @@ def normalize_run_row_payload(payload: dict[str, Any], run: dict[str, Any] | Non
         "avg_answer_similarity": safe_float(generation.get("average_answer_similarity")),
         "avg_answer_quality": safe_float(first_defined(generation.get("average_answer_quality_score"), avg_deterministic_raw)),
         "avg_deterministic_rubric": safe_float(avg_deterministic_raw),
-        "avg_judge_score": safe_float(avg_deterministic_raw),
+        "avg_judge_score": safe_float(generation.get("average_judge_score")),
         "avg_llm_judge_score": safe_float(avg_llm_raw),
         "avg_effective_generation_score": safe_float(avg_effective_raw),
+        "avg_primary_generation_score": safe_float(generation.get("average_primary_generation_score")),
         "avg_fact_recall": safe_float(generation.get("average_required_fact_recall")),
         "avg_faithfulness": safe_float(avg_faithfulness_raw),
         "exact_pass_rate": safe_float(generation.get("exact_pass_rate")),
@@ -212,6 +238,7 @@ def normalize_run_row_payload(payload: dict[str, Any], run: dict[str, Any] | Non
         "normalized.avg_deterministic_rubric": safe_float(normalized.get("generation.average_deterministic_rubric_score")),
         "normalized.avg_judge_score": safe_float(normalized.get("generation.average_judge_score")),
         "normalized.avg_llm_judge_score": safe_float(normalized.get("generation.average_llm_judge_score")),
+        "normalized.avg_effective_generation_score": safe_float(normalized.get("generation.average_effective_generation_score")),
         "normalized.avg_latency": safe_float(normalized.get("latency.average_ms")),
     }
 
