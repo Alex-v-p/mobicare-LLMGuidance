@@ -44,6 +44,7 @@ def summarize_results(per_case_results: list[dict[str, Any]]) -> dict[str, Any]:
         if (item.get("deterministic_rubric") or {}).get("applicable", (item.get("deterministic_rubric") or {}).get("enabled", True))
     ]
     fact_recall_items = [item for item in generation_items if item.get("fact_recall_applicable", (item.get("required_fact_total") or 0) > 0)]
+    fact_recall_v2_items = [item for item in generation_items if item.get("fact_recall_applicable", (item.get("required_fact_total") or 0) > 0) and (item.get("required_fact_recall_v2") is not None or item.get("required_fact_support_score_v2") is not None)]
     exact_pass_items = [item for item in generation_items if item.get("exact_pass_applicable", item.get("exact_pass") is not None)]
     grounded_fact_pass_items = [item for item in generation_items if item.get("grounded_fact_pass_applicable", item.get("grounded_fact_pass") is not None)]
 
@@ -123,6 +124,7 @@ def summarize_results(per_case_results: list[dict[str, Any]]) -> dict[str, Any]:
         "deterministic_applicable_case_count": len(deterministic_items),
         "observation_only_case_count": sum(1 for x in generation_items if x.get("evaluation_profile") == "observation_only"),
         "fact_recall_applicable_case_count": len(fact_recall_items),
+        "fact_recall_v2_applicable_case_count": len(fact_recall_v2_items),
         "exact_pass_applicable_case_count": len(exact_pass_items),
         "grounded_fact_pass_applicable_case_count": len(grounded_fact_pass_items),
         "average_answer_similarity": _avg_defined([x.get("answer_similarity") for x in generation_items]),
@@ -135,11 +137,35 @@ def summarize_results(per_case_results: list[dict[str, Any]]) -> dict[str, Any]:
         "average_llm_judge_score": _avg_defined([x.get("llm_judge_score", (x.get("llm_judge") or {}).get("score")) for x in generation_items]),
         "average_effective_generation_score": _avg_defined([x.get("effective_generation_score") for x in generation_items]),
         "average_primary_generation_score": _avg_defined([x.get("primary_generation_score") for x in generation_items]),
+        "average_deterministic_rubric_score_v2": (
+            _avg_defined([x.get("deterministic_rubric_score_v2") for x in deterministic_items])
+            if any(x.get("deterministic_rubric_score_v2") is not None for x in deterministic_items) else None
+        ),
+        "average_effective_generation_score_v2": (
+            _avg_defined([x.get("effective_generation_score_v2") for x in generation_items])
+            if any(x.get("effective_generation_score_v2") is not None for x in generation_items) else None
+        ),
+        "average_primary_generation_score_v2": (
+            _avg_defined([x.get("primary_generation_score_v2") for x in generation_items])
+            if any(x.get("primary_generation_score_v2") is not None for x in generation_items) else None
+        ),
         "average_reference_token_f1": _avg_defined([x.get("reference_token_f1") for x in generation_items]),
         "llm_judge_enabled_rate": _avg([1.0 if (x.get("llm_judge") or {}).get("enabled") else 0.0 for x in generation_items]),
         "llm_judge_error_rate": _avg([1.0 if str((x.get("llm_judge") or {}).get("error") or "").strip() else 0.0 for x in generation_items]),
         "average_required_fact_recall": _avg_defined([x.get("required_fact_recall") for x in fact_recall_items]),
+        "average_required_fact_recall_v2": (
+            _avg_defined([x.get("required_fact_recall_v2") for x in fact_recall_v2_items])
+            if fact_recall_v2_items else None
+        ),
+        "average_required_fact_support_score_v2": (
+            _avg_defined([x.get("required_fact_support_score_v2") for x in fact_recall_v2_items])
+            if fact_recall_v2_items else None
+        ),
         "forbidden_fact_violation_rate": _avg([1.0 if (_to_float(x.get("forbidden_fact_violations")) or 0.0) > 0 else 0.0 for x in generation_items]),
+        "forbidden_fact_violation_rate_v2": (
+            _avg([1.0 if (_to_float(x.get("forbidden_fact_violations_v2")) or 0.0) > 0 else 0.0 for x in generation_items if x.get("forbidden_fact_violations_v2") is not None])
+            if any(x.get("forbidden_fact_violations_v2") is not None for x in generation_items) else None
+        ),
         "average_faithfulness_to_gold_passage": _avg_defined([x.get("faithfulness_to_gold_passage") for x in generation_items]),
         "average_groundedness_score": _avg_defined([x.get("groundedness_score") for x in generation_items]),
         "average_faithfulness_to_retrieved_context": _avg_defined([x.get("faithfulness_to_retrieved_context") for x in generation_items]),

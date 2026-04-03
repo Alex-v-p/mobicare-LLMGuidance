@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import re
+from difflib import SequenceMatcher
 from typing import Any
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
+_SENTENCE_SPLIT_RE = re.compile(r"(?:[\r\n]+|(?<=[.!?;:])\s+)")
+_NEGATION_TOKENS = {"no", "not", "without", "never", "none", "absent", "absence", "denies", "denied"}
 _STOPWORDS = {
     "the", "a", "an", "to", "and", "or", "of", "in", "for", "on", "with", "is", "are", "was", "were", "by", "that",
     "this", "these", "those", "from", "as", "at", "be", "it", "its", "into", "than", "then", "their", "there",
@@ -39,6 +42,192 @@ def _set_f1(left: set[str], right: set[str]) -> float:
     precision = overlap / len(left)
     recall = overlap / len(right)
     return (2 * precision * recall) / (precision + recall) if precision + recall else 0.0
+
+
+def _sentence_candidates(text: str | None) -> list[str]:
+    raw = str(text or "").strip()
+    if not raw:
+        return []
+    segments = [segment.strip() for segment in _SENTENCE_SPLIT_RE.split(raw) if segment and segment.strip()]
+    return segments or [raw]
+
+
+def _ordered_overlap_ratio(fact_tokens: list[str], candidate_tokens: list[str]) -> float:
+    if not fact_tokens or not candidate_tokens:
+        return 0.0
+    matcher = SequenceMatcher(a=fact_tokens, b=candidate_tokens, autojunk=False)
+    match = matcher.find_longest_match(0, len(fact_tokens), 0, len(candidate_tokens))
+    return match.size / len(fact_tokens) if fact_tokens else 0.0
+
+
+def _soft_token_overlap(tokens: list[str], candidate_tokens: list[str]) -> float:
+    if not tokens:
+        return 0.0
+    if not candidate_tokens:
+        return 0.0
+    scores: list[float] = []
+    for token in tokens:
+        if token.isdigit():
+            scores.append(1.0 if token in candidate_tokens else 0.0)
+            continue
+        best = 0.0
+        for candidate in candidate_tokens:
+            if token == candidate:
+                best = 1.0
+                break
+            best = max(best, SequenceMatcher(None, token, candidate, autojunk=False).ratio())
+        scores.append(best)
+    return sum(scores) / len(scores) if scores else 0.0
+
+
+def _fact_acronym(tokens: list[str]) -> str:
+    return "".join(token[0] for token in tokens if token and token[0].isalpha())
+
+
+def _candidate_windows(answer: str | None, fact_token_count: int) -> list[str]:
+    segments = _sentence_candidates(answer)
+    candidates: list[str] = []
+    seen: set[str] = set()
+    target = max(1, fact_token_count)
+    window_sizes = sorted({max(2, target - 1), target, target + 1, target + 2})
+    for segment in segments:
+        segment_norm = _norm(segment)
+        if not segment_norm or segment_norm in seen:
+            continue
+        seen.add(segment_norm)
+        candidates.append(segment_norm)
+        tokens = segment_norm.split()
+        if not tokens:
+            continue
+        for size in window_sizes:
+            if size >= len(tokens):
+                continue
+            step = 1 if len(tokens) <= 32 else 2
+            for start in range(0, len(tokens) - size + 1, step):
+                window = " ".join(tokens[start:start + size])
+                if window and window not in seen:
+                    seen.add(window)
+                    candidates.append(window)
+    answer_norm = _norm(answer)
+    if answer_norm and answer_norm not in seen:
+        candidates.append(answer_norm)
+    return candidates
+
+
+def _fact_threshold_v2(fact_tokens: list[str], *, negative: bool) -> float:
+    token_count = len(fact_tokens)
+    if token_count <= 1:
+        threshold = 0.9
+    elif token_count == 2:
+        threshold = 0.72
+    elif token_count == 3:
+        threshold = 0.7
+    else:
+        threshold = 0.68
+    if negative:
+        threshold += 0.08
+    return min(0.95, threshold)
+
+
+def _fact_match_analysis_v2(answer: str, fact: str, *, negative: bool = False) -> dict[str, Any]:
+    fact_norm = _norm(fact)
+    fact_tokens = _informative(fact) or fact_norm.split()
+    fact_token_count = len(fact_tokens) if fact_tokens else max(1, len(fact_norm.split()))
+    numeric_tokens = [token for token in fact_norm.split() if token.isdigit()]
+    acronym = _fact_acronym(fact_tokens) if len(fact_tokens) >= 2 else ""
+    threshold = _fact_threshold_v2(fact_tokens, negative=negative)
+    if not fact_norm:
+        return {
+            "fact": fact,
+            "match": False,
+            "score": 0.0,
+            "threshold": threshold,
+            "preview": "",
+            "method": "empty_fact",
+        }
+
+    best: dict[str, Any] = {
+        "score": 0.0,
+        "preview": "",
+        "method": "window_similarity",
+        "soft_overlap": 0.0,
+        "token_f1": 0.0,
+        "ordered_overlap": 0.0,
+        "numeric_coverage": 1.0 if not numeric_tokens else 0.0,
+        "abbreviation_bonus": 0.0,
+        "ngram_bonus": 0.0,
+        "negation_penalty": 0.0,
+        "exact_match": False,
+    }
+
+    for candidate in _candidate_windows(answer, fact_token_count):
+        candidate_tokens = candidate.split()
+        if not candidate_tokens:
+            continue
+        candidate_set = set(candidate_tokens)
+        soft_overlap = _soft_token_overlap(fact_tokens, candidate_tokens)
+        token_f1 = _set_f1(set(fact_tokens), candidate_set)
+        ordered_overlap = _ordered_overlap_ratio(fact_tokens, candidate_tokens)
+        numeric_coverage = _coverage(numeric_tokens, candidate_set) if numeric_tokens else 1.0
+        ngram_bonus = 0.0
+        if len(fact_tokens) >= 2:
+            bigram = " ".join(fact_tokens[:2])
+            if bigram and bigram in candidate:
+                ngram_bonus = 1.0
+            elif len(fact_tokens) >= 3:
+                trigram = " ".join(fact_tokens[:3])
+                if trigram and trigram in candidate:
+                    ngram_bonus = 1.0
+        abbreviation_bonus = 1.0 if acronym and acronym in candidate_set else 0.0
+        exact_match = fact_norm in candidate
+        negation_penalty = 0.12 if negative and any(token in _NEGATION_TOKENS for token in candidate_tokens) else 0.0
+        score = max(
+            1.0 if exact_match else 0.0,
+            min(
+                1.0,
+                (0.45 * soft_overlap)
+                + (0.10 * token_f1)
+                + (0.15 * ordered_overlap)
+                + (0.12 * numeric_coverage)
+                + (0.03 * ngram_bonus)
+                + (0.15 * abbreviation_bonus),
+            ),
+        )
+        if numeric_tokens and numeric_coverage < 1.0 and not exact_match:
+            score = min(score, 0.55 + (0.2 * numeric_coverage))
+        score = max(0.0, score - negation_penalty)
+        if score > best["score"]:
+            best = {
+                "score": score,
+                "preview": candidate[:180],
+                "method": "exact_substring" if exact_match else "window_similarity",
+                "soft_overlap": soft_overlap,
+                "token_f1": token_f1,
+                "ordered_overlap": ordered_overlap,
+                "numeric_coverage": numeric_coverage,
+                "abbreviation_bonus": abbreviation_bonus,
+                "ngram_bonus": ngram_bonus,
+                "negation_penalty": negation_penalty,
+                "exact_match": exact_match,
+            }
+
+    result = {
+        "fact": fact,
+        "match": bool(best["score"] >= threshold),
+        "score": round(float(best["score"]), 4),
+        "threshold": round(float(threshold), 4),
+        "preview": best["preview"],
+        "method": best["method"],
+        "soft_overlap": round(float(best["soft_overlap"]), 4),
+        "token_f1": round(float(best["token_f1"]), 4),
+        "ordered_overlap": round(float(best["ordered_overlap"]), 4),
+        "numeric_coverage": round(float(best["numeric_coverage"]), 4),
+        "abbreviation_bonus": round(float(best["abbreviation_bonus"]), 4),
+        "ngram_bonus": round(float(best["ngram_bonus"]), 4),
+        "negation_penalty": round(float(best["negation_penalty"]), 4),
+        "exact_match": bool(best["exact_match"]),
+    }
+    return result
 
 
 def _verification_verdict(verification: dict[str, Any] | None) -> str:
@@ -273,6 +462,23 @@ def finalize_generation_score_fields(generation_scores: dict[str, Any], verifica
 
     generation_scores["deterministic_rubric_score"] = deterministic_score
     generation_scores["deterministic_rubric_grade"] = deterministic_grade
+    generation_scores.setdefault("deterministic_rubric_score_v2", generation_scores.get("deterministic_rubric_score_v2"))
+    generation_scores.setdefault("deterministic_rubric_grade_v2", generation_scores.get("deterministic_rubric_grade_v2"))
+    generation_scores.setdefault("effective_generation_score_v2", generation_scores.get("effective_generation_score_v2", generation_scores.get("deterministic_rubric_score_v2")))
+    generation_scores.setdefault("effective_generation_grade_v2", generation_scores.get("effective_generation_grade_v2", generation_scores.get("deterministic_rubric_grade_v2")))
+    generation_scores.setdefault("effective_generation_score_v2_source", generation_scores.get("effective_generation_score_v2_source", "deterministic_rubric_v2" if generation_scores.get("effective_generation_score_v2") is not None else None))
+    generation_scores.setdefault("primary_generation_score_v2", generation_scores.get("primary_generation_score_v2", generation_scores.get("effective_generation_score_v2")))
+    generation_scores.setdefault("primary_generation_grade_v2", generation_scores.get("primary_generation_grade_v2", generation_scores.get("effective_generation_grade_v2")))
+    generation_scores.setdefault("primary_generation_score_v2_source", generation_scores.get("primary_generation_score_v2_source", generation_scores.get("effective_generation_score_v2_source")))
+    generation_scores.setdefault("required_fact_recall_v2", generation_scores.get("required_fact_recall_v2"))
+    generation_scores.setdefault("required_fact_support_score_v2", generation_scores.get("required_fact_support_score_v2"))
+    generation_scores.setdefault("required_fact_hits_v2", generation_scores.get("required_fact_hits_v2"))
+    generation_scores.setdefault("required_fact_misses_v2", generation_scores.get("required_fact_misses_v2"))
+    generation_scores.setdefault("required_fact_details_v2", generation_scores.get("required_fact_details_v2"))
+    generation_scores.setdefault("forbidden_fact_violations_v2", generation_scores.get("forbidden_fact_violations_v2"))
+    generation_scores.setdefault("forbidden_fact_risk_score_v2", generation_scores.get("forbidden_fact_risk_score_v2"))
+    generation_scores.setdefault("forbidden_fact_details_v2", generation_scores.get("forbidden_fact_details_v2"))
+    generation_scores.setdefault("fact_scoring_version", generation_scores.get("fact_scoring_version"))
     generation_scores["llm_judge_score"] = llm_score
     generation_scores["llm_judge_grade"] = llm_grade
     generation_scores["effective_generation_score"] = effective_score
@@ -385,6 +591,10 @@ def score_generation(
     forbidden = case.get("forbidden_facts", []) or []
     required_hits = sum(1 for fact in required if _fact_hit(answer_norm, fact))
     forbidden_hits = sum(1 for fact in forbidden if _fact_hit(answer_norm, fact))
+    required_v2_details = [_fact_match_analysis_v2(answer, fact, negative=False) for fact in required]
+    forbidden_v2_details = [_fact_match_analysis_v2(answer, fact, negative=True) for fact in forbidden]
+    required_hits_v2 = sum(1 for item in required_v2_details if item.get("match"))
+    forbidden_hits_v2 = sum(1 for item in forbidden_v2_details if item.get("match"))
 
     answer_tokens = _informative(answer)
     answer_token_set = set(answer_tokens)
@@ -410,6 +620,15 @@ def score_generation(
     required_fact_applicable = bool(required)
     forbidden_fact_applicable = bool(forbidden)
     required_fact_recall = (required_hits / len(required)) if required_fact_applicable else None
+    required_fact_support_score_v2 = (
+        sum(float(item.get("score") or 0.0) for item in required_v2_details) / len(required_v2_details)
+        if required_fact_applicable else None
+    )
+    required_fact_recall_v2 = (required_hits_v2 / len(required)) if required_fact_applicable else None
+    forbidden_fact_risk_score_v2 = (
+        max(float(item.get("score") or 0.0) for item in forbidden_v2_details)
+        if forbidden_fact_applicable and forbidden_v2_details else None
+    )
 
     base_weights = _default_weights(rubric_config)
     dimension_applicability = {
@@ -428,6 +647,7 @@ def score_generation(
     deterministic_grade: str | None = None
 
     required_fact_subscore = _metric_or_none(required_fact_recall or 0.0, applicable=required_fact_applicable)
+    required_fact_subscore_v2 = _metric_or_none(required_fact_support_score_v2 or 0.0, applicable=required_fact_applicable)
     subscores = {
         "required_fact": required_fact_subscore,
         "required_fact_recall": required_fact_subscore,
@@ -437,6 +657,15 @@ def score_generation(
         "groundedness": _metric_or_none(groundedness, applicable=dimension_applicability["groundedness"]),
         "verification": _metric_or_none(verification_score, applicable=dimension_applicability["verification"]),
     }
+    subscores_v2 = {
+        **subscores,
+        "required_fact": required_fact_subscore_v2,
+        "required_fact_support_score_v2": required_fact_subscore_v2,
+    }
+
+    deterministic_rubric_score_v2: float | None = None
+    deterministic_grade_v2: str | None = None
+    deterministic_v2: dict[str, Any] | None = None
 
     if deterministic_applicable and weight_total > 0:
         weighted_sum = sum(
@@ -448,6 +677,16 @@ def score_generation(
             deterministic_rubric_score = max(0.0, deterministic_rubric_score - min(0.4, 0.2 * forbidden_hits))
         deterministic_rubric_score = max(0.0, min(1.0, deterministic_rubric_score))
         deterministic_grade = _grade_from_score(deterministic_rubric_score)
+
+        weighted_sum_v2 = sum(
+            float(subscores_v2[key] or 0.0) * applied_weights[key]
+            for key in applied_weights
+        )
+        deterministic_rubric_score_v2 = weighted_sum_v2 / weight_total
+        if forbidden_hits_v2:
+            deterministic_rubric_score_v2 = max(0.0, deterministic_rubric_score_v2 - min(0.4, 0.2 * forbidden_hits_v2))
+        deterministic_rubric_score_v2 = max(0.0, min(1.0, deterministic_rubric_score_v2))
+        deterministic_grade_v2 = _grade_from_score(deterministic_rubric_score_v2)
 
     exact_pass_applicable = bool(deterministic_applicable and (required_fact_applicable or forbidden_fact_applicable))
     exact_pass = None
@@ -481,6 +720,23 @@ def score_generation(
         "forbidden_fact_violations": forbidden_hits,
         "forbidden_fact_total": len(forbidden),
     }
+    deterministic_v2 = {
+        "enabled": deterministic_applicable,
+        "applicable": deterministic_applicable,
+        "skipped_reason": skipped_reason,
+        "score": deterministic_rubric_score_v2,
+        "grade": deterministic_grade_v2,
+        "weights": base_weights,
+        "applied_weights": applied_weights,
+        "applicable_dimensions": dimension_applicability,
+        "subscores": subscores_v2,
+        "required_fact_hits": required_hits_v2,
+        "required_fact_total": len(required),
+        "required_fact_misses": max(0, len(required) - required_hits_v2),
+        "forbidden_fact_violations": forbidden_hits_v2,
+        "forbidden_fact_total": len(forbidden),
+        "version": "heuristic_fact_v2",
+    }
 
     generation_scores = {
         "evaluation_profile": "observation_only" if observation_only else "standard",
@@ -493,6 +749,16 @@ def score_generation(
         "deterministic_rubric": deterministic,
         "deterministic_rubric_score": deterministic_rubric_score,
         "deterministic_rubric_grade": deterministic_grade,
+        "deterministic_rubric_v2": deterministic_v2,
+        "deterministic_rubric_score_v2": deterministic_rubric_score_v2,
+        "deterministic_rubric_grade_v2": deterministic_grade_v2,
+        "effective_generation_score_v2": deterministic_rubric_score_v2,
+        "effective_generation_grade_v2": deterministic_grade_v2,
+        "effective_generation_score_v2_source": "deterministic_rubric_v2" if deterministic_rubric_score_v2 is not None else None,
+        "primary_generation_score_v2": deterministic_rubric_score_v2,
+        "primary_generation_grade_v2": deterministic_grade_v2,
+        "primary_generation_score_v2_source": "deterministic_rubric_v2" if deterministic_rubric_score_v2 is not None else None,
+        "fact_scoring_version": "legacy_v1_plus_heuristic_v2",
         "answer_quality_score": deterministic_rubric_score,
         "answer_quality_grade": deterministic_grade,
         "judge_score": deterministic_rubric_score,
@@ -512,9 +778,17 @@ def score_generation(
         "required_fact_hits": required_hits,
         "required_fact_total": len(required),
         "required_fact_misses": max(0, len(required) - required_hits),
+        "required_fact_recall_v2": required_fact_recall_v2,
+        "required_fact_support_score_v2": required_fact_support_score_v2,
+        "required_fact_hits_v2": required_hits_v2,
+        "required_fact_misses_v2": max(0, len(required) - required_hits_v2),
+        "required_fact_details_v2": required_v2_details,
         "forbidden_fact_applicable": forbidden_fact_applicable,
         "forbidden_fact_violations": forbidden_hits,
         "forbidden_fact_total": len(forbidden),
+        "forbidden_fact_violations_v2": forbidden_hits_v2,
+        "forbidden_fact_risk_score_v2": forbidden_fact_risk_score_v2,
+        "forbidden_fact_details_v2": forbidden_v2_details,
         "faithfulness_to_gold_passage": _metric_or_none(faith_gold, applicable=bool(gold_token_set)),
         "faithfulness_to_retrieved_context": _metric_or_none(faith_context, applicable=bool(context_tokens)),
         "groundedness_score": _metric_or_none(groundedness, applicable=bool(answer_token_set)),

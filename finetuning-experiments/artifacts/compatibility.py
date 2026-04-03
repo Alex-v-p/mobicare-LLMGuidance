@@ -108,6 +108,13 @@ def backfill_generation_summary_fields(generation: dict[str, Any]) -> dict[str, 
     generation.setdefault("average_llm_judge_score", llm)
     generation.setdefault("average_effective_generation_score", effective)
     generation.setdefault("average_primary_generation_score", effective)
+    generation.setdefault("average_deterministic_rubric_score_v2", generation.get("average_deterministic_rubric_score_v2"))
+    generation.setdefault("average_effective_generation_score_v2", generation.get("average_effective_generation_score_v2"))
+    generation.setdefault("average_primary_generation_score_v2", generation.get("average_primary_generation_score_v2"))
+    generation.setdefault("average_required_fact_recall_v2", generation.get("average_required_fact_recall_v2"))
+    generation.setdefault("average_required_fact_support_score_v2", generation.get("average_required_fact_support_score_v2"))
+    generation.setdefault("forbidden_fact_violation_rate_v2", generation.get("forbidden_fact_violation_rate_v2"))
+    generation.setdefault("fact_recall_v2_applicable_case_count", generation.get("fact_recall_v2_applicable_case_count"))
     generation.setdefault("average_verification_alignment_score", generation.get("average_verification_alignment_score"))
     generation.setdefault("verification_alignment_rate", generation.get("verification_alignment_rate"))
     generation.setdefault("verification_alignment_applicable_case_count", generation.get("verification_alignment_applicable_case_count"))
@@ -237,7 +244,12 @@ def normalize_run_row_payload(payload: dict[str, Any], run: dict[str, Any] | Non
         "avg_llm_judge_score": safe_float(avg_llm_raw),
         "avg_effective_generation_score": safe_float(avg_effective_raw),
         "avg_primary_generation_score": safe_float(generation.get("average_primary_generation_score")),
+        "avg_deterministic_rubric_v2": safe_float(generation.get("average_deterministic_rubric_score_v2"), default=float("nan")),
+        "avg_effective_generation_score_v2": safe_float(generation.get("average_effective_generation_score_v2"), default=float("nan")),
+        "avg_primary_generation_score_v2": safe_float(generation.get("average_primary_generation_score_v2"), default=float("nan")),
         "avg_fact_recall": safe_float(generation.get("average_required_fact_recall")),
+        "avg_fact_recall_v2": safe_float(generation.get("average_required_fact_recall_v2"), default=float("nan")),
+        "avg_fact_support_score_v2": safe_float(generation.get("average_required_fact_support_score_v2"), default=float("nan")),
         "avg_faithfulness": safe_float(avg_faithfulness_raw),
         "exact_pass_rate": safe_float(generation.get("exact_pass_rate")),
         "grounded_fact_pass_rate": safe_float(generation.get("grounded_fact_pass_rate"), default=float("nan")),
@@ -246,6 +258,7 @@ def normalize_run_row_payload(payload: dict[str, Any], run: dict[str, Any] | Non
         "verification_alignment_rate": safe_float(generation.get("verification_alignment_rate"), default=float("nan")),
         "avg_verification_intrinsic_quality_score": safe_float(generation.get("average_verification_intrinsic_quality_score"), default=float("nan")),
         "forbidden_violation_rate": safe_float(generation.get("forbidden_fact_violation_rate")),
+        "forbidden_violation_rate_v2": safe_float(generation.get("forbidden_fact_violation_rate_v2"), default=float("nan")),
         "hallucination_rate": safe_float(generation.get("hallucination_rate")),
         "avg_latency": safe_float(primary_api.get("average")),
         "p50_latency": safe_float(primary_api.get("p50")),
@@ -269,6 +282,11 @@ def normalize_run_row_payload(payload: dict[str, Any], run: dict[str, Any] | Non
         "normalized.avg_judge_score": safe_float(normalized.get("generation.average_judge_score")),
         "normalized.avg_llm_judge_score": safe_float(normalized.get("generation.average_llm_judge_score")),
         "normalized.avg_effective_generation_score": safe_float(normalized.get("generation.average_effective_generation_score")),
+        "normalized.avg_deterministic_rubric_v2": safe_float(normalized.get("generation.average_deterministic_rubric_score_v2"), default=float("nan")),
+        "normalized.avg_effective_generation_score_v2": safe_float(normalized.get("generation.average_effective_generation_score_v2"), default=float("nan")),
+        "normalized.avg_fact_recall_v2": safe_float(normalized.get("generation.average_required_fact_recall_v2"), default=float("nan")),
+        "normalized.avg_fact_support_score_v2": safe_float(normalized.get("generation.average_required_fact_support_score_v2"), default=float("nan")),
+        "normalized.forbidden_violation_rate_v2": safe_float(normalized.get("generation.forbidden_fact_violation_rate_v2"), default=float("nan")),
         "normalized.avg_verification_alignment_score": safe_float(
             normalized.get("generation.average_verification_alignment_score"),
             default=float("nan"),
