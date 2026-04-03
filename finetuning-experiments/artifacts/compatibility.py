@@ -220,9 +220,9 @@ def normalize_run_row_payload(payload: dict[str, Any], run: dict[str, Any] | Non
     primary_api = (api.get("endpoint_summaries") or {}).get("guidance_endpoint") or api
     ingestion = payload.get("ingestion_summary") or {}
     telemetry = build_telemetry_summary(payload)
+    config_overview = build_config_overview(payload)
     source_mapping = backfill_source_mapping_summary_fields(payload.get("source_mapping_summary") or {}, config_overview.get("source_mapping") or {})
     normalized = payload.get("normalized_metrics") or {}
-    config_overview = build_config_overview(payload)
     ingestion_config = config_overview.get("ingestion") or {}
     inference_config = config_overview.get("inference") or {}
     source_mapping_config = config_overview.get("source_mapping") or {}
