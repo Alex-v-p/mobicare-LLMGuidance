@@ -11,7 +11,7 @@
       "chunk_size": 300,
       "chunk_overlap": 75
     },
-    "embedding_model": "qwen3-embedding:4b",
+    "embedding_model": "qwen3-embedding:0.6b",
     "delete_collection_first": true
   },
   "source_mapping": {
@@ -35,8 +35,8 @@
     "enable_response_verification": true,
     "enable_regeneration": true,
     "max_regeneration_attempts": 1,
-    "llm_model": "qwen2.5:3b-instruct",
-    "embedding_model": "qwen3-embedding:4b",
+    "llm_model": "qwen2.5:0.5b",
+    "embedding_model": "qwen3-embedding:0.6b",
     "prompt_engineering_label": "default",
     "pipeline_variant": "standard"
   },
