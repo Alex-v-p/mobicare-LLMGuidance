@@ -202,6 +202,7 @@ def build_case_dataframe(artifact: dict[str, Any]) -> pd.DataFrame:
                 "faithfulness": safe_float(faithfulness_raw),
                 "hallucination_rate": safe_float(hallucination_raw),
                 "exact_pass": safe_float(generation_scores.get("exact_pass")),
+                "grounded_fact_pass": safe_float(generation_scores.get("grounded_fact_pass"), default=float("nan")),
                 "verification_transport_pass": safe_float(1.0 if generation_scores.get("verification_transport_pass") is True else (0.0 if generation_scores.get("verification_transport_pass") is False else None), default=float("nan")),
                 "verification_alignment_score": safe_float(generation_scores.get("verification_alignment_score"), default=float("nan")),
                 "verification_intrinsic_quality_score": safe_float(generation_scores.get("verification_intrinsic_quality_score"), default=float("nan")),

@@ -138,6 +138,70 @@ def _verification_alignment_score(expected_band: str | None, observed_band: str 
     return max(0.0, 0.2 - penalty), "misaligned"
 
 
+def _grounded_fact_pass_fields(generation_scores: dict[str, Any]) -> tuple[bool, bool | None, str | None]:
+    deterministic_applicable = bool(
+        generation_scores.get("deterministic_rubric_applicable")
+        or (generation_scores.get("deterministic_rubric") or {}).get("applicable")
+        or (generation_scores.get("deterministic_rubric") or {}).get("enabled")
+    )
+    if not deterministic_applicable:
+        return False, None, "not_applicable"
+
+    required_total = int(generation_scores.get("required_fact_total") or 0)
+    forbidden_violations = float(generation_scores.get("forbidden_fact_violations") or 0.0)
+    required_fact_recall = generation_scores.get("required_fact_recall")
+    groundedness_score = generation_scores.get("groundedness_score")
+    context_faithfulness = generation_scores.get("faithfulness_to_retrieved_context")
+    effective_generation_score = generation_scores.get("effective_generation_score")
+    if effective_generation_score is None:
+        effective_generation_score = generation_scores.get("primary_generation_score")
+    if effective_generation_score is None:
+        effective_generation_score = generation_scores.get("deterministic_rubric_score")
+
+    try:
+        required_fact_recall = None if required_fact_recall is None else float(required_fact_recall)
+    except (TypeError, ValueError):
+        required_fact_recall = None
+    try:
+        groundedness_score = None if groundedness_score is None else float(groundedness_score)
+    except (TypeError, ValueError):
+        groundedness_score = None
+    try:
+        context_faithfulness = None if context_faithfulness is None else float(context_faithfulness)
+    except (TypeError, ValueError):
+        context_faithfulness = None
+    try:
+        effective_generation_score = None if effective_generation_score is None else float(effective_generation_score)
+    except (TypeError, ValueError):
+        effective_generation_score = None
+
+    meets_required_facts = True if required_total <= 0 else (required_fact_recall or 0.0) >= 0.6
+    meets_groundedness = True if groundedness_score is None else groundedness_score >= 0.5
+    meets_context_faithfulness = True if context_faithfulness is None else context_faithfulness >= 0.45
+    meets_effective_generation = True if effective_generation_score is None else effective_generation_score >= 0.5
+
+    passed = bool(
+        forbidden_violations <= 0
+        and meets_required_facts
+        and meets_groundedness
+        and meets_context_faithfulness
+        and meets_effective_generation
+    )
+    if passed:
+        return True, True, "passed"
+    if forbidden_violations > 0:
+        return True, False, "forbidden_fact_violation"
+    if not meets_required_facts:
+        return True, False, "insufficient_fact_recall"
+    if not meets_groundedness:
+        return True, False, "insufficient_groundedness"
+    if not meets_context_faithfulness:
+        return True, False, "insufficient_context_faithfulness"
+    if not meets_effective_generation:
+        return True, False, "insufficient_generation_score"
+    return True, False, "failed_requirements"
+
+
 def _grade_from_score(score: float) -> str:
     if score >= 0.85:
         return "excellent"
@@ -253,6 +317,11 @@ def finalize_generation_score_fields(generation_scores: dict[str, Any], verifica
     generation_scores["verification_intrinsic_quality_score"] = intrinsic_quality
     generation_scores["verification_alignment_score"] = alignment_score
     generation_scores["verification_alignment_label"] = alignment_label
+
+    grounded_fact_applicable, grounded_fact_pass, grounded_fact_reason = _grounded_fact_pass_fields(generation_scores)
+    generation_scores["grounded_fact_pass_applicable"] = grounded_fact_applicable
+    generation_scores["grounded_fact_pass"] = grounded_fact_pass
+    generation_scores["grounded_fact_pass_reason"] = grounded_fact_reason
     return generation_scores
 
 
@@ -455,5 +524,8 @@ def score_generation(
         "retrieved_context_chunk_count": len(retrieved_context),
         "exact_pass_applicable": exact_pass_applicable,
         "exact_pass": exact_pass,
+        "grounded_fact_pass_applicable": deterministic_applicable,
+        "grounded_fact_pass": None,
+        "grounded_fact_pass_reason": None,
     }
     return finalize_generation_score_fields(generation_scores, verification=verification)

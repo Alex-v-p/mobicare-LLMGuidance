@@ -45,6 +45,7 @@ def summarize_results(per_case_results: list[dict[str, Any]]) -> dict[str, Any]:
     ]
     fact_recall_items = [item for item in generation_items if item.get("fact_recall_applicable", (item.get("required_fact_total") or 0) > 0)]
     exact_pass_items = [item for item in generation_items if item.get("exact_pass_applicable", item.get("exact_pass") is not None)]
+    grounded_fact_pass_items = [item for item in generation_items if item.get("grounded_fact_pass_applicable", item.get("grounded_fact_pass") is not None)]
 
     stage_lists = [list((item.get("telemetry") or {}).get("stages") or []) for item in per_case_results]
     derived_timings = [dict((item.get("telemetry") or {}).get("derived") or {}) for item in per_case_results]
@@ -123,6 +124,7 @@ def summarize_results(per_case_results: list[dict[str, Any]]) -> dict[str, Any]:
         "observation_only_case_count": sum(1 for x in generation_items if x.get("evaluation_profile") == "observation_only"),
         "fact_recall_applicable_case_count": len(fact_recall_items),
         "exact_pass_applicable_case_count": len(exact_pass_items),
+        "grounded_fact_pass_applicable_case_count": len(grounded_fact_pass_items),
         "average_answer_similarity": _avg_defined([x.get("answer_similarity") for x in generation_items]),
         "average_answer_quality_score": _avg_defined([x.get("answer_quality_score") for x in deterministic_items]),
         "average_deterministic_rubric_score": _avg_defined([
@@ -155,6 +157,7 @@ def summarize_results(per_case_results: list[dict[str, Any]]) -> dict[str, Any]:
         "verification_alignment_applicable_case_count": sum(1 for x in generation_items if x.get("verification_alignment_score") is not None),
         "average_verification_intrinsic_quality_score": _avg_defined([x.get("verification_intrinsic_quality_score") for x in generation_items]),
         "exact_pass_rate": _avg_defined([1.0 if x.get("exact_pass") else 0.0 for x in exact_pass_items]),
+        "grounded_fact_pass_rate": _avg_defined([1.0 if x.get("grounded_fact_pass") else 0.0 for x in grounded_fact_pass_items]),
     }
     successful_total_latencies = [float(item.get("timings", {}).get("total_latency_seconds", 0.0)) for item in completed_cases]
     if derived_timings:

@@ -29,6 +29,7 @@ COMPARE_COLUMNS = [
     "avg_llm_judge_score",
     "avg_effective_generation_score",
     "exact_pass_rate",
+    "grounded_fact_pass_rate",
     "verification_pass_rate",
     "verification_alignment_rate",
     "hallucination_rate",
@@ -54,6 +55,7 @@ BENEFIT_DIRECTION = {
     "avg_llm_judge_score": 1,
     "avg_effective_generation_score": 1,
     "exact_pass_rate": 1,
+    "grounded_fact_pass_rate": 1,
     "verification_pass_rate": 1,
     "verification_alignment_rate": 1,
     "hallucination_rate": -1,
@@ -163,7 +165,7 @@ def render(df: pd.DataFrame) -> None:
     with left:
         metric_groups = {
             "Retrieval": ["hit@1", "hit@3", "mrr", "strict_hit@3", "strict_mrr", "weighted_relevance"],
-            "Generation": ["avg_deterministic_rubric", "avg_llm_judge_score", "avg_effective_generation_score", "exact_pass_rate", "hallucination_rate"],
+            "Generation": ["avg_deterministic_rubric", "avg_llm_judge_score", "avg_effective_generation_score", "exact_pass_rate", "grounded_fact_pass_rate", "hallucination_rate"],
             "Latency / reliability": ["avg_latency", "p95_latency", "queue_delay_avg", "api_failure_rate", "api_timeout_rate"],
             "Pipeline complexity": ["chunks_created"],
         }

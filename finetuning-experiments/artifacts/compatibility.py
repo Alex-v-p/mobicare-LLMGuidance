@@ -112,6 +112,8 @@ def backfill_generation_summary_fields(generation: dict[str, Any]) -> dict[str, 
     generation.setdefault("verification_alignment_rate", generation.get("verification_alignment_rate"))
     generation.setdefault("verification_alignment_applicable_case_count", generation.get("verification_alignment_applicable_case_count"))
     generation.setdefault("average_verification_intrinsic_quality_score", generation.get("average_verification_intrinsic_quality_score"))
+    generation.setdefault("grounded_fact_pass_rate", generation.get("grounded_fact_pass_rate"))
+    generation.setdefault("grounded_fact_pass_applicable_case_count", generation.get("grounded_fact_pass_applicable_case_count"))
     return generation
 
 
@@ -238,6 +240,7 @@ def normalize_run_row_payload(payload: dict[str, Any], run: dict[str, Any] | Non
         "avg_fact_recall": safe_float(generation.get("average_required_fact_recall")),
         "avg_faithfulness": safe_float(avg_faithfulness_raw),
         "exact_pass_rate": safe_float(generation.get("exact_pass_rate")),
+        "grounded_fact_pass_rate": safe_float(generation.get("grounded_fact_pass_rate"), default=float("nan")),
         "verification_pass_rate": safe_float(generation.get("verification_pass_rate")),
         "avg_verification_alignment_score": safe_float(generation.get("average_verification_alignment_score"), default=float("nan")),
         "verification_alignment_rate": safe_float(generation.get("verification_alignment_rate"), default=float("nan")),
@@ -272,6 +275,10 @@ def normalize_run_row_payload(payload: dict[str, Any], run: dict[str, Any] | Non
         ),
         "normalized.verification_alignment_rate": safe_float(
             normalized.get("generation.verification_alignment_rate"),
+            default=float("nan"),
+        ),
+        "normalized.grounded_fact_pass_rate": safe_float(
+            first_defined(normalized.get("generation.grounded_fact_pass_rate"), generation.get("grounded_fact_pass_rate")),
             default=float("nan"),
         ),
         "normalized.weighted_relevance_v2": safe_float(
