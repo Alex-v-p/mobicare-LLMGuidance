@@ -4,6 +4,18 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
+from ui.views.visuals import (
+    COMPARE_METRIC_GROUPS,
+    COMPARE_PRIORITY_METRICS,
+    DETAIL_FRAME_COLUMNS,
+    SUMMARY_FRAME_COLUMNS,
+    attach_run_labels,
+    build_delta_frames,
+    metric_label,
+    pareto_frontier,
+    score_runs,
+)
+
 
 COMPARE_COLUMNS = [
     "run_id",
@@ -21,7 +33,7 @@ COMPARE_COLUMNS = [
     "mrr",
     "strict_hit@3",
     "strict_mrr",
-    "weighted_relevance",
+    "weighted_relevance_display",
     "lenient_success_score",
     "context_diversity_score",
     "avg_answer_similarity",
@@ -41,84 +53,223 @@ COMPARE_COLUMNS = [
     "chunks_created",
 ]
 
-BENEFIT_DIRECTION = {
-    "hit@1": 1,
-    "hit@3": 1,
-    "mrr": 1,
-    "strict_hit@3": 1,
-    "strict_mrr": 1,
-    "weighted_relevance": 1,
-    "lenient_success_score": 1,
-    "context_diversity_score": 1,
-    "avg_answer_similarity": 1,
-    "avg_deterministic_rubric": 1,
-    "avg_llm_judge_score": 1,
-    "avg_effective_generation_score": 1,
-    "exact_pass_rate": 1,
-    "grounded_fact_pass_rate": 1,
-    "verification_pass_rate": 1,
-    "verification_alignment_rate": 1,
-    "hallucination_rate": -1,
-    "avg_latency": -1,
-    "p95_latency": -1,
-    "queue_delay_avg": -1,
-    "api_failure_rate": -1,
-    "api_timeout_rate": -1,
-    "chunks_created": -1,
-}
+
+def _coerce_summary_frame(summary_df: pd.DataFrame) -> pd.DataFrame:
+    if summary_df is None or summary_df.empty:
+        return pd.DataFrame(columns=SUMMARY_FRAME_COLUMNS)
+    return summary_df.reindex(columns=SUMMARY_FRAME_COLUMNS)
 
 
-def _normalize_for_heatmap(df: pd.DataFrame, metrics: list[str]) -> pd.DataFrame:
-    rows: list[dict[str, float | str]] = []
-    for metric in metrics:
-        series = pd.to_numeric(df[metric], errors="coerce")
-        if series.nunique(dropna=True) <= 1:
-            norm = pd.Series([1.0] * len(series), index=series.index)
-        else:
-            if BENEFIT_DIRECTION.get(metric, 1) < 0:
-                series = -series
-            norm = (series - series.min()) / (series.max() - series.min())
-        for idx, value in norm.items():
-            rows.append(
-                {
-                    "run_label": df.loc[idx, "run_label"],
-                    "metric": metric,
-                    "normalized_value": float(value),
-                    "raw_value": float(df.loc[idx, metric]),
-                }
-            )
-    return pd.DataFrame(rows)
+def _coerce_detail_frame(detail_df: pd.DataFrame) -> pd.DataFrame:
+    if detail_df is None or detail_df.empty:
+        return pd.DataFrame(columns=DETAIL_FRAME_COLUMNS)
+    return detail_df.reindex(columns=DETAIL_FRAME_COLUMNS)
 
 
-def _narrative(delta_df: pd.DataFrame, baseline_run_label: str) -> list[str]:
+SUMMARY_MERGE_COLUMNS = [
+    "wins_vs_baseline",
+    "losses_vs_baseline",
+    "ties_vs_baseline",
+    "net_improvement",
+    "biggest_gain",
+    "biggest_loss",
+]
+
+
+def _merge_summary_columns(compare_df: pd.DataFrame, summary_df: pd.DataFrame) -> pd.DataFrame:
+    summary_subset_columns = ["run_label", *SUMMARY_MERGE_COLUMNS]
+    summary_subset = _coerce_summary_frame(summary_df)[summary_subset_columns]
+
+    # Guard against re-merging into a frame that already contains these fields.
+    # Without dropping them first, pandas adds _x/_y suffixes and downstream column
+    # selection fails with KeyError.
+    base_compare_df = compare_df.drop(columns=[column for column in SUMMARY_MERGE_COLUMNS if column in compare_df.columns])
+    merged = base_compare_df.merge(summary_subset, on="run_label", how="left")
+
+    numeric_defaults = {
+        "wins_vs_baseline": 0,
+        "losses_vs_baseline": 0,
+        "ties_vs_baseline": 0,
+        "net_improvement": 0,
+    }
+    text_defaults = {
+        "biggest_gain": "—",
+        "biggest_loss": "—",
+    }
+    for column, default in numeric_defaults.items():
+        merged[column] = pd.to_numeric(merged.get(column), errors="coerce").fillna(default)
+    for column, default in text_defaults.items():
+        merged[column] = merged.get(column).fillna(default)
+    return merged
+
+
+def _narrative(summary_df: pd.DataFrame, detail_df: pd.DataFrame, baseline_run_label: str) -> list[str]:
     insights: list[str] = []
-    if delta_df.empty:
-        return insights
-    non_baseline = delta_df[delta_df["run_label"] != baseline_run_label].copy()
-    if non_baseline.empty:
+    if summary_df.empty or detail_df.empty:
         return insights
 
-    def best(metric: str, ascending: bool = False) -> pd.Series:
-        return non_baseline.sort_values(metric, ascending=ascending).iloc[0]
+    non_baseline_summary = summary_df[~summary_df["is_baseline"]].copy()
+    if non_baseline_summary.empty:
+        return insights
 
-    retrieval_winner = best("Δ hit@3", ascending=False)
-    generation_winner = best("Δ avg_effective_generation_score", ascending=False)
-    latency_winner = best("Δ p95_latency", ascending=True)
-    risk_winner = best("Δ api_failure_rate", ascending=True)
+    best_overall = non_baseline_summary.sort_values(["net_improvement", "composite_score"], ascending=False).iloc[0]
+    insights.append(
+        f"**Best overall challenger:** `{best_overall['run_label']}` wins on **{int(best_overall['wins_vs_baseline'])}** metrics and loses on **{int(best_overall['losses_vs_baseline'])}** vs baseline `{baseline_run_label}`."
+    )
 
-    insights.append(
-        f"**Retrieval lift:** `{retrieval_winner['run_label']}` improves hit@3 by **{retrieval_winner['Δ hit@3']:+.3f}** vs baseline."
-    )
-    insights.append(
-        f"**Generation lift:** `{generation_winner['run_label']}` changes effective generation score by **{generation_winner['Δ avg_effective_generation_score']:+.3f}**."
-    )
-    insights.append(
-        f"**Latency movement:** `{latency_winner['run_label']}` changes p95 latency by **{latency_winner['Δ p95_latency']:+.1f} ms**. Negative is better here."
-    )
-    insights.append(
-        f"**Operational risk:** `{risk_winner['run_label']}` changes failure rate by **{risk_winner['Δ api_failure_rate']:+.3f}**. Negative is better."
-    )
+    for metric in ["hit@3", "avg_effective_generation_score", "p95_latency", "api_failure_rate"]:
+        metric_rows = detail_df[(detail_df["metric"] == metric) & (~detail_df["is_baseline"])].copy()
+        if metric_rows.empty:
+            continue
+        best_row = metric_rows.sort_values("benefit_delta", ascending=False).iloc[0]
+        label = {
+            "hit@3": "Retrieval lift",
+            "avg_effective_generation_score": "Generation lift",
+            "p95_latency": "Latency movement",
+            "api_failure_rate": "Reliability movement",
+        }[metric]
+        insights.append(f"**{label}:** `{best_row['run_label']}` changes {metric_label(metric).lower()} by **{best_row['delta_display']}** vs baseline.")
     return insights
+
+
+def _render_summary_table(compare_df: pd.DataFrame, summary_df: pd.DataFrame) -> None:
+    merged = _merge_summary_columns(compare_df, summary_df)
+    columns = [
+        "label",
+        "run_id",
+        "composite_score",
+        "efficiency_score",
+        "hit@3",
+        "avg_effective_generation_score",
+        "p95_latency",
+        "wins_vs_baseline",
+        "losses_vs_baseline",
+        "net_improvement",
+        "biggest_gain",
+        "biggest_loss",
+    ]
+    for column in columns:
+        if column not in merged.columns:
+            merged[column] = "—"
+    st.dataframe(
+        merged[columns].sort_values(["net_improvement", "composite_score"], ascending=False),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+
+def _render_delta_heatmap(detail_df: pd.DataFrame, run_order: list[str]) -> None:
+    heatmap_df = detail_df.copy()
+    metric_order = [metric_label(metric) for metric in COMPARE_PRIORITY_METRICS if metric in heatmap_df["metric"].unique()]
+    base = alt.Chart(heatmap_df).encode(
+        x=alt.X("metric_label:N", sort=metric_order, title=None, axis=alt.Axis(labelAngle=-30)),
+        y=alt.Y("plot_run_label:N", sort=run_order, title=None),
+        tooltip=[
+            alt.Tooltip("plot_run_label:N", title="Run"),
+            alt.Tooltip("metric_label:N", title="Metric"),
+            alt.Tooltip("raw_display:N", title="Run value"),
+            alt.Tooltip("baseline_display:N", title="Baseline value"),
+            alt.Tooltip("delta_display:N", title="Delta"),
+            alt.Tooltip("benefit_delta:Q", title="Benefit-adjusted delta", format="+.3f"),
+        ],
+    )
+    heatmap = base.mark_rect().encode(
+        color=alt.Color(
+            "benefit_delta:Q",
+            title="Better ↔ Worse",
+            scale=alt.Scale(scheme="redblue", domainMid=0),
+        )
+    )
+    text = base.mark_text(fontSize=11).encode(
+        text="delta_display:N",
+        color=alt.condition(alt.datum.benefit_delta > 0.05, alt.value("white"), alt.value("#d1d5db")),
+    )
+    st.altair_chart((heatmap + text).properties(title="Metric-by-metric delta vs baseline"), use_container_width=True)
+
+
+def _render_delta_strip(detail_df: pd.DataFrame) -> None:
+    group_name = st.selectbox("Delta view", list(COMPARE_METRIC_GROUPS.keys()), key="compare_metric_group")
+    metric_group = [metric for metric in COMPARE_METRIC_GROUPS[group_name] if metric in detail_df["metric"].unique()]
+    subset = detail_df[(detail_df["metric"].isin(metric_group)) & (~detail_df["is_baseline"])].copy()
+    if subset.empty:
+        st.info("There are no non-baseline deltas to plot for this metric group.")
+        return
+
+    metric_order = [metric_label(metric) for metric in metric_group]
+    zero_rule = alt.Chart(pd.DataFrame({"x": [0]})).mark_rule(strokeDash=[5, 5], opacity=0.45).encode(x="x:Q")
+    points = alt.Chart(subset).mark_circle(size=130).encode(
+        x=alt.X("benefit_delta:Q", title="Improvement vs baseline (benefit-adjusted)", axis=alt.Axis(format="+.3f")),
+        y=alt.Y("metric_label:N", sort=metric_order, title=None),
+        color=alt.Color("plot_run_label:N", title="Run"),
+        tooltip=[
+            alt.Tooltip("plot_run_label:N", title="Run"),
+            alt.Tooltip("metric_label:N", title="Metric"),
+            alt.Tooltip("delta_display:N", title="Raw delta"),
+            alt.Tooltip("benefit_delta:Q", title="Benefit-adjusted delta", format="+.3f"),
+        ],
+    )
+    st.altair_chart((zero_rule + points).properties(title=f"{group_name} deltas"), use_container_width=True)
+
+
+def _render_net_improvement(summary_df: pd.DataFrame) -> None:
+    subset = summary_df[~summary_df["is_baseline"]].copy()
+    if subset.empty:
+        st.info("Add more than one run to compare improvements vs baseline.")
+        return
+
+    chart = alt.Chart(subset).mark_bar().encode(
+        y=alt.Y("plot_run_label:N", sort="-x", title=None),
+        x=alt.X("net_improvement:Q", title="Net improvement count"),
+        color=alt.condition(alt.datum.net_improvement >= 0, alt.value("#2563eb"), alt.value("#dc2626")),
+        tooltip=[
+            alt.Tooltip("plot_run_label:N", title="Run"),
+            alt.Tooltip("wins_vs_baseline:Q", title="Wins"),
+            alt.Tooltip("losses_vs_baseline:Q", title="Losses"),
+            alt.Tooltip("ties_vs_baseline:Q", title="Ties"),
+            alt.Tooltip("net_improvement:Q", title="Net improvement"),
+            alt.Tooltip("biggest_gain:N", title="Biggest gain"),
+            alt.Tooltip("biggest_loss:N", title="Biggest loss"),
+        ],
+    ).properties(title="How often each run beats the baseline")
+    st.altair_chart(chart, use_container_width=True)
+
+
+def _render_tradeoff(compare_df: pd.DataFrame, baseline_label: str) -> None:
+    frontier = pareto_frontier(compare_df, "p95_latency", "avg_effective_generation_score")
+    baseline_df = compare_df[compare_df["run_label"] == baseline_label]
+
+    base = alt.Chart(compare_df)
+    scatter = base.mark_circle(opacity=0.9).encode(
+        x=alt.X("p95_latency:Q", title="p95 latency (ms)", scale=alt.Scale(zero=False)),
+        y=alt.Y("avg_effective_generation_score:Q", title="Effective generation", scale=alt.Scale(domain=[0, 1])),
+        size=alt.Size("hit@3:Q", title="Hit@3", scale=alt.Scale(range=[180, 900])),
+        color=alt.Color("net_improvement:Q", title="Net improvement", scale=alt.Scale(scheme="redblue", domainMid=0)),
+        tooltip=[
+            alt.Tooltip("label:N", title="Label"),
+            alt.Tooltip("run_id:N", title="Run ID"),
+            alt.Tooltip("hit@3:Q", title="Hit@3", format=".3f"),
+            alt.Tooltip("avg_effective_generation_score:Q", title="Generation", format=".3f"),
+            alt.Tooltip("p95_latency:Q", title="p95 latency", format=".1f"),
+            alt.Tooltip("wins_vs_baseline:Q", title="Wins"),
+            alt.Tooltip("losses_vs_baseline:Q", title="Losses"),
+            alt.Tooltip("net_improvement:Q", title="Net"),
+        ],
+    )
+    labels = alt.Chart(compare_df).mark_text(align="left", dx=8, dy=-8).encode(
+        x="p95_latency:Q",
+        y="avg_effective_generation_score:Q",
+        text="short_run_label:N",
+    )
+    frontier_chart = alt.Chart(frontier).mark_line(point=True, strokeDash=[6, 4], opacity=0.8).encode(
+        x="p95_latency:Q",
+        y="avg_effective_generation_score:Q",
+    )
+    baseline_ring = alt.Chart(baseline_df).mark_circle(size=520, filled=False, strokeWidth=2.5).encode(
+        x="p95_latency:Q",
+        y="avg_effective_generation_score:Q",
+    )
+    st.altair_chart((scatter + frontier_chart + labels + baseline_ring).properties(title="Trade-off map for selected runs").interactive(), use_container_width=True)
+    st.caption("Bubble size reflects hit@3. Color shows how many metrics each run improves vs the chosen baseline. The outlined point is the baseline.")
 
 
 def render(df: pd.DataFrame) -> None:
@@ -127,110 +278,52 @@ def render(df: pd.DataFrame) -> None:
         st.info("Select at least one run.")
         return
 
-    compare_df = df[COMPARE_COLUMNS].copy()
-    compare_df["run_label"] = compare_df["label"].fillna("") + " | " + compare_df["run_id"].fillna("")
-    st.dataframe(compare_df.drop(columns=["run_label"]), use_container_width=True, hide_index=True)
+    compare_df = df[[column for column in COMPARE_COLUMNS if column in df.columns]].copy()
+    compare_df = score_runs(compare_df)
+    compare_df = attach_run_labels(compare_df)
 
     baseline_label = st.selectbox("Baseline run", compare_df["run_label"].tolist(), index=0)
-    baseline = compare_df.loc[compare_df["run_label"] == baseline_label].iloc[0]
+    summary_df, detail_df = build_delta_frames(compare_df, baseline_label, COMPARE_PRIORITY_METRICS)
+    summary_df = _coerce_summary_frame(summary_df)
+    detail_df = _coerce_detail_frame(detail_df)
+    compare_df = _merge_summary_columns(compare_df, summary_df)
 
-    numeric_cols = list(BENEFIT_DIRECTION.keys())
-    delta_rows = []
-    for _, row in compare_df.iterrows():
-        delta = {"run_id": row["run_id"], "label": row["label"], "run_label": row["run_label"]}
-        wins = 0
-        losses = 0
-        for col in numeric_cols:
-            delta_value = float(row[col]) - float(baseline[col])
-            delta[f"Δ {col}"] = delta_value
-            if row["run_label"] != baseline_label:
-                adjusted = delta_value * BENEFIT_DIRECTION[col]
-                if adjusted > 0:
-                    wins += 1
-                elif adjusted < 0:
-                    losses += 1
-        delta["wins_vs_baseline"] = wins
-        delta["losses_vs_baseline"] = losses
-        delta_rows.append(delta)
-    delta_df = pd.DataFrame(delta_rows)
+    st.markdown("### Comparison summary")
+    _render_summary_table(compare_df, summary_df)
 
-    st.markdown("### Change vs baseline")
-    st.dataframe(delta_df.drop(columns=["run_label"]), use_container_width=True, hide_index=True)
+    if detail_df.empty:
+        st.info("No comparable metrics were found for the selected runs yet, so baseline deltas are unavailable for this selection.")
+        st.markdown("### Trade-off map")
+        _render_tradeoff(compare_df, baseline_label)
+        return
 
     st.markdown("### What changed")
-    for line in _narrative(delta_df, baseline_label):
-        st.markdown(f"- {line}")
+    narrative_lines = _narrative(summary_df, detail_df, baseline_label)
+    if narrative_lines:
+        for line in narrative_lines:
+            st.markdown(f"- {line}")
+    else:
+        st.caption("There is not enough comparable data yet to generate a narrative summary.")
 
-    left, right = st.columns([1.1, 0.9])
+    left, right = st.columns([1.15, 0.85])
     with left:
-        metric_groups = {
-            "Retrieval": ["hit@1", "hit@3", "mrr", "strict_hit@3", "strict_mrr", "weighted_relevance"],
-            "Generation": ["avg_deterministic_rubric", "avg_llm_judge_score", "avg_effective_generation_score", "exact_pass_rate", "grounded_fact_pass_rate", "hallucination_rate"],
-            "Latency / reliability": ["avg_latency", "p95_latency", "queue_delay_avg", "api_failure_rate", "api_timeout_rate"],
-            "Pipeline complexity": ["chunks_created"],
-        }
-        group_name = st.selectbox("Metric group", list(metric_groups.keys()))
-        melted = compare_df.melt(
-            id_vars=["run_label"],
-            value_vars=metric_groups[group_name],
-            var_name="metric",
-            value_name="value",
-        )
-        chart = (
-            alt.Chart(melted)
-            .mark_bar()
-            .encode(
-                x=alt.X("run_label:N", title="Run"),
-                y=alt.Y("value:Q", title="Value"),
-                color="metric:N",
-                xOffset="metric:N",
-                tooltip=["run_label", "metric", "value"],
-            )
-            .properties(title=f"{group_name} metrics")
-            .interactive()
-        )
-        st.altair_chart(chart, use_container_width=True)
-
+        _render_delta_strip(detail_df)
     with right:
-        diagnostic_cols = ["hit@3", "mrr", "avg_deterministic_rubric", "avg_llm_judge_score", "avg_effective_generation_score", "p95_latency", "api_failure_rate"]
-        heatmap_df = _normalize_for_heatmap(compare_df, diagnostic_cols)
-        heatmap = (
-            alt.Chart(heatmap_df)
-            .mark_rect()
-            .encode(
-                x=alt.X("metric:N", title="Metric"),
-                y=alt.Y("run_label:N", title="Run"),
-                color=alt.Color("normalized_value:Q", title="Relative strength"),
-                tooltip=["run_label", "metric", "raw_value", "normalized_value"],
-            )
-            .properties(title="Relative strength heatmap")
-        )
-        st.altair_chart(heatmap, use_container_width=True)
+        _render_net_improvement(summary_df)
+
+    st.markdown("### Delta heatmap")
+    run_order = summary_df.sort_values(["is_baseline", "net_improvement", "composite_score"], ascending=[False, False, False])["plot_run_label"].tolist()
+    if not run_order:
+        run_order = compare_df.sort_values(["composite_score", "efficiency_score"], ascending=False)["plot_run_label"].tolist()
+    _render_delta_heatmap(detail_df, run_order)
 
     st.markdown("### Trade-off map")
-    tradeoff = (
-        alt.Chart(compare_df)
-        .mark_circle(size=170)
-        .encode(
-            x=alt.X("p95_latency:Q", title="p95 latency (ms)"),
-            y=alt.Y("avg_effective_generation_score:Q", title="Generation score"),
-            color=alt.Color("hit@3:Q", title="hit@3"),
-            shape=alt.Shape("retrieval_mode:N", title="Retrieval mode"),
-            tooltip=[
-                "run_label",
-                "chunking_strategy",
-                "retrieval_mode",
-                "llm_model",
-                "prompt_label",
-                "hit@3",
-                "mrr",
-                "avg_deterministic_rubric",
-                "avg_llm_judge_score",
-                "avg_effective_generation_score",
-                "p95_latency",
-                "api_failure_rate",
-            ],
+    _render_tradeoff(compare_df, baseline_label)
+
+    with st.expander("Raw metric deltas"):
+        wide_delta = (
+            detail_df.pivot(index="plot_run_label", columns="metric_label", values="delta_display")
+            .reset_index()
+            .rename(columns={"plot_run_label": "run"})
         )
-        .interactive()
-    )
-    st.altair_chart(tradeoff, use_container_width=True)
+        st.dataframe(wide_delta, use_container_width=True, hide_index=True)
