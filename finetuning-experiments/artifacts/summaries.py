@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from artifacts.compatibility import build_config_overview, build_telemetry_summary
 from artifacts.models import CURRENT_ARTIFACT_VERSION, RunSummaryArtifact
 from utils.json import write_json
 
@@ -23,15 +24,7 @@ def build_run_summary(payload: dict[str, Any]) -> dict[str, Any]:
         notes=payload.get("notes", ""),
         change_note=payload.get("change_note", ""),
         case_count=len(payload.get("per_case_results") or []),
-        config_overview={
-            "ingestion": (config.get("ingestion") or {}),
-            "inference": (config.get("inference") or {}),
-            "source_mapping": (config.get("source_mapping") or {}),
-            "execution": {
-                "api_test": ((config.get("execution") or {}).get("api_test") or {}),
-                "environment": ((config.get("execution") or {}).get("environment") or {}),
-            },
-        },
+        config_overview=build_config_overview(payload),
         cache={
             "run_fingerprint": (payload.get("cache") or {}).get("run_fingerprint"),
             "ingestion_fingerprint": (payload.get("cache") or {}).get("ingestion_fingerprint"),
@@ -65,14 +58,7 @@ def build_run_summary(payload: dict[str, Any]) -> dict[str, Any]:
             "case_count": len((payload.get("source_mapping_summary") or {}).get("case_chunk_assignments") or []),
             "label_totals": (payload.get("source_mapping_summary") or {}).get("label_totals") or {},
         },
-        telemetry_summary={
-            "success_only": primary_api.get("success_only") or {},
-            "queue_delay": primary_api.get("queue_delay") or {},
-            "execution_duration": primary_api.get("execution_duration") or {},
-            "stage_latency_summary": primary_api.get("stage_latency_summary") or {},
-            "endpoint_summaries": api_summary.get("endpoint_summaries") or {},
-            "failure_taxonomy": api_summary.get("failure_taxonomy") or {},
-        },
+        telemetry_summary=build_telemetry_summary(payload),
     )
     return summary.to_dict()
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
+from artifacts.compatibility import build_config_overview, build_telemetry_summary
 from artifacts.models import CURRENT_ARTIFACT_VERSION
 from artifacts.summaries import build_run_summary
 
@@ -23,9 +24,16 @@ def migrate_run_artifact(payload: dict[str, Any]) -> dict[str, Any]:
     artifact.setdefault("api_summary", {})
     artifact.setdefault("normalized_metrics", {})
     artifact.setdefault("per_case_results", [])
+    artifact.setdefault("config_overview", build_config_overview(artifact))
+    artifact.setdefault("telemetry_summary", build_telemetry_summary(artifact))
+    artifact.setdefault("case_count", len(artifact.get("per_case_results") or []))
     for case in artifact["per_case_results"]:
         if isinstance(case, dict):
             case.setdefault("endpoint_envelope", {})
+            case.setdefault("retrieval_scores", {})
+            case.setdefault("generation_scores", {})
+            case.setdefault("timings", {})
+            case.setdefault("telemetry", {})
     artifact["cache"].setdefault("run_fingerprint", None)
     artifact["cache"].setdefault("ingestion_fingerprint", None)
     artifact["cache"].setdefault("ingestion_cache", {})
@@ -45,7 +53,8 @@ def migrate_summary_artifact(payload: dict[str, Any]) -> dict[str, Any]:
     summary.setdefault("artifact_version", CURRENT_ARTIFACT_VERSION)
     summary.setdefault("api_summary", {})
     summary.setdefault("environment", {})
-    summary.setdefault("telemetry_summary", {})
+    summary.setdefault("telemetry_summary", build_telemetry_summary(summary))
+    summary.setdefault("config_overview", build_config_overview(summary))
     summary["artifact_version"] = CURRENT_ARTIFACT_VERSION
     return summary
 
