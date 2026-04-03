@@ -4,6 +4,7 @@ from statistics import mean
 from typing import Any
 
 from .latency import summarize_latencies, summarize_stage_latencies
+from artifacts.compatibility import first_defined
 
 
 def _avg(items: list[float]) -> float:
@@ -135,6 +136,11 @@ def summarize_results(per_case_results: list[dict[str, Any]]) -> dict[str, Any]:
         ]),
         "average_judge_score": _avg_defined([x.get("judge_score") for x in generation_items]),
         "average_llm_judge_score": _avg_defined([x.get("llm_judge_score", (x.get("llm_judge") or {}).get("score")) for x in generation_items]),
+        "average_llm_judge_score_when_available": _avg_defined([
+            x.get("llm_judge_score", (x.get("llm_judge") or {}).get("score"))
+            for x in generation_items
+            if x.get("llm_judge_available") or x.get("llm_judge_requested")
+        ]),
         "average_effective_generation_score": _avg_defined([x.get("effective_generation_score") for x in generation_items]),
         "average_primary_generation_score": _avg_defined([x.get("primary_generation_score") for x in generation_items]),
         "average_deterministic_rubric_score_v2": (
@@ -150,8 +156,12 @@ def summarize_results(per_case_results: list[dict[str, Any]]) -> dict[str, Any]:
             if any(x.get("primary_generation_score_v2") is not None for x in generation_items) else None
         ),
         "average_reference_token_f1": _avg_defined([x.get("reference_token_f1") for x in generation_items]),
-        "llm_judge_enabled_rate": _avg([1.0 if (x.get("llm_judge") or {}).get("enabled") else 0.0 for x in generation_items]),
-        "llm_judge_error_rate": _avg([1.0 if str((x.get("llm_judge") or {}).get("error") or "").strip() else 0.0 for x in generation_items]),
+        "llm_judge_requested_case_count": sum(1 for x in generation_items if x.get("llm_judge_requested") or (x.get("llm_judge") or {}).get("enabled")),
+        "llm_judge_available_case_count": sum(1 for x in generation_items if x.get("llm_judge_available") is True),
+        "llm_judge_enabled_rate": _avg([1.0 if (x.get("llm_judge_requested") or (x.get("llm_judge") or {}).get("enabled")) else 0.0 for x in generation_items]),
+        "llm_judge_available_rate": _avg([1.0 if x.get("llm_judge_available") is True else 0.0 for x in generation_items]),
+        "llm_judge_error_rate": _avg([1.0 if str(first_defined(x.get("llm_judge_error"), (x.get("llm_judge") or {}).get("error")) or "").strip() else 0.0 for x in generation_items]),
+        "llm_judge_primary_opt_in_rate": _avg([1.0 if x.get("llm_judge_use_as_primary") else 0.0 for x in generation_items]),
         "average_required_fact_recall": _avg_defined([x.get("required_fact_recall") for x in fact_recall_items]),
         "average_required_fact_recall_v2": (
             _avg_defined([x.get("required_fact_recall_v2") for x in fact_recall_v2_items])

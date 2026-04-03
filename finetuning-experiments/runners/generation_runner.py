@@ -39,6 +39,9 @@ def run_generation_stage(
     generation_scores = score_generation(case.to_dict(), generated_answer, retrieved_chunks, normalized.get("verification"), rubric_config)
 
     llm_judge_config = getattr(evaluation_config, "llm_judge", None) if evaluation_config is not None else None
+    generation_scores["llm_judge_requested"] = bool(llm_judge_config is not None and getattr(llm_judge_config, "enabled", False))
+    generation_scores["llm_judge_use_as_primary"] = bool(llm_judge_config is not None and getattr(llm_judge_config, "use_as_primary", False))
+    generation_scores["llm_judge_profile"] = getattr(llm_judge_config, "judge_profile", None) if llm_judge_config is not None else None
     if llm_judge_config is not None and getattr(llm_judge_config, "enabled", False):
         payload = {
             "question": case.question,
@@ -51,8 +54,10 @@ def run_generation_stage(
             ) if getattr(llm_judge_config, "include_retrieved_context", True) else "",
             "generated_answer": generated_answer,
             "deterministic_rubric": generation_scores.get("deterministic_rubric") or {},
+            "deterministic_rubric_v2": generation_scores.get("deterministic_rubric_v2") or {},
             "verification": normalized.get("verification") or {},
             "evaluation_profile": generation_scores.get("evaluation_profile"),
+            "judge_profile": getattr(llm_judge_config, "judge_profile", "legacy_v1"),
         }
         try:
             generation_scores["llm_judge"] = evaluate_llm_judge(llm_judge_config, payload)
@@ -62,6 +67,7 @@ def run_generation_stage(
             if getattr(llm_judge_config, "fail_open", True):
                 generation_scores["llm_judge"] = {
                     "enabled": True,
+                    "available": False,
                     "error": str(exc),
                     "score": None,
                     "overall_grade": None,
@@ -70,6 +76,8 @@ def run_generation_stage(
                     "weaknesses": [],
                     "reasoning_summary": "",
                     "model": getattr(llm_judge_config, "model", None),
+                    "provider": getattr(llm_judge_config, "provider", "ollama"),
+                    "judge_profile": getattr(llm_judge_config, "judge_profile", "legacy_v1"),
                     "raw_response": "",
                 }
                 generation_scores["llm_judge_score"] = None

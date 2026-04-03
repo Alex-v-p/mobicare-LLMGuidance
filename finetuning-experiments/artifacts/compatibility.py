@@ -106,6 +106,7 @@ def backfill_generation_summary_fields(generation: dict[str, Any]) -> dict[str, 
     generation.setdefault("average_deterministic_rubric_score", deterministic)
     generation.setdefault("average_judge_score", deterministic)
     generation.setdefault("average_llm_judge_score", llm)
+    generation.setdefault("average_llm_judge_score_when_available", generation.get("average_llm_judge_score_when_available", llm))
     generation.setdefault("average_effective_generation_score", effective)
     generation.setdefault("average_primary_generation_score", effective)
     generation.setdefault("average_deterministic_rubric_score_v2", generation.get("average_deterministic_rubric_score_v2"))
@@ -121,6 +122,16 @@ def backfill_generation_summary_fields(generation: dict[str, Any]) -> dict[str, 
     generation.setdefault("average_verification_intrinsic_quality_score", generation.get("average_verification_intrinsic_quality_score"))
     generation.setdefault("grounded_fact_pass_rate", generation.get("grounded_fact_pass_rate"))
     generation.setdefault("grounded_fact_pass_applicable_case_count", generation.get("grounded_fact_pass_applicable_case_count"))
+    enabled_rate = generation.get("llm_judge_enabled_rate")
+    if enabled_rate in (None, 0, 0.0) and llm not in (None,):
+        generation["llm_judge_enabled_rate"] = 1.0 if safe_int(generation.get("case_count")) > 0 else 0.0
+    else:
+        generation.setdefault("llm_judge_enabled_rate", enabled_rate if enabled_rate is not None else 0.0)
+    generation.setdefault("llm_judge_available_rate", generation.get("llm_judge_available_rate", generation.get("llm_judge_enabled_rate")))
+    generation.setdefault("llm_judge_requested_case_count", generation.get("llm_judge_requested_case_count"))
+    generation.setdefault("llm_judge_available_case_count", generation.get("llm_judge_available_case_count"))
+    generation.setdefault("llm_judge_primary_opt_in_rate", generation.get("llm_judge_primary_opt_in_rate", 0.0))
+    generation.setdefault("llm_judge_error_rate", generation.get("llm_judge_error_rate", 0.0))
     return generation
 
 
@@ -148,11 +159,16 @@ def build_config_overview(payload: dict[str, Any]) -> dict[str, Any]:
     source_mapping.setdefault("llm_labeling_profile", "heuristic_v1")
     source_mapping.setdefault("max_sequence_length", 3)
     source_mapping.setdefault("semantic_fallback_max_matches", 1)
+    evaluation = dict(config.get("evaluation") or {})
+    llm_judge = dict(evaluation.get("llm_judge") or {})
+    llm_judge.setdefault("judge_profile", "legacy_v1")
+    llm_judge.setdefault("use_as_primary", False)
+    evaluation["llm_judge"] = llm_judge
     return {
         "ingestion": dict(config.get("ingestion") or {}),
         "inference": dict(config.get("inference") or {}),
         "source_mapping": source_mapping,
-        "evaluation": dict(config.get("evaluation") or {}),
+        "evaluation": evaluation,
         "execution": {
             "api_test": dict(execution.get("api_test") or {}),
             "environment": dict(execution.get("environment") or {}),
@@ -265,6 +281,9 @@ def normalize_run_row_payload(payload: dict[str, Any], run: dict[str, Any] | Non
         "avg_deterministic_rubric": safe_float(avg_deterministic_raw),
         "avg_judge_score": safe_float(generation.get("average_judge_score")),
         "avg_llm_judge_score": safe_float(avg_llm_raw),
+        "avg_llm_judge_score_when_available": safe_float(generation.get("average_llm_judge_score_when_available"), default=float("nan")),
+        "llm_judge_enabled_rate": safe_float(generation.get("llm_judge_enabled_rate"), default=float("nan")),
+        "llm_judge_available_rate": safe_float(generation.get("llm_judge_available_rate"), default=float("nan")),
         "avg_effective_generation_score": safe_float(avg_effective_raw),
         "avg_primary_generation_score": safe_float(generation.get("average_primary_generation_score")),
         "avg_deterministic_rubric_v2": safe_float(generation.get("average_deterministic_rubric_score_v2"), default=float("nan")),
@@ -304,6 +323,9 @@ def normalize_run_row_payload(payload: dict[str, Any], run: dict[str, Any] | Non
         "normalized.avg_deterministic_rubric": safe_float(normalized.get("generation.average_deterministic_rubric_score")),
         "normalized.avg_judge_score": safe_float(normalized.get("generation.average_judge_score")),
         "normalized.avg_llm_judge_score": safe_float(normalized.get("generation.average_llm_judge_score")),
+        "normalized.avg_llm_judge_score_when_available": safe_float(normalized.get("generation.average_llm_judge_score_when_available"), default=float("nan")),
+        "normalized.llm_judge_enabled_rate": safe_float(normalized.get("generation.llm_judge_enabled_rate"), default=float("nan")),
+        "normalized.llm_judge_available_rate": safe_float(normalized.get("generation.llm_judge_available_rate"), default=float("nan")),
         "normalized.avg_effective_generation_score": safe_float(normalized.get("generation.average_effective_generation_score")),
         "normalized.avg_deterministic_rubric_v2": safe_float(normalized.get("generation.average_deterministic_rubric_score_v2"), default=float("nan")),
         "normalized.avg_effective_generation_score_v2": safe_float(normalized.get("generation.average_effective_generation_score_v2"), default=float("nan")),

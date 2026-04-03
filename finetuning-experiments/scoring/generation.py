@@ -26,6 +26,14 @@ def _fact_hit(answer_norm: str, fact: str) -> bool:
     return bool(fact_norm and fact_norm in answer_norm)
 
 
+
+
+def _first_defined(*values: Any) -> Any:
+    for value in values:
+        if value is not None:
+            return value
+    return None
+
 def _coverage(tokens: list[str], haystack: set[str]) -> float:
     unique = set(tokens)
     return len(unique & haystack) / len(unique) if unique else 0.0
@@ -440,8 +448,13 @@ def _resolve_effective_generation_fields(generation_scores: dict[str, Any]) -> t
     effective_grade = generation_scores.get("effective_generation_grade")
     effective_source = generation_scores.get("effective_generation_score_source")
 
+    llm_primary_opt_in = bool(generation_scores.get("llm_judge_use_as_primary"))
     if effective_score is None:
-        if evaluation_profile == "observation_only" and llm_score is not None:
+        if llm_primary_opt_in and llm_score is not None:
+            effective_score = llm_score
+            effective_grade = llm_grade
+            effective_source = "llm_judge"
+        elif evaluation_profile == "observation_only" and llm_score is not None:
             effective_score = llm_score
             effective_grade = llm_grade
             effective_source = "llm_judge"
@@ -481,6 +494,23 @@ def finalize_generation_score_fields(generation_scores: dict[str, Any], verifica
     generation_scores.setdefault("fact_scoring_version", generation_scores.get("fact_scoring_version"))
     generation_scores["llm_judge_score"] = llm_score
     generation_scores["llm_judge_grade"] = llm_grade
+    llm_judge_payload = generation_scores.get("llm_judge") or {}
+    llm_available = generation_scores.get("llm_judge_available")
+    if llm_available is None:
+        llm_available = bool(
+            generation_scores.get("llm_judge_requested") and (
+                llm_score is not None or bool(llm_judge_payload) or not str(llm_judge_payload.get("error") or "").strip()
+            )
+        )
+        if str(llm_judge_payload.get("error") or "").strip():
+            llm_available = False
+        if llm_judge_payload.get("available") is False:
+            llm_available = False
+    generation_scores["llm_judge_available"] = llm_available
+    generation_scores["llm_judge_error"] = _first_defined(generation_scores.get("llm_judge_error"), llm_judge_payload.get("error"))
+    generation_scores["llm_judge_profile"] = _first_defined(generation_scores.get("llm_judge_profile"), llm_judge_payload.get("judge_profile"))
+    generation_scores["llm_judge_enabled"] = bool(generation_scores.get("llm_judge_requested") or llm_judge_payload.get("enabled"))
+    generation_scores["llm_judge_use_as_primary"] = bool(generation_scores.get("llm_judge_use_as_primary"))
     generation_scores["effective_generation_score"] = effective_score
     generation_scores["effective_generation_grade"] = effective_grade
     generation_scores["effective_generation_score_source"] = effective_source

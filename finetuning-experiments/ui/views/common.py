@@ -195,6 +195,8 @@ def build_case_dataframe(artifact: dict[str, Any]) -> pd.DataFrame:
                 "deterministic_rubric_score": safe_float(deterministic_score_raw),
                 "judge_score": safe_float(first_defined(generation_scores.get("judge_score"), deterministic_score_raw)),
                 "llm_judge_score": safe_float(llm_score_raw),
+                "llm_judge_available": safe_float(1.0 if generation_scores.get("llm_judge_available") is True else (0.0 if generation_scores.get("llm_judge_available") is False else None), default=float("nan")),
+                "llm_judge_requested": safe_float(1.0 if generation_scores.get("llm_judge_requested") is True else (0.0 if generation_scores.get("llm_judge_requested") is False else None), default=float("nan")),
                 "effective_generation_score": safe_float(effective_generation_score_raw),
                 "primary_generation_score": safe_float(first_defined(generation_scores.get("primary_generation_score"), effective_generation_score_raw)),
                 "deterministic_rubric_score_v2": safe_float(generation_scores.get("deterministic_rubric_score_v2"), default=float("nan")),
